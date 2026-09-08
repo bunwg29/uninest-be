@@ -9,7 +9,9 @@ import {
   User,
 } from '../../../modules/users/entities';
 import { RefreshToken, OtpCode } from '../../../modules/auth/entities';
+import { Province, Ward } from '../../../modules/locations/entities';
 import { seedRbac } from './rbac.seeder';
+import { seedLocations } from './locations.seeder';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -22,6 +24,11 @@ const SEEDERS: Record<
     description:
       'Nạp vai trò (0: Student, 1: Landlord, 2: Admin) và bảng permissions',
     fn: seedRbac,
+  },
+  locations: {
+    name: 'Locations Seeder',
+    description: 'Nạp 34 tỉnh/thành phố và 3.321 phường/xã từ dataset VN units',
+    fn: seedLocations,
   },
 };
 
@@ -61,7 +68,16 @@ async function run() {
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE || 'uninest',
-    entities: [Role, Permission, RolePermission, User, RefreshToken, OtpCode],
+    entities: [
+      Role,
+      Permission,
+      RolePermission,
+      User,
+      RefreshToken,
+      OtpCode,
+      Province,
+      Ward,
+    ],
     synchronize: isSync,
     namingStrategy: new SnakeNamingStrategy(),
   });

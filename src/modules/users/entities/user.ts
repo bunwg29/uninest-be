@@ -12,6 +12,7 @@ import {
 import { UserRoleType } from '@common/constants';
 import { Role } from './role';
 import type { RefreshToken } from '../../auth/entities/refresh-token';
+import type { Province, Ward } from '../../locations/entities';
 
 @Entity('users')
 export class User {
@@ -65,6 +66,46 @@ export class User {
 
   @UpdateDateColumn({ type: 'timestamptz', name: 'updated_at' })
   updatedAt!: Date;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    name: 'province_code',
+  })
+  provinceCode!: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    name: 'ward_code',
+  })
+  wardCode!: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    name: 'street_address',
+  })
+  streetAddress!: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+    name: 'full_address',
+  })
+  fullAddress!: string | null;
+
+  @ManyToOne('Province', { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'province_code' })
+  province?: Province;
+
+  @ManyToOne('Ward', { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'ward_code' })
+  ward?: Ward;
 
   @ManyToOne(() => Role, (role) => role.users)
   @JoinColumn({ name: 'role_id' })

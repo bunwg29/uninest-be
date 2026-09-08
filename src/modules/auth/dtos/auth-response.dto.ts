@@ -32,6 +32,20 @@ export class AuthUserDto {
   @ApiProperty({ example: true })
   isActive!: boolean;
 
+  @ApiPropertyOptional({ example: '79' })
+  provinceCode?: string | null;
+
+  @ApiPropertyOptional({ example: '26734' })
+  wardCode?: string | null;
+
+  @ApiPropertyOptional({ example: 'Số 123 Đường Nguyễn Huệ' })
+  streetAddress?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'Số 123 Đường Nguyễn Huệ, Phường Bến Nghé, Thành phố Hồ Chí Minh',
+  })
+  fullAddress?: string | null;
+
   @ApiProperty({
     example: ['listings:read', 'bookings:create', 'users:me'],
     type: [String],

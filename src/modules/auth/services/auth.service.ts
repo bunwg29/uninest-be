@@ -24,6 +24,7 @@ import {
 import { OtpType } from '../entities/otp-code';
 import { UserRoleType, ROLE_CODES, ROLE_NAMES } from '@common/constants';
 import { User } from '../../users/entities/user';
+import { LocationsService } from '../../locations/locations.service';
 
 @Injectable()
 export class AuthService {
@@ -31,6 +32,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly otpService: OtpService,
     private readonly tokenService: TokenService,
+    private readonly locationsService: LocationsService,
   ) {}
 
   private mapToAuthUserDto(user: User, permissions: string[]): AuthUserDto {
@@ -48,6 +50,10 @@ export class AuthService {
       roleName: roleName,
       isVerified: user.isVerified,
       isActive: user.isActive,
+      provinceCode: user.provinceCode,
+      wardCode: user.wardCode,
+      streetAddress: user.streetAddress,
+      fullAddress: user.fullAddress,
       permissions,
     };
   }
@@ -83,6 +89,22 @@ export class AuthService {
       }
     }
 
+    let fullAddress: string | null = null;
+
+    if (dto.provinceCode && dto.wardCode) {
+      try {
+        fullAddress = await this.locationsService.formatFullAddress(
+          dto.provinceCode,
+          dto.wardCode,
+          dto.streetAddress,
+        );
+      } catch {
+        fullAddress = dto.streetAddress?.trim() || null;
+      }
+    } else if (dto.streetAddress) {
+      fullAddress = dto.streetAddress.trim();
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const identifier = dto.phone || dto.email!;
 
@@ -94,6 +116,10 @@ export class AuthService {
       roleId: dto.roleId,
       isActive: true,
       isVerified: false,
+      provinceCode: dto.provinceCode || null,
+      wardCode: dto.wardCode || null,
+      streetAddress: dto.streetAddress?.trim() || null,
+      fullAddress,
     });
 
     await this.otpService.sendOtp(identifier, OtpType.REGISTER);

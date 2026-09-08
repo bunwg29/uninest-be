@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersModule } from '../users/users.module';
+import { LocationsModule } from '../locations/locations.module';
 import { RefreshToken, OtpCode } from './entities';
 import { AuthService, OtpService, TokenService } from './services';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -26,6 +27,7 @@ import { AuthController } from './auth.controller';
       }),
     }),
     UsersModule,
+    LocationsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, OtpService, TokenService, JwtStrategy],

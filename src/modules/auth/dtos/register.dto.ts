@@ -79,4 +79,31 @@ export class RegisterDto {
   @IsString()
   @MaxLength(100)
   deviceId?: string;
+
+  @ApiPropertyOptional({
+    example: '79',
+    description: 'Mã tỉnh/thành phố',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({
+    example: '26734',
+    description: 'Mã phường/xã',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  wardCode?: string;
+
+  @ApiPropertyOptional({
+    example: 'Số 123 Đường Nguyễn Huệ',
+    description: 'Địa chỉ cụ thể (số nhà, tên đường, khu phố)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  streetAddress?: string;
 }
