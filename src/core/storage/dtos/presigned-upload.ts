@@ -17,7 +17,7 @@ export class CreatePresignedUploadUrlDto {
   @IsString()
   @Matches(/^image\/(jpeg|png|webp|gif|heic)$/, {
     message:
-      'Only image formats (jpeg, png, webp, gif, heic) are supported for room/avatar uploads',
+      'Chỉ hỗ trợ các định dạng ảnh (jpeg, png, webp, gif, heic) khi tải lên ảnh phòng hoặc ảnh đại diện',
   })
   contentType!: string;
 
