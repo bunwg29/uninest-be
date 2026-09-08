@@ -33,12 +33,11 @@ export class TransformInterceptor<T> implements NestInterceptor<
             data: (obj.data as T) ?? null,
             error: (obj.error as string | null) ?? null,
             messages:
-              (obj.messages as string | string[]) ||
-              'Operation completed successfully',
+              (obj.messages as string | string[]) || 'Thao tác thành công',
           };
         }
 
-        let messages: string | string[] = 'Operation completed successfully';
+        let messages: string | string[] = 'Thao tác thành công';
         let responseData: T | null = data;
 
         if (
