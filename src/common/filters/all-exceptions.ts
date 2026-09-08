@@ -25,7 +25,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const message =
       exception instanceof Error
         ? exception.message
-        : 'Internal server error occurred';
+        : 'Đã có lỗi hệ thống xảy ra';
 
     this.logger.error(
       `\x1b[31m[ERROR]\x1b[0m [${request.method}] ${request.url} ➔ ${status} - ${message}`,
@@ -37,8 +37,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       data: null,
       error:
         status === HTTP_STATUS_CODES.INTERNAL_SERVER_ERROR
-          ? 'Internal Server Error'
-          : 'Exception',
+          ? 'Lỗi máy chủ nội bộ'
+          : 'Lỗi ngoại lệ',
       messages: message,
     });
   }
