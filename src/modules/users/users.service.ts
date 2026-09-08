@@ -67,7 +67,7 @@ export class UsersService {
     const user = await this.findById(id);
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy người dùng với mã ${id}`);
     }
 
     Object.assign(user, data);

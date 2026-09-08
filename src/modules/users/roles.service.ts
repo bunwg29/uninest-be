@@ -41,7 +41,7 @@ export class RolesService {
     });
 
     if (!role) {
-      throw new NotFoundException(`Role with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy vai trò với mã ${id}`);
     }
 
     return role;
@@ -73,7 +73,7 @@ export class RolesService {
     const role = await this.roleRepository.findOne({ where: { id: roleId } });
 
     if (!role) {
-      throw new NotFoundException(`Role with ID ${roleId} not found`);
+      throw new NotFoundException(`Không tìm thấy vai trò với mã ${roleId}`);
     }
 
     const permission = await this.permissionRepository.findOne({
@@ -82,7 +82,7 @@ export class RolesService {
 
     if (!permission) {
       throw new NotFoundException(
-        `Permission with ID ${permissionId} not found`,
+        `Không tìm thấy quyền hạn với mã ${permissionId}`,
       );
     }
 
@@ -92,7 +92,7 @@ export class RolesService {
 
     if (existing) {
       throw new ConflictException(
-        `Permission ${permission.code} is already assigned to role ${role.code}`,
+        `Quyền ${permission.code} đã được gán cho vai trò ${role.code}`,
       );
     }
 
@@ -115,7 +115,7 @@ export class RolesService {
 
     if (result.affected === 0) {
       throw new NotFoundException(
-        `Permission assignment not found for role ${roleId} and permission ${permissionId}`,
+        `Không tìm thấy liên kết quyền hạn giữa vai trò ${roleId} và quyền ${permissionId}`,
       );
     }
   }
