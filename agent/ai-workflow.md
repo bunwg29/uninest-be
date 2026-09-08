@@ -9,7 +9,9 @@ Mọi AI coding assistant và thành viên dự án phải tuân thủ nghiêm n
 
 ## Bước 1: Kiểm tra Ràng buộc, Ranh giới & Ràng buộc Bắt buộc
 - Đọc [**`agent/rules.md`**](./rules.md):
+  - **KIỂM TRA NHÁNH GIT PHỤ TRÁCH**: Xác định file/tính năng sắp sửa thuộc trách nhiệm của nhánh Git nào. Luôn checkout đúng nhánh trước khi code (`feat/sp1-base-backend-local`, `feat/sp1-api-auth-rbac`, ...).
   - **SỬ DỤNG MODULE SẴN CÓ**: Chỉ code trong các module `@modules/*` và hạ tầng `@core/*`, `@common/*` sẵn có.
+  - **100% TIẾNG VIỆT THỐNG NHẤT**: Toàn bộ message, exception, validation error đều dùng tiếng Việt.
   - **100% VALIDATION QUA DTO**: Không bao giờ nhận body/params kiểu `any`.
   - **HẰNG SỐ IN HOA**: Mọi hằng số mới phải viết kiểu `UPPER_SNAKE_CASE`.
   - **KHÔNG COMMENT BỪA BÃI**: Để code tự tường minh, không comment giải thích các dòng code hiển nhiên.
@@ -54,3 +56,8 @@ npm run format:check
 
 ## Bước 7: Báo cáo cho Người dùng
 - Tóm tắt ngắn gọn các việc đã làm, danh sách endpoint mới, đường dẫn file thay đổi (có markdown link trực tiếp) và kết quả kiểm tra type/lint.
+## Bước 7: Commit Chuẩn & Báo cáo cho Người dùng
+- Kiểm tra `git status` đảm bảo chỉ chứa các file thuộc đúng phạm vi trách nhiệm của nhánh hiện tại.
+- Tạo commit với message chuẩn Conventional Commits kèm mã Task ID (ví dụ: `feat(auth): implement token revocation (TSK-SP1-02)`).
+- Chờ người dùng cho phép ("Allow") trước khi commit hoặc push.
+- Tóm tắt ngắn gọn các việc đã làm, danh sách endpoint mới, đường dẫn file thay đổi (có markdown link trực tiếp) và kết quả kiểm tra build/lint.

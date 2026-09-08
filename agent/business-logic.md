@@ -16,8 +16,24 @@
 
 - **Đăng ký & Đăng nhập**: Xác thực bằng email hoặc số điện thoại kèm mật khẩu/mã OTP.
 - **Phân quyền (RBAC)**: Hỗ trợ 3 vai trò `student`, `landlord`, `admin`. Kiểm soát truy cập API qua Guard và Role Decorator.
+- **Đăng ký & Đăng nhập**:
+  - Hỗ trợ đăng nhập linh hoạt bằng Số điện thoại hoặc Email kèm Mật khẩu.
+  - Client tự động phát hiện và gửi kèm thông tin thiết bị (`deviceId`, `deviceName`) khi đăng nhập.
+  - Backend lưu vết `deviceId` và `deviceName` vào bảng `refresh_tokens` phục vụ kiểm soát phiên truy cập và bảo mật thiết bị.
+- **Xác thực OTP (One-Time Password)**:
+  - Mã OTP gồm 6 chữ số phục vụ kích hoạt tài khoản đăng ký mới, đăng nhập nhanh và xác thực quên mật khẩu.
+  - Thời hạn mã OTP: 5 phút. Cooldown gửi lại mã: 60 giây.
+  - Giới hạn thử sai mã OTP tối đa 5 lần; khi vượt quá giới hạn, mã sẽ bị vô hiệu và yêu cầu người dùng gửi lại mã mới.
+- **Quản lý Phiên & Thu hồi Token (Token Revocation)**:
+  - Cơ chế JWT gồm Access Token ngắn hạn (15 phút) và Refresh Token dài hạn (7 ngày).
+  - Khi người dùng đăng xuất (`POST /api/v1/auth/logout`), backend lập tức đánh dấu thu hồi `is_revoked = true` cho refresh token tương ứng, ngăn chặn tuyệt đối việc tái sử dụng token bị đánh cắp.
+- **Quên mật khẩu & Đặt lại mật khẩu**:
+  - Luồng chuẩn 3 bước: Yêu cầu mã OTP qua số điện thoại -> Xác minh OTP -> Đặt mật khẩu mới (tối thiểu 8 ký tự, có ít nhất một chữ số và một chữ in hoa).
+- **Phân quyền (RBAC)**: Hỗ trợ 3 vai trò `student`, `landlord`, `admin`. Kiểm soát truy cập API qua Guard (`JwtAuthGuard`, `RolesGuard`) và Decorator (`@Roles`, `@CurrentUser`).
+- **Chuẩn hoá Ngôn ngữ**: 100% thông báo thành công, ngoại lệ (`HttpException`), lỗi validation và thông điệp lỗi trong API envelope đều sử dụng Tiếng Việt thống nhất, rõ nghĩa và đồng bộ với Mobile App.
 - **Hồ sơ cá nhân**: Cập nhật thông tin người dùng, ảnh đại diện (avatar upload lên Cloudflare R2), xác thực số điện thoại, đổi mật khẩu.
 - **Bảo mật**: Mật khẩu mã hóa bằng bcrypt/argon2; cơ chế JWT gồm Access Token ngắn hạn và Refresh Token lưu trữ an toàn.
+- **Bảo mật**: Mật khẩu mã hóa bằng bcrypt/argon2 an toàn.
 
 ### B. Quản lý Tin đăng Phòng trọ (`listings`)
 

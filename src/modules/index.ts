@@ -12,3 +12,4 @@ export * from './payment';
 export * from './comparison';
 export * from './recommendations';
 export * from './ai-chat';
+export * from './locations';
