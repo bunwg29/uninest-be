@@ -6,13 +6,31 @@ export const SYSTEM_CONSTANTS = {
   APP_VERSION: '1.0.0',
 } as const;
 
+export enum UserRoleType {
+  STUDENT = 0,
+  LANDLORD = 1,
+  ADMIN = 2,
+}
+
+export type UserRole = UserRoleType;
+
 export const USER_ROLES = {
-  STUDENT: 'student',
-  LANDLORD: 'landlord',
-  ADMIN: 'admin',
+  STUDENT: UserRoleType.STUDENT,
+  LANDLORD: UserRoleType.LANDLORD,
+  ADMIN: UserRoleType.ADMIN,
 } as const;
 
-export type UserRole = (typeof USER_ROLES)[keyof typeof USER_ROLES];
+export const ROLE_NAMES: Record<UserRoleType, string> = {
+  [UserRoleType.STUDENT]: 'Sinh viên',
+  [UserRoleType.LANDLORD]: 'Chủ trọ',
+  [UserRoleType.ADMIN]: 'Quản trị viên',
+};
+
+export const ROLE_CODES: Record<UserRoleType, string> = {
+  [UserRoleType.STUDENT]: 'STUDENT',
+  [UserRoleType.LANDLORD]: 'LANDLORD',
+  [UserRoleType.ADMIN]: 'ADMIN',
+};
 
 export const PAGINATION_DEFAULTS = {
   DEFAULT_PAGE: 1,
