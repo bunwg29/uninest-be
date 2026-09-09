@@ -170,7 +170,8 @@ export class CreateListingDto {
 
   @ApiPropertyOptional({
     type: [CreateListingImageDto],
-    description: 'Danh sách ảnh phòng đã upload lên Cloudflare R2, tối đa 10 ảnh',
+    description:
+      'Danh sách ảnh phòng đã upload lên Cloudflare R2, tối đa 10 ảnh',
   })
   @IsOptional()
   @IsArray({ message: 'Danh sách ảnh phải là mảng' })

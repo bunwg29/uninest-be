@@ -113,7 +113,7 @@ export class Listing {
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt!: Date | null;
 
-  @ManyToOne(() => User, (user) => user.listings, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, 'listings', { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'owner_id' })
   owner!: User;
 
