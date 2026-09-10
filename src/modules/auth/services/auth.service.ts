@@ -20,6 +20,7 @@ import {
   AuthTokenDto,
   AuthUserDto,
   OtpResponseDto,
+  ChangePasswordDto,
 } from '../dtos';
 import { OtpType } from '../entities/otp-code';
 import { UserRoleType, ROLE_CODES, ROLE_NAMES } from '@common/constants';
@@ -157,6 +158,11 @@ export class AuthService {
     if (!user.isVerified) {
       await this.usersService.markVerified(user.id);
       user.isVerified = true;
+    }
+
+    if (dto.type === OtpType.REGISTER && user.phone === dto.identifier) {
+      await this.usersService.markPhoneVerified(user.id);
+      user.phoneVerified = true;
     }
 
     const permissions = await this.usersService.getUserPermissions(user.roleId);
@@ -316,5 +322,43 @@ export class AuthService {
     const permissions = await this.usersService.getUserPermissions(user.roleId);
 
     return this.mapToAuthUserDto(user, permissions);
+  }
+
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+    deviceId?: string,
+  ): Promise<{ message: string }> {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException(
+        'Mật khẩu mới và xác nhận mật khẩu không khớp',
+      );
+    }
+
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException('Mật khẩu mới phải khác mật khẩu hiện tại');
+    }
+
+    const user = await this.usersService.findByIdWithPassword(userId);
+
+    if (!user?.passwordHash) {
+      throw new UnauthorizedException('Không tìm thấy mật khẩu hiện tại');
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(
+      dto.currentPassword,
+      user.passwordHash,
+    );
+
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('Mật khẩu hiện tại không chính xác');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.usersService.updatePassword(userId, passwordHash);
+    await this.tokenService.revokeOtherUserTokens(userId, deviceId);
+
+    return { message: 'Đổi mật khẩu thành công' };
   }
 }
