@@ -19,6 +19,15 @@ export class UsersService {
     });
   }
 
+  async findByIdWithPassword(id: string): Promise<User | null> {
+    return this.userRepository
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .leftJoinAndSelect('user.role', 'role')
+      .where('user.id = :id', { id })
+      .getOne();
+  }
+
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { email: email.toLowerCase().trim() },
@@ -77,6 +86,10 @@ export class UsersService {
 
   async markVerified(id: string): Promise<void> {
     await this.userRepository.update(id, { isVerified: true });
+  }
+
+  async markPhoneVerified(id: string): Promise<void> {
+    await this.userRepository.update(id, { phoneVerified: true });
   }
 
   async updatePassword(id: string, passwordHash: string): Promise<void> {

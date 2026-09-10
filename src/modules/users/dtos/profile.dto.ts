@@ -1,0 +1,117 @@
+import {
+  IsArray,
+  IsEmail,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+  Matches,
+  Max,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class UpdateProfileDto {
+  @ApiPropertyOptional({ example: 'Nguyễn Xuân Hoài' })
+  @IsOptional()
+  @IsString()
+  @MinLength(2, { message: 'Họ và tên tối thiểu 2 ký tự' })
+  @MaxLength(50, { message: 'Họ và tên tối đa 50 ký tự' })
+  name?: string;
+
+  @ApiPropertyOptional({ example: 'xuanhoai@gmail.com' })
+  @IsOptional()
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
+  @MaxLength(150)
+  email?: string;
+
+  @ApiPropertyOptional({ example: 'ĐH Bách khoa - ĐH Đà Nẵng' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  school?: string;
+
+  @ApiPropertyOptional({ example: 'Sinh viên năm 3 Bách khoa' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300, { message: 'Giới thiệu tối đa 300 ký tự' })
+  bio?: string;
+
+  @ApiPropertyOptional({ example: ['Hòa Khánh', 'Khuê Mỹ'], type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  interestedAreas?: string[];
+}
+
+export class PresignAvatarDto {
+  @ApiProperty({ example: 'avatar.png' })
+  @IsNotEmpty({ message: 'Tên tệp không được để trống' })
+  @IsString()
+  @MaxLength(255)
+  fileName!: string;
+
+  @ApiProperty({ example: 'image/png', enum: ['image/jpeg', 'image/png'] })
+  @Matches(/^image\/(jpeg|png)$/, {
+    message: 'Ảnh đại diện chỉ chấp nhận định dạng JPG hoặc PNG',
+  })
+  contentType!: string;
+
+  @ApiProperty({ example: 1048576 })
+  @IsInt()
+  @Min(1, { message: 'Dung lượng ảnh phải lớn hơn 0' })
+  @Max(5 * 1024 * 1024, { message: 'Ảnh đại diện tối đa 5MB' })
+  fileSize!: number;
+}
+
+export class ConfirmAvatarDto {
+  @ApiProperty({ example: 'avatars/user-id/avatar-id.png' })
+  @IsNotEmpty({ message: 'objectKey không được để trống' })
+  @IsString()
+  @MaxLength(500)
+  objectKey!: string;
+}
+
+export class RequestPhoneOtpDto {
+  @ApiProperty({ example: '0905123456' })
+  @IsNotEmpty({ message: 'Số điện thoại mới không được để trống' })
+  @IsString()
+  @Matches(/^(0|\+84)(3|5|7|8|9)[0-9]{8}$/, {
+    message: 'Số điện thoại không hợp lệ',
+  })
+  newPhone!: string;
+}
+
+export class VerifyPhoneOtpDto {
+  @ApiProperty({ example: 'request-id' })
+  @IsNotEmpty({ message: 'Mã yêu cầu không được để trống' })
+  @IsString()
+  requestId!: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsNotEmpty({ message: 'Mã OTP không được để trống' })
+  @Matches(/^\d{6}$/, { message: 'Mã OTP phải có đúng 6 chữ số' })
+  otp!: string;
+}
+
+export class ProfileResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() name!: string;
+  @ApiPropertyOptional() avatarUrl!: string | null;
+  @ApiPropertyOptional() phone!: string | null;
+  @ApiProperty() phoneVerified!: boolean;
+  @ApiPropertyOptional() email!: string | null;
+  @ApiPropertyOptional() school!: string | null;
+  @ApiPropertyOptional() bio!: string | null;
+  @ApiProperty({ type: [String] }) interestedAreas!: string[];
+  @ApiProperty() role!: string;
+  @ApiProperty() stats!: {
+    savedRooms: number;
+    appointments: number;
+    reviews: number;
+  };
+  @ApiProperty() createdAt!: Date;
+}
