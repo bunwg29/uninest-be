@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -12,7 +13,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { CurrentUser, Roles } from '@common/decorators';
+import { CurrentUser, Public, Roles } from '@common/decorators';
 import { UserRoleType } from '@common/constants';
 import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import { CreateListingDto } from '../dtos';
@@ -22,6 +23,21 @@ import { ListingsService } from '../services/listings.service';
 @Controller('listings')
 export class ListingsController {
   constructor(private readonly listingsService: ListingsService) {}
+
+  @Get('amenities')
+  @Public()
+  @ApiOperation({
+    summary: 'Lấy danh mục tiện ích phòng trọ',
+    description:
+      'Trả về danh sách tiện ích hoạt động có mã số và nhóm số (0 = Nội thất, 1 = Tiện ích, ...)',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Danh sách tiện ích thành công',
+  })
+  async getAmenities() {
+    return this.listingsService.getAmenities();
+  }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
