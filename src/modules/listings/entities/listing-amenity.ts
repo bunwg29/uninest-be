@@ -13,8 +13,8 @@ export class ListingAmenity {
   @PrimaryColumn({ type: 'uuid', name: 'listing_id' })
   listingId!: string;
 
-  @PrimaryColumn({ type: 'uuid', name: 'amenity_id' })
-  amenityId!: string;
+  @PrimaryColumn({ type: 'smallint', name: 'amenity_id' })
+  amenityId!: number;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;

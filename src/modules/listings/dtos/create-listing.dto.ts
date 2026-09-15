@@ -8,7 +8,6 @@ import {
   IsOptional,
   IsString,
   IsUrl,
-  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -18,11 +17,19 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateListingImageDto {
   @ApiProperty({
-    example: 'https://cdn.uninest.vn/listings/phong-1.jpg',
-    description: 'URL ảnh đã upload lên Cloudflare R2',
+    example:
+      'https://pub-250e35ee14664cab87368a3ea466d91f.r2.dev/listings/1715800000000-uuid.jpg',
+    description:
+      'URL ảnh sau khi đã upload lên Cloudflare R2 (bắt buộc giao thức http/https, không nhận URI cục bộ)',
   })
   @IsNotEmpty({ message: 'URL ảnh không được để trống' })
-  @IsUrl({}, { message: 'URL ảnh không hợp lệ' })
+  @IsUrl(
+    { protocols: ['http', 'https'], require_protocol: true },
+    {
+      message:
+        'URL ảnh phải là liên kết web (http/https) hợp lệ từ Cloudflare R2',
+    },
+  )
   @MaxLength(1000, { message: 'URL ảnh tối đa 1000 ký tự' })
   url!: string;
 
@@ -181,14 +188,14 @@ export class CreateListingDto {
   images?: CreateListingImageDto[];
 
   @ApiPropertyOptional({
-    example: ['6d7f67b1-8f0b-4b72-bb15-9ac4c69d1c0d'],
-    description: 'Danh sách mã tiện ích',
+    example: [1, 2, 3],
+    description: 'Danh sách mã định danh tiện ích dạng số',
+    type: [Number],
   })
   @IsOptional()
   @IsArray({ message: 'Danh sách tiện ích phải là mảng' })
-  @IsUUID('4', {
-    each: true,
-    message: 'Mã tiện ích không hợp lệ',
-  })
-  amenityIds?: string[];
+  @IsInt({ each: true, message: 'Mã tiện ích phải là số nguyên' })
+  @Min(0, { each: true, message: 'Mã tiện ích không được là số âm' })
+  @Type(() => Number)
+  amenityIds?: number[];
 }

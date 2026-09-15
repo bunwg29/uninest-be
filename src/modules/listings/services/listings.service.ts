@@ -64,6 +64,19 @@ export class ListingsService {
       );
     }
 
+    if (dto.images?.length) {
+      for (const image of dto.images) {
+        if (
+          !image.url.startsWith('http://') &&
+          !image.url.startsWith('https://')
+        ) {
+          throw new BadRequestException(
+            'Ảnh phòng phải được upload lên Cloudflare R2 trước khi tạo tin đăng, không chấp nhận đường dẫn cục bộ thiết bị',
+          );
+        }
+      }
+    }
+
     return this.dataSource.transaction(async (manager) => {
       const listing = manager.create(Listing, {
         ownerId: userId,
@@ -135,6 +148,13 @@ export class ListingsService {
       }
 
       return createdListing;
+    });
+  }
+
+  async getAmenities(): Promise<Amenity[]> {
+    return this.amenityRepository.find({
+      where: { isActive: true },
+      order: { group: 'ASC', id: 'ASC' },
     });
   }
 }
