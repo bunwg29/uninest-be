@@ -5,6 +5,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -73,7 +74,12 @@ export class R2StorageService {
     const sanitizedExt =
       rawExt?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
     const randomId = randomUUID();
-    const cleanFolder = folder.replace(/[^a-zA-Z0-9_-]/g, '') || 'listings';
+    const cleanFolder =
+      folder
+        .split('/')
+        .map((segment) => segment.replace(/[^a-zA-Z0-9_-]/g, ''))
+        .filter(Boolean)
+        .join('/') || 'listings';
     const key = `${cleanFolder}/${Date.now()}-${randomId}.${sanitizedExt}`;
 
     return this.getPresignedUploadUrl({
@@ -141,6 +147,10 @@ export class R2StorageService {
     };
   }
 
+  getPublicUrl(key: string): string {
+    return this.resolvePublicUrl(key);
+  }
+
   async deleteFile(key: string): Promise<boolean> {
     if (!this.isConfigured || !this.s3Client) {
       this.logger.log(`Mock delete file key: ${key}`);
@@ -160,6 +170,25 @@ export class R2StorageService {
     } catch (error) {
       this.logger.error(`Error deleting file from R2: ${key}`, error);
 
+      return false;
+    }
+  }
+
+  async objectExists(key: string): Promise<boolean> {
+    if (!this.isConfigured || !this.s3Client) {
+      return true;
+    }
+
+    try {
+      await this.s3Client.send(
+        new HeadObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+        }),
+      );
+
+      return true;
+    } catch {
       return false;
     }
   }

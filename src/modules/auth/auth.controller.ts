@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,6 +28,7 @@ import {
   AuthTokenDto,
   AuthUserDto,
   OtpResponseDto,
+  ChangePasswordDto,
 } from './dtos';
 import { Public, CurrentUser } from '@common/decorators';
 import { JwtAuthGuard } from '@common/guards';
@@ -187,5 +189,21 @@ export class AuthController {
   })
   async getMe(@CurrentUser('userId') userId: string) {
     return this.authService.getMe(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('change-password')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Đổi mật khẩu tài khoản' })
+  async changePassword(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: ChangePasswordDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.changePassword(
+      userId,
+      dto,
+      req.headers['x-device-id']?.toString(),
+    );
   }
 }
