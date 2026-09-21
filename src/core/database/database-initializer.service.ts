@@ -9,6 +9,52 @@ export class DatabaseInitializerService implements OnModuleInit {
 
   async onModuleInit() {
     await this.initializeExtensions();
+    await this.migrateAmenitiesSchema();
+  }
+
+  private async migrateAmenitiesSchema() {
+    try {
+      const check = (await this.dataSource.query(`
+        SELECT data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'amenities' AND column_name = 'id'
+      `)) as unknown as { data_type?: string }[];
+
+      if (check.length > 0 && check[0]?.data_type === 'uuid') {
+        this.logger.log(
+          'Phát hiện bảng amenities dùng id UUID cũ. Đang tự động chuyển đổi sang kiểu số (smallint)...',
+        );
+
+        await this.dataSource.query(`
+          DROP TABLE IF EXISTS listing_amenities CASCADE;
+          DROP TABLE IF EXISTS amenities CASCADE;
+
+          CREATE TABLE amenities (
+            id SMALLINT PRIMARY KEY,
+            name VARCHAR(80) NOT NULL UNIQUE,
+            "group" SMALLINT NOT NULL DEFAULT 0,
+            is_active BOOLEAN NOT NULL DEFAULT true
+          );
+
+          CREATE TABLE listing_amenities (
+            listing_id UUID NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+            amenity_id SMALLINT NOT NULL REFERENCES amenities(id) ON DELETE RESTRICT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (listing_id, amenity_id)
+          );
+        `);
+
+        this.logger.log(
+          'Đã chuyển đổi cấu trúc bảng amenities sang kiểu số (smallint) thành công.',
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      this.logger.warn(
+        `Lỗi khi kiểm tra/chuyển đổi schema amenities: ${message}`,
+      );
+    }
   }
 
   private async initializeExtensions() {

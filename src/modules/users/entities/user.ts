@@ -130,4 +130,7 @@ export class User {
 
   @OneToMany('RefreshToken', 'user')
   refreshTokens?: RefreshToken[];
+
+  @OneToMany('Listing', 'owner')
+  listings?: unknown[];
 }
