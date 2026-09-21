@@ -10,8 +10,15 @@ import {
 } from '../../../modules/users/entities';
 import { RefreshToken, OtpCode } from '../../../modules/auth/entities';
 import { Province, Ward } from '../../../modules/locations/entities';
+import {
+  Amenity,
+  Listing,
+  ListingAmenity,
+  ListingImage,
+} from '../../../modules/listings/entities';
 import { seedRbac } from './rbac.seeder';
 import { seedLocations } from './locations.seeder';
+import { seedAmenities } from './amenities.seeder';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
@@ -29,6 +36,12 @@ const SEEDERS: Record<
     name: 'Locations Seeder',
     description: 'Nạp 34 tỉnh/thành phố và 3.321 phường/xã từ dataset VN units',
     fn: seedLocations,
+  },
+  amenities: {
+    name: 'Amenities Seeder',
+    description:
+      'Nạp danh mục tiện ích với mã số (1..16) và nhóm số (0: Nội thất, 1: Tiện ích, 2: An ninh, 3: Phòng)',
+    fn: seedAmenities,
   },
 };
 
@@ -77,6 +90,10 @@ async function run() {
       OtpCode,
       Province,
       Ward,
+      Amenity,
+      Listing,
+      ListingAmenity,
+      ListingImage,
     ],
     synchronize: isSync,
     namingStrategy: new SnakeNamingStrategy(),
