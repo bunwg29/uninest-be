@@ -47,6 +47,23 @@ export class User {
   })
   avatarUrl!: string | null;
 
+  @Column({ type: 'boolean', name: 'phone_verified', default: false })
+  phoneVerified!: boolean;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  school!: string | null;
+
+  @Column({ type: 'varchar', length: 300, nullable: true })
+  bio!: string | null;
+
+  @Column({
+    type: 'text',
+    array: true,
+    nullable: true,
+    name: 'interested_areas',
+  })
+  interestedAreas!: string[] | null;
+
   @Index('idx_users_role_id')
   @Column({
     type: 'smallint',
