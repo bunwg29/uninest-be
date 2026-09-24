@@ -13,13 +13,15 @@ import {
   ListingImage,
   ListingStatus,
 } from '../entities';
-import { CreateListingDto } from '../dtos';
+import { CreateListingDto, LandlordListingsQueryDto } from '../dtos';
 
 @Injectable()
 export class ListingsService {
   constructor(
     @InjectRepository(Amenity)
     private readonly amenityRepository: Repository<Amenity>,
+    @InjectRepository(Listing)
+    private readonly listingRepository: Repository<Listing>,
     @InjectRepository(Province)
     private readonly provinceRepository: Repository<Province>,
     @InjectRepository(Ward)
@@ -151,10 +153,318 @@ export class ListingsService {
     });
   }
 
+  async getLandlordListings(userId: string, query: LandlordListingsQueryDto) {
+    const { keyword, limit, page, sortBy, status } = query;
+    const listingsQuery = this.listingRepository
+      .createQueryBuilder('listing')
+      .leftJoinAndSelect('listing.images', 'image')
+      .leftJoinAndSelect('listing.province', 'province')
+      .leftJoinAndSelect('listing.ward', 'ward')
+      .leftJoinAndSelect('listing.listingAmenities', 'listingAmenity')
+      .where('listing.ownerId = :userId', { userId });
+
+    if (status === 'all' || status === 'deleted') {
+      listingsQuery.withDeleted();
+    }
+
+    if (status === 'deleted') {
+      listingsQuery.andWhere('listing.deletedAt IS NOT NULL');
+    } else if (status && status !== 'all') {
+      listingsQuery.andWhere('listing.status = :status', { status });
+    }
+
+    if (keyword) {
+      listingsQuery.andWhere(
+        '(listing.title ILIKE :keyword OR listing.fullAddress ILIKE :keyword)',
+        { keyword: `%${keyword}%` },
+      );
+    }
+
+    if (sortBy === 'oldest') {
+      listingsQuery.orderBy('listing.createdAt', 'ASC');
+    } else if (sortBy === 'price_asc') {
+      listingsQuery.orderBy('listing.price', 'ASC');
+    } else if (sortBy === 'price_desc') {
+      listingsQuery.orderBy('listing.price', 'DESC');
+    } else {
+      listingsQuery.orderBy('listing.updatedAt', 'DESC');
+    }
+
+    const [listings, totalCount] = await listingsQuery
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+    const counterRows = await this.listingRepository
+      .createQueryBuilder('listing')
+      .select('listing.status', 'status')
+      .addSelect('COUNT(listing.id)', 'count')
+      .where('listing.ownerId = :userId', { userId })
+      .groupBy('listing.status')
+      .getRawMany<{ status: ListingStatus; count: string }>();
+    const counters: Record<ListingStatus | 'deleted', number> = {
+      [ListingStatus.PENDING]: 0,
+      [ListingStatus.ACTIVE]: 0,
+      [ListingStatus.REJECTED]: 0,
+      [ListingStatus.HIDDEN]: 0,
+      [ListingStatus.RENTED]: 0,
+      deleted: 0,
+    };
+
+    counterRows.forEach((row) => {
+      counters[row.status] = Number(row.count);
+    });
+
+    counters.deleted = await this.listingRepository
+      .createQueryBuilder('listing')
+      .withDeleted()
+      .where('listing.ownerId = :userId', { userId })
+      .andWhere('listing.deletedAt IS NOT NULL')
+      .getCount();
+
+    return {
+      items: listings.map((listing) => this.toLandlordListing(listing)),
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+      countsByStatus: counters,
+    };
+  }
+
+  async getLandlordListing(userId: string, id: string) {
+    const listing = await this.listingRepository.findOne({
+      where: { id, ownerId: userId },
+      relations: {
+        images: true,
+        province: true,
+        ward: true,
+        listingAmenities: true,
+      },
+    });
+
+    if (!listing) {
+      throw new NotFoundException('Không tìm thấy tin đăng của bạn');
+    }
+
+    return this.toLandlordListing(listing);
+  }
+
+  async updateListingStatus(
+    userId: string,
+    id: string,
+    status: ListingStatus.ACTIVE | ListingStatus.HIDDEN,
+  ) {
+    const listing = await this.listingRepository.findOneBy({
+      id,
+      ownerId: userId,
+    });
+
+    if (!listing) {
+      throw new NotFoundException('Không tìm thấy tin đăng của bạn');
+    }
+
+    const canHide =
+      status === ListingStatus.HIDDEN &&
+      listing.status === ListingStatus.ACTIVE;
+    const canShow =
+      status === ListingStatus.ACTIVE &&
+      listing.status === ListingStatus.HIDDEN;
+    const isUnchanged = listing.status === status;
+
+    if (!canHide && !canShow && !isUnchanged) {
+      throw new BadRequestException(
+        'Chỉ tin đang hiển thị hoặc đã ẩn mới có thể đổi trạng thái nhanh',
+      );
+    }
+
+    listing.status = status;
+    const updatedListing = await this.listingRepository.save(listing);
+
+    return this.toLandlordListing(updatedListing);
+  }
+
+  async updateListing(
+    userId: string,
+    id: string,
+    dto: CreateListingDto,
+  ): Promise<Listing> {
+    const province = await this.provinceRepository.findOneBy({
+      code: dto.provinceCode,
+    });
+
+    if (!province) {
+      throw new NotFoundException('Không tìm thấy tỉnh/thành phố');
+    }
+
+    const ward = await this.wardRepository.findOneBy({ code: dto.wardCode });
+
+    if (!ward) {
+      throw new NotFoundException('Không tìm thấy phường/xã');
+    }
+
+    if (ward.provinceCode !== province.code) {
+      throw new BadRequestException(
+        'Phường/xã không thuộc tỉnh/thành phố đã chọn',
+      );
+    }
+
+    const amenityIds = [...new Set(dto.amenityIds ?? [])];
+    const amenities = amenityIds.length
+      ? await this.amenityRepository.findBy({ id: In(amenityIds) })
+      : [];
+
+    if (amenities.length !== amenityIds.length) {
+      throw new NotFoundException('Một hoặc nhiều tiện ích không tồn tại');
+    }
+
+    if (amenities.some((amenity) => !amenity.isActive)) {
+      throw new BadRequestException(
+        'Một hoặc nhiều tiện ích đã bị vô hiệu hóa',
+      );
+    }
+
+    if (dto.images?.some((image) => !/^https?:\/\//.test(image.url))) {
+      throw new BadRequestException('Ảnh phòng phải là liên kết web hợp lệ');
+    }
+
+    const coverCount = dto.images?.filter((image) => image.isCover).length ?? 0;
+
+    if (coverCount > 1) {
+      throw new BadRequestException('Tin đăng chỉ được có một ảnh bìa');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const listing = await manager.findOne(Listing, {
+        where: { id, ownerId: userId },
+      });
+
+      if (!listing) {
+        throw new NotFoundException('Không tìm thấy tin đăng của bạn');
+      }
+
+      Object.assign(listing, {
+        title: dto.title,
+        description: dto.description ?? null,
+        roomType: dto.roomType,
+        price: String(dto.price),
+        area: String(dto.area),
+        maxOccupants: dto.maxOccupants,
+        electricPrice:
+          dto.electricPrice === undefined ? null : String(dto.electricPrice),
+        waterPrice:
+          dto.waterPrice === undefined ? null : String(dto.waterPrice),
+        deposit: dto.deposit === undefined ? null : String(dto.deposit),
+        streetAddress: dto.streetAddress,
+        provinceCode: province.code,
+        wardCode: ward.code,
+        fullAddress: `${dto.streetAddress}, ${ward.fullName}, ${province.fullName}`,
+        location: {
+          type: 'Point',
+          coordinates: [dto.longitude, dto.latitude],
+        },
+        status: ListingStatus.PENDING,
+      });
+
+      await manager.save(Listing, listing);
+      await manager.delete(ListingImage, { listingId: id });
+      await manager.delete(ListingAmenity, { listingId: id });
+
+      if (dto.images?.length) {
+        const hasCover = coverCount === 1;
+        const images = dto.images.map((image, index) =>
+          manager.create(ListingImage, {
+            listingId: id,
+            url: image.url,
+            isCover: hasCover ? image.isCover === true : index === 0,
+            sortOrder: index,
+          }),
+        );
+
+        await manager.save(ListingImage, images);
+      }
+
+      if (amenities.length) {
+        const listingAmenities = amenities.map((amenity) =>
+          manager.create(ListingAmenity, {
+            listingId: id,
+            amenityId: amenity.id,
+          }),
+        );
+
+        await manager.save(ListingAmenity, listingAmenities);
+      }
+
+      const updatedListing = await manager.findOne(Listing, {
+        where: { id },
+        relations: { images: true, listingAmenities: true },
+      });
+
+      if (!updatedListing) {
+        throw new NotFoundException('Không tìm thấy tin đăng vừa cập nhật');
+      }
+
+      return updatedListing;
+    });
+  }
+
+  async deleteListing(userId: string, id: string): Promise<void> {
+    const listing = await this.listingRepository.findOneBy({
+      id,
+      ownerId: userId,
+    });
+
+    if (!listing) {
+      throw new NotFoundException('Không tìm thấy tin đăng của bạn');
+    }
+
+    await this.listingRepository.softRemove(listing);
+  }
+
   async getAmenities(): Promise<Amenity[]> {
     return this.amenityRepository.find({
       where: { isActive: true },
       order: { group: 'ASC', id: 'ASC' },
     });
+  }
+
+  private toLandlordListing(listing: Listing) {
+    const images = [...(listing.images ?? [])].sort(
+      (a, b) => a.sortOrder - b.sortOrder,
+    );
+    const coverImage = images.find((image) => image.isCover) ?? images[0];
+
+    return {
+      id: listing.id,
+      title: listing.title,
+      price: Number(listing.price),
+      area: Number(listing.area),
+      address: listing.fullAddress,
+      imageUrl: coverImage?.url,
+      imageUrls: images.map((image) => image.url),
+      status: listing.deletedAt ? 'deleted' : listing.status,
+      isFeatured: false,
+      viewCount: 0,
+      contactCount: 0,
+      saveCount: 0,
+      holdingStatus: false,
+      roomType: listing.roomType,
+      maxOccupants: listing.maxOccupants,
+      description: listing.description ?? undefined,
+      electricPrice: listing.electricPrice
+        ? Number(listing.electricPrice)
+        : undefined,
+      waterPrice: listing.waterPrice ? Number(listing.waterPrice) : undefined,
+      deposit: listing.deposit ? Number(listing.deposit) : undefined,
+      streetAddress: listing.streetAddress,
+      provinceCode: listing.provinceCode,
+      provinceName: listing.province?.fullName,
+      wardCode: listing.wardCode,
+      wardName: listing.ward?.fullName,
+      latitude: listing.location.coordinates[1],
+      longitude: listing.location.coordinates[0],
+      amenityIds: listing.listingAmenities?.map((item) => item.amenityId) ?? [],
+    };
   }
 }
