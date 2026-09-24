@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Province, Ward } from '@modules/locations/entities';
 import { Amenity, Listing, ListingAmenity, ListingImage } from './entities';
 import { ListingsController } from './controllers/listings.controller';
+import { LandlordListingsController } from './controllers/landlord-listings.controller';
 import { ListingsService } from './services/listings.service';
 
 @Module({
@@ -16,7 +17,7 @@ import { ListingsService } from './services/listings.service';
       Ward,
     ]),
   ],
-  controllers: [ListingsController],
+  controllers: [ListingsController, LandlordListingsController],
   providers: [ListingsService],
   exports: [ListingsService],
 })
