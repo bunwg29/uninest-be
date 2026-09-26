@@ -4,7 +4,7 @@ import { Amenity, AmenityGroup } from '../../../modules/listings/entities';
 export async function seedAmenities(dataSource: DataSource): Promise<void> {
   const amenityRepo = dataSource.getRepository(Amenity);
 
-  console.log('[Amenities Seeder] Bắt đầu nạp danh mục tiện ích...');
+  console.log('[Seeder tiện ích] Bắt đầu nạp danh mục tiện ích...');
 
   const amenitiesToSeed: {
     id: number;
@@ -80,6 +80,12 @@ export async function seedAmenities(dataSource: DataSource): Promise<void> {
       group: AmenityGroup.ROOM_FEATURE,
       isActive: true,
     },
+    {
+      id: 17,
+      name: 'Máy nước nóng',
+      group: AmenityGroup.FURNITURE,
+      isActive: true,
+    },
   ];
 
   for (const item of amenitiesToSeed) {
@@ -95,6 +101,6 @@ export async function seedAmenities(dataSource: DataSource): Promise<void> {
   }
 
   console.log(
-    `[Amenities Seeder] Đã nạp thành công ${amenitiesToSeed.length} tiện ích.`,
+    `[Seeder tiện ích] Đã nạp thành công ${amenitiesToSeed.length} tiện ích.`,
   );
 }
