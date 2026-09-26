@@ -96,6 +96,9 @@ export class Listing {
   })
   location!: ListingPoint;
 
+  @Column({ type: 'jsonb', nullable: true, name: 'viewing_schedule' })
+  viewingSchedule!: Record<string, unknown> | null;
+
   @Index('idx_listings_status')
   @Column({
     type: 'enum',
