@@ -147,8 +147,50 @@ export class R2StorageService {
     };
   }
 
-  getPublicUrl(key: string): string {
-    return this.resolvePublicUrl(key);
+  getPublicUrl(storageReference: string): string {
+    const objectKey = this.getObjectKey(storageReference);
+
+    return objectKey ? this.resolvePublicUrl(objectKey) : storageReference;
+  }
+
+  getObjectKey(storageReference: string | null | undefined): string | null {
+    if (!storageReference) return null;
+
+    const normalizedReference = storageReference.trim();
+
+    if (!normalizedReference) return null;
+
+    if (/^https?:\/\//i.test(normalizedReference)) {
+      const configuredStorageKey =
+        this.getKeyFromPublicUrl(normalizedReference);
+
+      if (configuredStorageKey) return configuredStorageKey;
+
+      try {
+        const pathname = decodeURIComponent(
+          new URL(normalizedReference).pathname,
+        );
+        const knownFolderMatch = pathname.match(
+          /\/(listings|avatars)\/([^?#]+)/,
+        );
+
+        if (!knownFolderMatch) return null;
+
+        const legacyKey = `${knownFolderMatch[1]}/${knownFolderMatch[2]}`;
+
+        return legacyKey.includes('..') || legacyKey.includes('\\')
+          ? null
+          : legacyKey;
+      } catch {
+        return null;
+      }
+    }
+
+    const key = normalizedReference.replace(/^\/+/, '');
+
+    if (!key || key.includes('..') || key.includes('\\')) return null;
+
+    return key;
   }
 
   getKeyFromPublicUrl(publicUrl: string): string | null {

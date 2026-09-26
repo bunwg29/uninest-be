@@ -95,7 +95,7 @@
 1. **Client yêu cầu upload**: Client gọi API `POST /api/v1/storage/presigned-upload-url` kèm `fileName` và `contentType`.
 2. **Server tạo Presigned URL**: Server sử dụng `R2StorageService` (`@aws-sdk/s3-request-presigner`) tạo URL ký trước có thời hạn (ví dụ 15 phút).
 3. **Client upload trực tiếp**: Client gửi HTTP `PUT` chứa binary file trực tiếp lên Cloudflare R2 endpoint. Server hoàn toàn không bị nghẽn băng thông do truyền file trung gian.
-4. **Lưu trữ URL**: Client gửi URL ảnh đã upload lên R2 vào body các API tạo/sửa tin đăng hoặc avatar.
+4. **Lưu trữ object key**: Database chỉ lưu object key của ảnh (ví dụ `listings/...jpg` hoặc `avatars/...jpg`). Backend ghép public base URL khi trả response cho client để có thể đổi nhà cung cấp storage mà không phải sửa dữ liệu.
 5. **Dọn ảnh khi cập nhật**: Sau khi cập nhật tin thành công, backend xóa khỏi R2 các ảnh đã bị chủ trọ loại khỏi tin; ảnh của tin bị xóa mềm vẫn được giữ lại theo chính sách lưu vết.
 
 ---

@@ -10,7 +10,30 @@ export class DatabaseInitializerService implements OnModuleInit {
   async onModuleInit() {
     await this.initializeExtensions();
     await this.migrateListingsViewingScheduleSchema();
+    await this.migrateStorageReferencesToObjectKeys();
     await this.migrateAmenitiesSchema();
+  }
+
+  private async migrateStorageReferencesToObjectKeys() {
+    try {
+      await this.dataSource.query(`
+        UPDATE listing_images
+        SET url = SUBSTRING(url FROM '(listings/[^?#]+)')
+        WHERE url ~ '^https?://.*/listings/'
+      `);
+
+      await this.dataSource.query(`
+        UPDATE users
+        SET avatar_url = SUBSTRING(avatar_url FROM '(avatars/[^?#]+)')
+        WHERE avatar_url ~ '^https?://.*/avatars/'
+      `);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      this.logger.warn(
+        `Không thể chuyển URL storage cũ sang object key: ${message}`,
+      );
+    }
   }
 
   private async migrateListingsViewingScheduleSchema() {

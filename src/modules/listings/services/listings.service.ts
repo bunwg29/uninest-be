@@ -68,19 +68,6 @@ export class ListingsService {
       );
     }
 
-    if (dto.images?.length) {
-      for (const image of dto.images) {
-        if (
-          !image.url.startsWith('http://') &&
-          !image.url.startsWith('https://')
-        ) {
-          throw new BadRequestException(
-            'Ảnh phòng phải được upload lên Cloudflare R2 trước khi tạo tin đăng, không chấp nhận đường dẫn cục bộ thiết bị',
-          );
-        }
-      }
-    }
-
     return this.dataSource.transaction(async (manager) => {
       const listing = manager.create(Listing, {
         ownerId: userId,
@@ -122,7 +109,7 @@ export class ListingsService {
         const images = dto.images.map((image, index) =>
           manager.create(ListingImage, {
             listingId: savedListing.id,
-            url: image.url,
+            url: image.key,
             isCover: hasCover ? image.isCover === true : index === 0,
             sortOrder: index,
           }),
@@ -330,18 +317,14 @@ export class ListingsService {
       );
     }
 
-    if (dto.images?.some((image) => !/^https?:\/\//.test(image.url))) {
-      throw new BadRequestException('Ảnh phòng phải là liên kết web hợp lệ');
-    }
-
     const coverCount = dto.images?.filter((image) => image.isCover).length ?? 0;
 
     if (coverCount > 1) {
       throw new BadRequestException('Tin đăng chỉ được có một ảnh bìa');
     }
 
-    const nextImageUrls = new Set(dto.images?.map((image) => image.url) ?? []);
-    const { updatedListing, removedImageUrls } =
+    const nextImageKeys = new Set(dto.images?.map((image) => image.key) ?? []);
+    const { updatedListing, removedImageKeys } =
       await this.dataSource.transaction(async (manager) => {
         const listing = await manager.findOne(Listing, {
           where: { id, ownerId: userId },
@@ -352,9 +335,10 @@ export class ListingsService {
           throw new NotFoundException('Không tìm thấy tin đăng của bạn');
         }
 
-        const removedImageUrls = listing.images
-          .map((image) => image.url)
-          .filter((url) => !nextImageUrls.has(url));
+        const removedImageKeys = listing.images
+          .map((image) => this.storageService.getObjectKey(image.url))
+          .filter((key): key is string => key !== null)
+          .filter((key) => !nextImageKeys.has(key));
 
         Object.assign(listing, {
           title: dto.title,
@@ -391,7 +375,7 @@ export class ListingsService {
           const images = dto.images.map((image, index) =>
             manager.create(ListingImage, {
               listingId: id,
-              url: image.url,
+              url: image.key,
               isCover: hasCover ? image.isCover === true : index === 0,
               sortOrder: index,
             }),
@@ -420,10 +404,10 @@ export class ListingsService {
           throw new NotFoundException('Không tìm thấy tin đăng vừa cập nhật');
         }
 
-        return { updatedListing, removedImageUrls };
+        return { updatedListing, removedImageKeys };
       });
 
-    await this.deleteImagesFromStorage(removedImageUrls);
+    await this.deleteImagesFromStorage(removedImageKeys);
 
     return updatedListing;
   }
@@ -448,13 +432,9 @@ export class ListingsService {
     });
   }
 
-  private async deleteImagesFromStorage(imageUrls: string[]): Promise<void> {
+  private async deleteImagesFromStorage(imageKeys: string[]): Promise<void> {
     await Promise.all(
-      imageUrls.map(async (imageUrl) => {
-        const key = this.storageService.getKeyFromPublicUrl(imageUrl);
-
-        if (key) await this.storageService.deleteFile(key);
-      }),
+      imageKeys.map((key) => this.storageService.deleteFile(key)),
     );
   }
 
@@ -463,6 +443,12 @@ export class ListingsService {
       (a, b) => a.sortOrder - b.sortOrder,
     );
     const coverImage = images.find((image) => image.isCover) ?? images[0];
+    const imageKeys = images
+      .map((image) => this.storageService.getObjectKey(image.url))
+      .filter((key): key is string => key !== null);
+    const coverImageKey = coverImage
+      ? this.storageService.getObjectKey(coverImage.url)
+      : null;
 
     return {
       id: listing.id,
@@ -470,8 +456,14 @@ export class ListingsService {
       price: Number(listing.price),
       area: Number(listing.area),
       address: listing.fullAddress,
-      imageUrl: coverImage?.url,
-      imageUrls: images.map((image) => image.url),
+      imageUrl: coverImage
+        ? this.storageService.getPublicUrl(coverImage.url)
+        : undefined,
+      imageKey: coverImageKey ?? undefined,
+      imageUrls: images.map((image) =>
+        this.storageService.getPublicUrl(image.url),
+      ),
+      imageKeys,
       status: listing.deletedAt ? 'deleted' : listing.status,
       isFeatured: false,
       viewCount: 0,
