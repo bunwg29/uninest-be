@@ -8,7 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUrl,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -18,21 +18,19 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateListingImageDto {
   @ApiProperty({
-    example:
-      'https://pub-250e35ee14664cab87368a3ea466d91f.r2.dev/listings/1715800000000-uuid.jpg',
-    description:
-      'URL ảnh sau khi đã upload lên Cloudflare R2 (bắt buộc giao thức http/https, không nhận URI cục bộ)',
+    example: 'listings/1715800000000-uuid.jpg',
+    description: 'Object key của ảnh sau khi đã tải lên storage',
   })
-  @IsNotEmpty({ message: 'URL ảnh không được để trống' })
-  @IsUrl(
-    { protocols: ['http', 'https'], require_protocol: true },
+  @IsNotEmpty({ message: 'Object key ảnh không được để trống' })
+  @IsString({ message: 'Object key ảnh phải là chuỗi' })
+  @Matches(
+    /^(?!.*\.\.)(?!.*\/\/)listings\/[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$/,
     {
-      message:
-        'URL ảnh phải là liên kết web (http/https) hợp lệ từ Cloudflare R2',
+      message: 'Object key ảnh tin đăng không hợp lệ',
     },
   )
-  @MaxLength(1000, { message: 'URL ảnh tối đa 1000 ký tự' })
-  url!: string;
+  @MaxLength(1000, { message: 'Object key ảnh tối đa 1000 ký tự' })
+  key!: string;
 
   @ApiPropertyOptional({
     example: true,
@@ -232,8 +230,7 @@ export class CreateListingDto {
 
   @ApiPropertyOptional({
     type: [CreateListingImageDto],
-    description:
-      'Danh sách ảnh phòng đã upload lên Cloudflare R2, tối đa 10 ảnh',
+    description: 'Danh sách object key của ảnh phòng đã tải lên, tối đa 10 ảnh',
   })
   @IsOptional()
   @IsArray({ message: 'Danh sách ảnh phải là mảng' })

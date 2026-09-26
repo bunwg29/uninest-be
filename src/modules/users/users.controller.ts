@@ -121,10 +121,10 @@ export class UsersController {
       throw new BadRequestException('Không tìm thấy hồ sơ cá nhân');
     }
 
-    const oldAvatarKey = user.avatarUrl?.split('/').slice(-3).join('/');
+    const oldAvatarKey = this.r2StorageService.getObjectKey(user.avatarUrl);
     const avatarUrl = this.r2StorageService.getPublicUrl(dto.objectKey);
 
-    await this.usersService.update(userId, { avatarUrl });
+    await this.usersService.update(userId, { avatarUrl: dto.objectKey });
 
     if (oldAvatarKey?.startsWith(avatarPrefix)) {
       await this.r2StorageService.deleteFile(oldAvatarKey);
@@ -191,7 +191,9 @@ export class UsersController {
     return {
       id: user.id,
       name: user.fullName,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: user.avatarUrl
+        ? this.r2StorageService.getPublicUrl(user.avatarUrl)
+        : null,
       phone: user.phone,
       phoneVerified:
         user.phoneVerified || (user.isVerified && Boolean(user.phone)),

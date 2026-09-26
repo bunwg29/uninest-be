@@ -26,6 +26,7 @@ import { OtpType } from '../entities/otp-code';
 import { UserRoleType, ROLE_CODES, ROLE_NAMES } from '@common/constants';
 import { User } from '../../users/entities/user';
 import { LocationsService } from '../../locations/locations.service';
+import { R2StorageService } from '@core/storage';
 
 @Injectable()
 export class AuthService {
@@ -34,6 +35,7 @@ export class AuthService {
     private readonly otpService: OtpService,
     private readonly tokenService: TokenService,
     private readonly locationsService: LocationsService,
+    private readonly storageService: R2StorageService,
   ) {}
 
   private mapToAuthUserDto(user: User, permissions: string[]): AuthUserDto {
@@ -45,7 +47,9 @@ export class AuthService {
       email: user.email,
       phone: user.phone,
       fullName: user.fullName,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: user.avatarUrl
+        ? this.storageService.getPublicUrl(user.avatarUrl)
+        : null,
       roleId: user.roleId,
       role: roleCode,
       roleName: roleName,
