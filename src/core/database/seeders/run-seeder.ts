@@ -19,29 +19,46 @@ import {
 import { seedRbac } from './rbac.seeder';
 import { seedLocations } from './locations.seeder';
 import { seedAmenities } from './amenities.seeder';
+import { seedRooms } from './rooms.seeder';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env'), quiet: true });
+
+async function seedRoomsWithDependencies(
+  dataSource: DataSource,
+): Promise<void> {
+  await seedRbac(dataSource);
+  await seedAmenities(dataSource);
+  await seedLocations(dataSource);
+  await seedRooms(dataSource);
+}
 
 const SEEDERS: Record<
   string,
   { name: string; description: string; fn: (ds: DataSource) => Promise<void> }
 > = {
   rbac: {
-    name: 'RBAC Seeder',
+    name: 'Seeder phân quyền',
     description:
-      'Nạp vai trò (0: Student, 1: Landlord, 2: Admin) và bảng permissions',
+      'Nạp vai trò (0: Sinh viên, 1: Chủ trọ, 2: Quản trị viên) và danh sách quyền',
     fn: seedRbac,
   },
+  amenities: {
+    name: 'Seeder tiện ích',
+    description:
+      'Nạp danh mục tiện ích với mã số (1..17) và nhóm số (0: Nội thất, 1: Tiện ích, 2: An ninh, 3: Phòng)',
+    fn: seedAmenities,
+  },
   locations: {
-    name: 'Locations Seeder',
-    description: 'Nạp 34 tỉnh/thành phố và 3.321 phường/xã từ dataset VN units',
+    name: 'Seeder địa giới',
+    description:
+      'Nạp 34 tỉnh/thành phố và 3.321 phường/xã từ dữ liệu đơn vị hành chính Việt Nam',
     fn: seedLocations,
   },
-  amenities: {
-    name: 'Amenities Seeder',
+  rooms: {
+    name: 'Seeder 55 phòng trọ',
     description:
-      'Nạp danh mục tiện ích với mã số (1..16) và nhóm số (0: Nội thất, 1: Tiện ích, 2: An ninh, 3: Phòng)',
-    fn: seedAmenities,
+      'Nạp dữ liệu phân quyền, tiện ích, địa giới, 5 chủ trọ và 55 phòng trọ mẫu',
+    fn: seedRoomsWithDependencies,
   },
 };
 
@@ -49,11 +66,11 @@ async function run() {
   const arg = process.argv[2]?.trim().toLowerCase();
 
   if (!arg) {
-    console.log('\n[Seeder CLI] Thieu ten seeder can chay.');
-    console.log('\nCach dung:');
+    console.log('\n[Trình nạp dữ liệu] Thiếu tên seeder cần chạy.');
+    console.log('\nCách dùng:');
     console.log('   npm run seed -- <ten_seeder>');
-    console.log('   (Vi du: npm run seed -- rbac)');
-    console.log('\nDanh sach cac seeders co san:');
+    console.log('   (Ví dụ: npm run seed -- rooms)');
+    console.log('\nDanh sách các seeder có sẵn:');
 
     for (const [key, item] of Object.entries(SEEDERS)) {
       console.log(`   - ${key}: ${item.name} (${item.description})`);
@@ -66,8 +83,8 @@ async function run() {
   const seeder = SEEDERS[cleanKey];
 
   if (!seeder) {
-    console.log(`\n[Seeder CLI] Khong tim thay seeder: "${arg}"`);
-    console.log('Cac seeder hop le: ' + Object.keys(SEEDERS).join(', '));
+    console.log(`\n[Trình nạp dữ liệu] Không tìm thấy seeder: "${arg}"`);
+    console.log('Các seeder hợp lệ: ' + Object.keys(SEEDERS).join(', '));
     process.exit(1);
   }
 
@@ -80,7 +97,7 @@ async function run() {
     port: Number(process.env.DB_PORT) || 5432,
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE || 'uninest',
+    database: process.env.DB_DATABASE || 'uninest_db',
     entities: [
       Role,
       Permission,
@@ -101,16 +118,16 @@ async function run() {
 
   try {
     console.log(
-      `\n[Seeder CLI] Dang ket noi database ${process.env.DB_DATABASE || 'uninest'}...`,
+      `\n[Trình nạp dữ liệu] Đang kết nối cơ sở dữ liệu ${process.env.DB_DATABASE || 'uninest_db'}...`,
     );
     await dataSource.initialize();
-    console.log(`[Seeder CLI] Bat dau chay ${seeder.name}...`);
+    console.log(`[Trình nạp dữ liệu] Bắt đầu chạy ${seeder.name}...`);
 
     await seeder.fn(dataSource);
 
-    console.log(`[Seeder CLI] Hoan thanh thanh cong!\n`);
+    console.log('[Trình nạp dữ liệu] Hoàn thành thành công!\n');
   } catch (error) {
-    console.error('[Seeder CLI] Loi trong qua trinh seed:', error);
+    console.error('[Trình nạp dữ liệu] Lỗi trong quá trình nạp:', error);
     process.exit(1);
   } finally {
     if (dataSource.isInitialized) {
