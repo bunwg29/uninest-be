@@ -151,6 +151,25 @@ export class R2StorageService {
     return this.resolvePublicUrl(key);
   }
 
+  getKeyFromPublicUrl(publicUrl: string): string | null {
+    const normalizedBaseUrl = this.publicUrl.replace(/\/$/, '');
+
+    if (normalizedBaseUrl && publicUrl.startsWith(`${normalizedBaseUrl}/`)) {
+      return decodeURIComponent(publicUrl.slice(normalizedBaseUrl.length + 1));
+    }
+
+    try {
+      const parsedUrl = new URL(publicUrl);
+      const defaultR2Host = `${this.bucketName}.r2.cloudflarestorage.com`;
+
+      if (parsedUrl.hostname !== defaultR2Host) return null;
+
+      return decodeURIComponent(parsedUrl.pathname.replace(/^\//, '')) || null;
+    } catch {
+      return null;
+    }
+  }
+
   async deleteFile(key: string): Promise<boolean> {
     if (!this.isConfigured || !this.s3Client) {
       this.logger.log(`Mock delete file key: ${key}`);

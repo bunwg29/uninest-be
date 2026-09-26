@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { R2StorageService } from '@core/storage';
 import { Province, Ward } from '@modules/locations/entities';
 import {
   Amenity,
@@ -28,6 +29,7 @@ export class ListingsService {
     private readonly wardRepository: Repository<Ward>,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly storageService: R2StorageService,
   ) {}
 
   async createListing(userId: string, dto: CreateListingDto): Promise<Listing> {
@@ -102,6 +104,9 @@ export class ListingsService {
           coordinates: [dto.longitude, dto.latitude],
         },
         status: ListingStatus.PENDING,
+        viewingSchedule: dto.viewingSchedule
+          ? { ...dto.viewingSchedule }
+          : null,
       });
 
       const savedListing = await manager.save(Listing, listing);
@@ -335,78 +340,92 @@ export class ListingsService {
       throw new BadRequestException('Tin đăng chỉ được có một ảnh bìa');
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const listing = await manager.findOne(Listing, {
-        where: { id, ownerId: userId },
+    const nextImageUrls = new Set(dto.images?.map((image) => image.url) ?? []);
+    const { updatedListing, removedImageUrls } =
+      await this.dataSource.transaction(async (manager) => {
+        const listing = await manager.findOne(Listing, {
+          where: { id, ownerId: userId },
+          relations: { images: true },
+        });
+
+        if (!listing) {
+          throw new NotFoundException('Không tìm thấy tin đăng của bạn');
+        }
+
+        const removedImageUrls = listing.images
+          .map((image) => image.url)
+          .filter((url) => !nextImageUrls.has(url));
+
+        Object.assign(listing, {
+          title: dto.title,
+          description: dto.description ?? null,
+          roomType: dto.roomType,
+          price: String(dto.price),
+          area: String(dto.area),
+          maxOccupants: dto.maxOccupants,
+          electricPrice:
+            dto.electricPrice === undefined ? null : String(dto.electricPrice),
+          waterPrice:
+            dto.waterPrice === undefined ? null : String(dto.waterPrice),
+          deposit: dto.deposit === undefined ? null : String(dto.deposit),
+          streetAddress: dto.streetAddress,
+          provinceCode: province.code,
+          wardCode: ward.code,
+          fullAddress: `${dto.streetAddress}, ${ward.fullName}, ${province.fullName}`,
+          location: {
+            type: 'Point',
+            coordinates: [dto.longitude, dto.latitude],
+          },
+          status: ListingStatus.PENDING,
+          viewingSchedule: dto.viewingSchedule
+            ? { ...dto.viewingSchedule }
+            : null,
+        });
+
+        await manager.save(Listing, listing);
+        await manager.delete(ListingImage, { listingId: id });
+        await manager.delete(ListingAmenity, { listingId: id });
+
+        if (dto.images?.length) {
+          const hasCover = coverCount === 1;
+          const images = dto.images.map((image, index) =>
+            manager.create(ListingImage, {
+              listingId: id,
+              url: image.url,
+              isCover: hasCover ? image.isCover === true : index === 0,
+              sortOrder: index,
+            }),
+          );
+
+          await manager.save(ListingImage, images);
+        }
+
+        if (amenities.length) {
+          const listingAmenities = amenities.map((amenity) =>
+            manager.create(ListingAmenity, {
+              listingId: id,
+              amenityId: amenity.id,
+            }),
+          );
+
+          await manager.save(ListingAmenity, listingAmenities);
+        }
+
+        const updatedListing = await manager.findOne(Listing, {
+          where: { id },
+          relations: { images: true, listingAmenities: true },
+        });
+
+        if (!updatedListing) {
+          throw new NotFoundException('Không tìm thấy tin đăng vừa cập nhật');
+        }
+
+        return { updatedListing, removedImageUrls };
       });
 
-      if (!listing) {
-        throw new NotFoundException('Không tìm thấy tin đăng của bạn');
-      }
+    await this.deleteImagesFromStorage(removedImageUrls);
 
-      Object.assign(listing, {
-        title: dto.title,
-        description: dto.description ?? null,
-        roomType: dto.roomType,
-        price: String(dto.price),
-        area: String(dto.area),
-        maxOccupants: dto.maxOccupants,
-        electricPrice:
-          dto.electricPrice === undefined ? null : String(dto.electricPrice),
-        waterPrice:
-          dto.waterPrice === undefined ? null : String(dto.waterPrice),
-        deposit: dto.deposit === undefined ? null : String(dto.deposit),
-        streetAddress: dto.streetAddress,
-        provinceCode: province.code,
-        wardCode: ward.code,
-        fullAddress: `${dto.streetAddress}, ${ward.fullName}, ${province.fullName}`,
-        location: {
-          type: 'Point',
-          coordinates: [dto.longitude, dto.latitude],
-        },
-        status: ListingStatus.PENDING,
-      });
-
-      await manager.save(Listing, listing);
-      await manager.delete(ListingImage, { listingId: id });
-      await manager.delete(ListingAmenity, { listingId: id });
-
-      if (dto.images?.length) {
-        const hasCover = coverCount === 1;
-        const images = dto.images.map((image, index) =>
-          manager.create(ListingImage, {
-            listingId: id,
-            url: image.url,
-            isCover: hasCover ? image.isCover === true : index === 0,
-            sortOrder: index,
-          }),
-        );
-
-        await manager.save(ListingImage, images);
-      }
-
-      if (amenities.length) {
-        const listingAmenities = amenities.map((amenity) =>
-          manager.create(ListingAmenity, {
-            listingId: id,
-            amenityId: amenity.id,
-          }),
-        );
-
-        await manager.save(ListingAmenity, listingAmenities);
-      }
-
-      const updatedListing = await manager.findOne(Listing, {
-        where: { id },
-        relations: { images: true, listingAmenities: true },
-      });
-
-      if (!updatedListing) {
-        throw new NotFoundException('Không tìm thấy tin đăng vừa cập nhật');
-      }
-
-      return updatedListing;
-    });
+    return updatedListing;
   }
 
   async deleteListing(userId: string, id: string): Promise<void> {
@@ -427,6 +446,16 @@ export class ListingsService {
       where: { isActive: true },
       order: { group: 'ASC', id: 'ASC' },
     });
+  }
+
+  private async deleteImagesFromStorage(imageUrls: string[]): Promise<void> {
+    await Promise.all(
+      imageUrls.map(async (imageUrl) => {
+        const key = this.storageService.getKeyFromPublicUrl(imageUrl);
+
+        if (key) await this.storageService.deleteFile(key);
+      }),
+    );
   }
 
   private toLandlordListing(listing: Listing) {
@@ -465,6 +494,7 @@ export class ListingsService {
       latitude: listing.location.coordinates[1],
       longitude: listing.location.coordinates[0],
       amenityIds: listing.listingAmenities?.map((item) => item.amenityId) ?? [],
+      viewingSchedule: listing.viewingSchedule ?? undefined,
     };
   }
 }
