@@ -38,6 +38,7 @@
 ### B. Quản lý Tin đăng Phòng trọ (`listings`)
 
 - **Đăng tin & Cập nhật**: Chủ trọ (`landlord`) tạo tin mới gồm tiêu đề, mô tả, giá thuê, tiền cọc, diện tích, loại phòng, địa chỉ chi tiết, tiện nghi đi kèm, ảnh phòng (upload R2).
+- **Lịch xem phòng**: Chủ trọ thiết lập các buổi sáng, chiều, tối có thể xem phòng cho từng ngày trong tuần; lịch được lưu cùng tin đăng và trả về khi chỉnh sửa.
 - **Vòng đời tin đăng (Lifecycle)**:
   - Mới tạo mặc định ở trạng thái chờ duyệt (`pending`).
   - Quản trị viên (`admin`) xét duyệt chuyển sang `active` hoặc từ chối (`rejected`).
@@ -95,6 +96,7 @@
 2. **Server tạo Presigned URL**: Server sử dụng `R2StorageService` (`@aws-sdk/s3-request-presigner`) tạo URL ký trước có thời hạn (ví dụ 15 phút).
 3. **Client upload trực tiếp**: Client gửi HTTP `PUT` chứa binary file trực tiếp lên Cloudflare R2 endpoint. Server hoàn toàn không bị nghẽn băng thông do truyền file trung gian.
 4. **Lưu trữ URL**: Client gửi URL ảnh đã upload lên R2 vào body các API tạo/sửa tin đăng hoặc avatar.
+5. **Dọn ảnh khi cập nhật**: Sau khi cập nhật tin thành công, backend xóa khỏi R2 các ảnh đã bị chủ trọ loại khỏi tin; ảnh của tin bị xóa mềm vẫn được giữ lại theo chính sách lưu vết.
 
 ---
 
