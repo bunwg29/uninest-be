@@ -1,28 +1,15 @@
-import 'reflect-metadata';
 import * as bcrypt from 'bcryptjs';
-import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
-import { UserRoleType, ROLE_CODES, ROLE_NAMES } from '@common/constants';
-import { seedLocations } from '@core/database/seeders/locations.seeder';
-import { RefreshToken, OtpCode } from '@modules/auth/entities';
+import { UserRoleType } from '@common/constants';
 import {
-  Amenity,
-  AmenityGroup,
   Listing,
   ListingAmenity,
   ListingImage,
   ListingStatus,
 } from '@modules/listings/entities';
-import { Province, Ward } from '@modules/locations/entities';
-import {
-  Permission,
-  Role,
-  RolePermission,
-  User,
-} from '@modules/users/entities';
+import { User } from '@modules/users/entities';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
-import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 
 type UniversityCode =
   'DHQG_TPHCM' | 'BK_TPHCM' | 'KT_TPHCM' | 'DHQG_HN' | 'BK_HN';
@@ -150,82 +137,6 @@ const LANDLORDS: LandlordSeedData[] = [
   },
 ];
 
-const REQUIRED_AMENITIES: {
-  id: number;
-  name: string;
-  group: AmenityGroup;
-  isActive: boolean;
-}[] = [
-  { id: 1, name: 'Điều hòa', group: AmenityGroup.FURNITURE, isActive: true },
-  { id: 2, name: 'Tủ lạnh', group: AmenityGroup.FURNITURE, isActive: true },
-  {
-    id: 3,
-    name: 'Máy giặt chung',
-    group: AmenityGroup.FURNITURE,
-    isActive: true,
-  },
-  {
-    id: 5,
-    name: 'Nội thất cơ bản',
-    group: AmenityGroup.FURNITURE,
-    isActive: true,
-  },
-  {
-    id: 6,
-    name: 'WiFi miễn phí',
-    group: AmenityGroup.FACILITY,
-    isActive: true,
-  },
-  {
-    id: 7,
-    name: 'Chỗ để xe',
-    group: AmenityGroup.FACILITY,
-    isActive: true,
-  },
-  {
-    id: 8,
-    name: 'Bếp chung',
-    group: AmenityGroup.FACILITY,
-    isActive: true,
-  },
-  {
-    id: 10,
-    name: 'Ban công',
-    group: AmenityGroup.FACILITY,
-    isActive: true,
-  },
-  {
-    id: 11,
-    name: 'Camera an ninh',
-    group: AmenityGroup.SECURITY,
-    isActive: true,
-  },
-  {
-    id: 12,
-    name: 'Bảo vệ 24/7',
-    group: AmenityGroup.SECURITY,
-    isActive: true,
-  },
-  {
-    id: 14,
-    name: 'WC riêng',
-    group: AmenityGroup.ROOM_FEATURE,
-    isActive: true,
-  },
-  {
-    id: 15,
-    name: 'Cửa sổ lớn',
-    group: AmenityGroup.ROOM_FEATURE,
-    isActive: true,
-  },
-  {
-    id: 17,
-    name: 'Máy nước nóng',
-    group: AmenityGroup.FURNITURE,
-    isActive: true,
-  },
-];
-
 const AMENITY_IDS_BY_FIELD: ReadonlyArray<readonly [AmenityField, number]> = [
   ['hasWifi', 6],
   ['hasAirConditioner', 1],
@@ -301,8 +212,6 @@ const ROOM_LIMITS: Record<
 
 const ROOM_IMAGE_URL_PATTERN =
   /^https:\/\/images\.unsplash\.com\/photo-[^?]+\?w=800&q=80&sig=\d{3}$/;
-
-dotenv.config({ path: path.resolve(process.cwd(), '.env'), quiet: true });
 
 function readRoomsData(): RoomSeedData[] {
   const content = fs.readFileSync(ROOMS_DATA_PATH, 'utf8');
@@ -444,36 +353,6 @@ function validateRoomsData(rooms: RoomSeedData[]): void {
         `Phân bổ ${universityCode} phải là ${expectedCount} phòng, hiện có ${actualCount} phòng`,
       );
     }
-  }
-}
-
-async function ensureReferenceData(dataSource: DataSource): Promise<void> {
-  const roleRepository = dataSource.getRepository(Role);
-  const amenityRepository = dataSource.getRepository(Amenity);
-  const provinceRepository = dataSource.getRepository(Province);
-  const wardRepository = dataSource.getRepository(Ward);
-
-  await roleRepository.upsert(
-    {
-      id: UserRoleType.LANDLORD,
-      code: ROLE_CODES[UserRoleType.LANDLORD],
-      name: ROLE_NAMES[UserRoleType.LANDLORD],
-      description: 'Chủ nhà trọ đăng tin và quản lý phòng cho thuê',
-    },
-    ['id'],
-  );
-
-  await amenityRepository.upsert(REQUIRED_AMENITIES, ['id']);
-
-  const requiredProvinceCount = await provinceRepository.countBy({
-    code: In(['01', '79']),
-  });
-  const requiredWardCount = await wardRepository.countBy({
-    code: In(['00166', '00292', '26800', '27139', '27169']),
-  });
-
-  if (requiredProvinceCount < 2 || requiredWardCount < 5) {
-    await seedLocations(dataSource);
   }
 }
 
@@ -740,68 +619,23 @@ async function verifySeededRooms(
   }
 }
 
-async function run(): Promise<void> {
+export async function seedRooms(dataSource: DataSource): Promise<void> {
   const rooms = readRoomsData();
 
   validateRoomsData(rooms);
 
-  const isSynchronizeEnabled =
-    process.env.DB_SYNCHRONIZE === 'true' || process.env.DB_SYNCHRONIZE === '1';
-  const dataSource = new DataSource({
-    type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: Number(process.env.DB_PORT) || 5432,
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE || 'uninest_db',
-    entities: [
-      Role,
-      Permission,
-      RolePermission,
-      User,
-      RefreshToken,
-      OtpCode,
-      Province,
-      Ward,
-      Amenity,
-      Listing,
-      ListingAmenity,
-      ListingImage,
-    ],
-    synchronize: isSynchronizeEnabled,
-    logging: false,
-    namingStrategy: new SnakeNamingStrategy(),
+  const ownerIds = await seedLandlords(dataSource);
+  const seededRooms = await dataSource.transaction(async (manager) => {
+    const results: SeededRoom[] = [];
+
+    for (const room of rooms) {
+      results.push(await upsertRoom(manager, room, ownerIds));
+    }
+
+    return results;
   });
 
-  try {
-    console.log('Đang kết nối PostgreSQL và PostGIS local...');
-    await dataSource.initialize();
-    await ensureReferenceData(dataSource);
+  await verifySeededRooms(dataSource, seededRooms);
 
-    const ownerIds = await seedLandlords(dataSource);
-    const seededRooms = await dataSource.transaction(async (manager) => {
-      const results: SeededRoom[] = [];
-
-      for (const room of rooms) {
-        results.push(await upsertRoom(manager, room, ownerIds));
-      }
-
-      return results;
-    });
-
-    await verifySeededRooms(dataSource, seededRooms);
-
-    console.log('\nĐã nạp 55 phòng trọ thành công');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-
-    console.error(`Nạp dữ liệu phòng trọ thất bại: ${message}`);
-    process.exitCode = 1;
-  } finally {
-    if (dataSource.isInitialized) {
-      await dataSource.destroy();
-    }
-  }
+  console.log('\nĐã nạp 55 phòng trọ thành công');
 }
-
-void run();
