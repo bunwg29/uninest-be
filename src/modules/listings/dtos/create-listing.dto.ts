@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -40,6 +41,60 @@ export class CreateListingImageDto {
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')
   isCover?: boolean;
+}
+
+export class ViewingSlotDto {
+  @ApiProperty({ example: true, description: 'Có thể xem phòng vào buổi sáng' })
+  @IsBoolean({ message: 'Trạng thái buổi sáng phải là kiểu boolean' })
+  morning!: boolean;
+
+  @ApiProperty({
+    example: false,
+    description: 'Có thể xem phòng vào buổi chiều',
+  })
+  @IsBoolean({ message: 'Trạng thái buổi chiều phải là kiểu boolean' })
+  afternoon!: boolean;
+
+  @ApiProperty({ example: true, description: 'Có thể xem phòng vào buổi tối' })
+  @IsBoolean({ message: 'Trạng thái buổi tối phải là kiểu boolean' })
+  evening!: boolean;
+}
+
+export class ViewingScheduleDto {
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Hai' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  mon!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Ba' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  tue!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Tư' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  wed!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Năm' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  thu!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Sáu' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  fri!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Bảy' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  sat!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng Chủ nhật' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  sun!: ViewingSlotDto;
 }
 
 export class CreateListingDto {
@@ -198,4 +253,17 @@ export class CreateListingDto {
   @Min(0, { each: true, message: 'Mã tiện ích không được là số âm' })
   @Type(() => Number)
   amenityIds?: number[];
+
+  @ApiPropertyOptional({
+    type: ViewingScheduleDto,
+    description: 'Lịch cho xem phòng định kỳ trong tuần',
+    example: {
+      mon: { morning: true, afternoon: false, evening: true },
+      tue: { morning: false, afternoon: true, evening: false },
+    },
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ViewingScheduleDto)
+  viewingSchedule?: ViewingScheduleDto;
 }

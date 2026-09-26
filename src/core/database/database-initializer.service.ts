@@ -9,7 +9,21 @@ export class DatabaseInitializerService implements OnModuleInit {
 
   async onModuleInit() {
     await this.initializeExtensions();
+    await this.migrateListingsViewingScheduleSchema();
     await this.migrateAmenitiesSchema();
+  }
+
+  private async migrateListingsViewingScheduleSchema() {
+    try {
+      await this.dataSource.query(`
+        ALTER TABLE IF EXISTS listings
+        ADD COLUMN IF NOT EXISTS viewing_schedule JSONB
+      `);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      this.logger.warn(`Không thể cập nhật cột lịch xem phòng: ${message}`);
+    }
   }
 
   private async migrateAmenitiesSchema() {
