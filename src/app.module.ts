@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppConfigModule, DatabaseModule, StorageModule } from '@core';
 import {
   HealthModule,
@@ -20,6 +21,7 @@ import {
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot(),
     AppConfigModule,
     DatabaseModule,
     StorageModule,
