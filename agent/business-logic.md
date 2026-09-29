@@ -64,6 +64,11 @@
 
 - **Hội thoại gắn liền tin đăng**: Tạo luồng trao đổi trực tiếp giữa sinh viên và chủ trọ của một phòng cụ thể.
 - **Nội dung tin nhắn**: Hỗ trợ gửi tin nhắn văn bản và tệp hình ảnh đính kèm (qua Cloudflare R2). Đánh dấu trạng thái đã đọc/chưa đọc.
+- **Dữ liệu**: bảng `conversations` (duy nhất theo cặp `listing_id` + `student_id`, chỉ sinh viên được khởi tạo) và `messages` (`client_message_id` chống gửi trùng khi gửi lại lúc mất mạng, `image_keys` lưu object key thư mục `chat/`, tối đa 5 ảnh/tin, `read_at`, `recalled_at`). Cả hai bảng dùng soft delete; dữ liệu được lưu tối thiểu 12 tháng.
+- **Realtime**: Socket.IO namespace `/chat`, xác thực bằng JWT access token ở handshake (`auth.token`), từ chối kết nối ngay khi token sai. Sự kiện client gửi: `message.send`, `conversation.read` (có ack theo envelope `{ status, data, error, messages }`). Sự kiện server phát tới cả hai bên: `message.new`, `message.recalled`, `conversation.read`.
+- **REST bổ trợ**: `POST /conversations`, `GET /conversations` (lọc `all`/`unread`), `GET /conversations/summary`, `GET /conversations/:id`, `GET /conversations/:id/messages` (cursor, mới nhất trước), `POST /conversations/:id/messages`, `PATCH /conversations/:id/read`, `DELETE /conversations/:id/messages/:messageId`.
+- **Quy tắc**: chỉ hai người tham gia được xem hội thoại; tin nhắn không thể sửa, người gửi chỉ được thu hồi (ẩn) tin của mình trong 24 giờ, nội dung gốc vẫn được lưu để phục vụ khiếu nại. Hội thoại chưa có tin nhắn không hiển thị trong danh sách.
+- **Điểm móc thông báo**: mỗi tin nhắn mới phát sự kiện nội bộ `message.created` (`EventEmitter2`) để Notification Pipeline (Sprint 3) đăng ký lắng nghe.
 
 ### F. Diễn đàn Cộng đồng Sinh viên (`forum`)
 
