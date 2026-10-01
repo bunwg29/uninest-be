@@ -19,6 +19,7 @@ import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import {
   ConversationsQueryDto,
   CreateConversationDto,
+  EditMessageDto,
   MessagesQueryDto,
   SendMessageDto,
 } from '../dtos';
@@ -104,6 +105,31 @@ export class ChatController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.chatService.markConversationRead(userId, id);
+  }
+
+  @Patch(':id/messages/:messageId')
+  @ApiOperation({
+    summary: 'Chỉnh sửa nội dung tin nhắn của chính mình trong vòng 24 giờ',
+  })
+  async editMessage(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('messageId', ParseUUIDPipe) messageId: string,
+    @Body() dto: EditMessageDto,
+  ) {
+    return this.chatService.editMessage(userId, id, messageId, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({
+    summary:
+      'Xoá đoạn chat phía người dùng hiện tại (người kia vẫn giữ nguyên lịch sử)',
+  })
+  async deleteConversation(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.chatService.deleteConversation(userId, id);
   }
 
   @Delete(':id/messages/:messageId')

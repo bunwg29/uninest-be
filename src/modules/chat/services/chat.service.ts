@@ -15,10 +15,12 @@ import {
 } from '@modules/listings/entities';
 import {
   ChatMessageResponseDto,
+  ConversationDeletedResponseDto,
   ConversationResponseDto,
   ConversationSummaryResponseDto,
   ConversationsQueryDto,
   CreateConversationDto,
+  EditMessageDto,
   MarkReadResponseDto,
   MessagesPageResponseDto,
   MessagesQueryDto,
@@ -40,6 +42,16 @@ export interface MessageCreatedEvent {
 export interface MessageRecalledEvent {
   message: ChatMessageResponseDto;
   participantIds: [string, string];
+}
+
+export interface MessageUpdatedEvent {
+  message: ChatMessageResponseDto;
+  participantIds: [string, string];
+}
+
+export interface ConversationDeletedEvent {
+  conversationId: string;
+  userId: string;
 }
 
 export interface ConversationReadEvent extends MarkReadResponseDto {
@@ -150,7 +162,18 @@ export class ChatService {
         '(conversation.studentId = :userId OR conversation.landlordId = :userId)',
         { userId },
       )
-      .andWhere('conversation.lastMessageAt IS NOT NULL');
+      .andWhere('conversation.lastMessageAt IS NOT NULL')
+      .andWhere(
+        `conversation.last_message_at > ${this.buildHiddenAtExpression('conversation', ':userId')}`,
+      );
+
+    if (query.keyword) {
+      queryBuilder.andWhere(
+        `(CASE WHEN conversation.student_id = :userId THEN landlord.full_name ELSE student.full_name END ILIKE :pattern
+          OR listing.title ILIKE :pattern)`,
+        { pattern: `%${this.escapeLikePattern(query.keyword)}%` },
+      );
+    }
 
     if (query.filter === 'unread') {
       queryBuilder.andWhere(this.buildUnreadExistsClause('conversation'), {
@@ -182,6 +205,9 @@ export class ChatService {
         { userId },
       )
       .andWhere('conversation.lastMessageAt IS NOT NULL')
+      .andWhere(
+        `conversation.last_message_at > ${this.buildHiddenAtExpression('conversation', ':userId')}`,
+      )
       .getCount();
 
     const unreadRows = await this.messageRepository
@@ -194,6 +220,9 @@ export class ChatService {
         { userId },
       )
       .andWhere('conversation.deletedAt IS NULL')
+      .andWhere(
+        `message.created_at > ${this.buildHiddenAtExpression('conversation', ':userId')}`,
+      )
       .andWhere('message.senderId <> :userId', { userId })
       .andWhere('message.readAt IS NULL')
       .andWhere('message.recalledAt IS NULL')
@@ -232,11 +261,20 @@ export class ChatService {
     conversationId: string,
     query: MessagesQueryDto,
   ): Promise<MessagesPageResponseDto> {
-    await this.findParticipantConversation(userId, conversationId);
+    const conversation = await this.findParticipantConversation(
+      userId,
+      conversationId,
+    );
 
     const queryBuilder = this.messageRepository
       .createQueryBuilder('message')
       .where('message.conversationId = :conversationId', { conversationId });
+
+    const hiddenAt = this.getHiddenAt(conversation, userId);
+
+    if (hiddenAt) {
+      queryBuilder.andWhere('message.created_at > :hiddenAt', { hiddenAt });
+    }
 
     if (query.cursor) {
       const cursorMessage = await this.messageRepository.findOne({
@@ -447,6 +485,102 @@ export class ChatService {
     return response;
   }
 
+  async editMessage(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+    dto: EditMessageDto,
+  ): Promise<ChatMessageResponseDto> {
+    const conversation = await this.findParticipantConversation(
+      userId,
+      conversationId,
+    );
+
+    const message = await this.messageRepository.findOne({
+      where: { id: messageId, conversationId },
+    });
+
+    if (!message) {
+      throw new NotFoundException('Không tìm thấy tin nhắn');
+    }
+
+    if (message.senderId !== userId) {
+      throw new ForbiddenException(
+        'Bạn chỉ có thể chỉnh sửa tin nhắn của mình',
+      );
+    }
+
+    if (message.recalledAt) {
+      throw new BadRequestException(
+        'Không thể chỉnh sửa tin nhắn đã được thu hồi',
+      );
+    }
+
+    if (!message.content) {
+      throw new BadRequestException(
+        'Chỉ có thể chỉnh sửa tin nhắn có nội dung văn bản',
+      );
+    }
+
+    if (Date.now() - message.createdAt.getTime() > CHAT_LIMITS.EDIT_WINDOW_MS) {
+      throw new BadRequestException(
+        'Chỉ có thể chỉnh sửa tin nhắn trong vòng 24 giờ sau khi gửi',
+      );
+    }
+
+    const content = dto.content.trim();
+
+    if (!content) {
+      throw new BadRequestException('Nội dung tin nhắn không được để trống');
+    }
+
+    if (content === message.content) {
+      return this.mapper.toMessage(message);
+    }
+
+    message.originalContent = message.originalContent ?? message.content;
+    message.content = content;
+    message.editedAt = new Date();
+
+    const response = this.mapper.toMessage(
+      await this.messageRepository.save(message),
+    );
+
+    const event: MessageUpdatedEvent = {
+      message: response,
+      participantIds: this.getParticipantIds(conversation),
+    };
+
+    this.eventEmitter.emit(CHAT_EVENTS.MESSAGE_UPDATED, event);
+
+    return response;
+  }
+
+  async deleteConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<ConversationDeletedResponseDto> {
+    const conversation = await this.findParticipantConversation(
+      userId,
+      conversationId,
+    );
+
+    const column =
+      conversation.studentId === userId
+        ? 'studentDeletedAt'
+        : 'landlordDeletedAt';
+
+    await this.conversationRepository.update(conversationId, {
+      [column]: new Date(),
+    });
+
+    const event: ConversationDeletedEvent = { conversationId, userId };
+
+    this.eventEmitter.emit(CHAT_EVENTS.CONVERSATION_DELETED, event);
+
+    return { conversationId };
+  }
+
   private async findParticipantConversation(
     userId: string,
     conversationId: string,
@@ -573,6 +707,7 @@ export class ChatService {
              AND unread_message.read_at IS NULL
              AND unread_message.recalled_at IS NULL
              AND unread_message.deleted_at IS NULL
+             AND unread_message.created_at > ${this.buildHiddenAtExpression('c', '$1')}
          ) AS "unreadCount"
        FROM conversations c
        LEFT JOIN LATERAL (
@@ -580,6 +715,7 @@ export class ChatService {
                 m.recalled_at, m.created_at
          FROM messages m
          WHERE m.conversation_id = c.id AND m.deleted_at IS NULL
+           AND m.created_at > ${this.buildHiddenAtExpression('c', '$1')}
          ORDER BY m.created_at DESC, m.id DESC
          LIMIT 1
        ) last_message ON TRUE
@@ -608,6 +744,27 @@ export class ChatService {
     );
   }
 
+  private buildHiddenAtExpression(
+    conversationAlias: string,
+    userParameter: string,
+  ): string {
+    return `COALESCE(
+      CASE WHEN ${conversationAlias}.student_id = ${userParameter}
+        THEN ${conversationAlias}.student_deleted_at
+        ELSE ${conversationAlias}.landlord_deleted_at END,
+      'epoch'::timestamptz)`;
+  }
+
+  private getHiddenAt(conversation: Conversation, userId: string): Date | null {
+    return conversation.studentId === userId
+      ? conversation.studentDeletedAt
+      : conversation.landlordDeletedAt;
+  }
+
+  private escapeLikePattern(keyword: string): string {
+    return keyword.replace(/[\\%_]/g, (character) => `\\${character}`);
+  }
+
   private buildUnreadExistsClause(conversationAlias: string): string {
     return `EXISTS (
       SELECT 1 FROM messages unread_message
@@ -616,6 +773,7 @@ export class ChatService {
         AND unread_message.read_at IS NULL
         AND unread_message.recalled_at IS NULL
         AND unread_message.deleted_at IS NULL
+        AND unread_message.created_at > ${this.buildHiddenAtExpression(conversationAlias, ':userId')}
     )`;
   }
 

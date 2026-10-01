@@ -37,6 +37,12 @@ export class Conversation {
   @Column({ type: 'timestamptz', name: 'last_message_at', nullable: true })
   lastMessageAt!: Date | null;
 
+  @Column({ type: 'timestamptz', name: 'student_deleted_at', nullable: true })
+  studentDeletedAt!: Date | null;
+
+  @Column({ type: 'timestamptz', name: 'landlord_deleted_at', nullable: true })
+  landlordDeletedAt!: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 
