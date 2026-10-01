@@ -50,6 +50,12 @@ export class Message {
   @Column({ type: 'timestamptz', name: 'recalled_at', nullable: true })
   recalledAt!: Date | null;
 
+  @Column({ type: 'timestamptz', name: 'edited_at', nullable: true })
+  editedAt!: Date | null;
+
+  @Column({ type: 'text', name: 'original_content', nullable: true })
+  originalContent!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 

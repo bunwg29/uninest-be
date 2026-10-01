@@ -25,9 +25,11 @@ import { MarkConversationReadDto, SendSocketMessageDto } from '../dtos';
 import { ChatPresenceService } from '../services/chat-presence.service';
 import { ChatService } from '../services/chat.service';
 import type {
+  ConversationDeletedEvent,
   ConversationReadEvent,
   MessageCreatedEvent,
   MessageRecalledEvent,
+  MessageUpdatedEvent,
 } from '../services/chat.service';
 
 interface SocketAck<T> {
@@ -165,6 +167,24 @@ export class ChatGateway
       event.participantIds,
       CHAT_SOCKET_EVENTS.MESSAGE_RECALLED,
       event.message,
+    );
+  }
+
+  @OnEvent(CHAT_EVENTS.MESSAGE_UPDATED)
+  broadcastMessageUpdated(event: MessageUpdatedEvent): void {
+    this.emitToParticipants(
+      event.participantIds,
+      CHAT_SOCKET_EVENTS.MESSAGE_UPDATED,
+      event.message,
+    );
+  }
+
+  @OnEvent(CHAT_EVENTS.CONVERSATION_DELETED)
+  broadcastConversationDeleted(event: ConversationDeletedEvent): void {
+    this.emitToParticipants(
+      [event.userId],
+      CHAT_SOCKET_EVENTS.CONVERSATION_DELETED,
+      { conversationId: event.conversationId },
     );
   }
 

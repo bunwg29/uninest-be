@@ -21,6 +21,8 @@ export class ChatMessageResponseDto {
 
   @ApiProperty({ nullable: true, type: Date }) readAt!: Date | null;
 
+  @ApiProperty({ nullable: true, type: Date }) editedAt!: Date | null;
+
   @ApiProperty() createdAt!: Date;
 }
 
@@ -112,4 +114,8 @@ export class MarkReadResponseDto {
   @ApiProperty({ nullable: true, type: Date }) readAt!: Date | null;
 
   @ApiProperty() updatedCount!: number;
+}
+
+export class ConversationDeletedResponseDto {
+  @ApiProperty() conversationId!: string;
 }
