@@ -2,11 +2,13 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { R2StorageService } from '@core/storage';
 import { createPaginatedResult } from '@common/dtos';
 import {
   Listing,
@@ -92,6 +94,8 @@ export interface SendMessageResult {
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
   constructor(
     @InjectRepository(Conversation)
     private readonly conversationRepository: Repository<Conversation>,
@@ -102,6 +106,7 @@ export class ChatService {
     @InjectRepository(ListingImage)
     private readonly listingImageRepository: Repository<ListingImage>,
     private readonly mapper: ChatMapperService,
+    private readonly storageService: R2StorageService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -459,6 +464,8 @@ export class ChatService {
     }
 
     if (message.recalledAt) {
+      await this.deleteMessageImages(message);
+
       return this.mapper.toMessage(message);
     }
 
@@ -473,6 +480,9 @@ export class ChatService {
     message.recalledAt = new Date();
 
     const saved = await this.messageRepository.save(message);
+
+    await this.deleteMessageImages(saved);
+
     const response = this.mapper.toMessage(saved);
 
     const event: MessageRecalledEvent = {
@@ -579,6 +589,39 @@ export class ChatService {
     this.eventEmitter.emit(CHAT_EVENTS.CONVERSATION_DELETED, event);
 
     return { conversationId };
+  }
+
+  private async deleteMessageImages(message: Message): Promise<void> {
+    const keys = message.imageKeys.filter((key) =>
+      key.startsWith(CHAT_LIMITS.IMAGE_KEY_PREFIX),
+    );
+
+    if (keys.length === 0) {
+      return;
+    }
+
+    try {
+      const results = await Promise.all(
+        keys.map(async (key) => ({
+          key,
+          isDeleted: await this.storageService.deleteFile(key),
+        })),
+      );
+
+      const remainingKeys = results
+        .filter(({ isDeleted }) => !isDeleted)
+        .map(({ key }) => key);
+
+      await this.messageRepository.update(message.id, {
+        imageKeys: remainingKeys,
+      });
+
+      message.imageKeys = remainingKeys;
+    } catch (error) {
+      this.logger.warn(
+        `Không thể xoá ảnh của tin nhắn ${message.id} trên R2: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   private async findParticipantConversation(
