@@ -15,6 +15,7 @@
     "start:prod": "node -r tsconfig-paths/register dist/main",
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "test:search": "node --require ts-node/register --require tsconfig-paths/register --test --test-concurrency=1 src/modules/search/search-query.spec.ts src/modules/search/search.integration.spec.ts",
     "typecheck": "tsc --noEmit",
     "seed": "ts-node -r tsconfig-paths/register src/core/database/seeders/run-seeder.ts"
   },
