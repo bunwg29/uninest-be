@@ -15,6 +15,7 @@ import type { Province, Ward } from '@modules/locations/entities';
 import { ListingStatus } from './listing-status';
 import { ListingImage } from './listing-image';
 import { ListingAmenity } from './listing-amenity';
+import { Favorite } from './favorite';
 
 type ListingPoint = {
   type: 'Point';
@@ -107,6 +108,9 @@ export class Listing {
   })
   status!: ListingStatus;
 
+  @Column({ type: 'integer', name: 'view_count', default: 0 })
+  viewCount!: number;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 
@@ -135,4 +139,7 @@ export class Listing {
     cascade: true,
   })
   listingAmenities!: ListingAmenity[];
+
+  @OneToMany(() => Favorite, (favorite) => favorite.listing)
+  favorites!: Favorite[];
 }
