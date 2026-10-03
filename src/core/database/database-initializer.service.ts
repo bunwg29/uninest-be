@@ -9,9 +9,31 @@ export class DatabaseInitializerService implements OnModuleInit {
 
   async onModuleInit() {
     await this.initializeExtensions();
+    await this.migrateListingsSearchSchema();
     await this.migrateListingsViewingScheduleSchema();
     await this.migrateStorageReferencesToObjectKeys();
     await this.migrateAmenitiesSchema();
+  }
+
+  private async migrateListingsSearchSchema() {
+    try {
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS idx_listings_location_geography
+        ON listings USING GIST ((location::geography))
+      `);
+
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS idx_listings_active_created_at
+        ON listings (created_at DESC, id)
+        WHERE status = 'active' AND deleted_at IS NULL
+      `);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      this.logger.warn(
+        `Không thể khởi tạo index tìm kiếm tin đăng: ${message}`,
+      );
+    }
   }
 
   private async migrateStorageReferencesToObjectKeys() {
@@ -95,19 +117,17 @@ export class DatabaseInitializerService implements OnModuleInit {
   }
 
   private async initializeExtensions() {
-    const extensions = ['uuid-ossp', 'postgis', 'vector'];
+    const extensions = ['uuid-ossp', 'postgis', 'vector', 'unaccent'];
 
     for (const ext of extensions) {
       try {
         await this.dataSource.query(`CREATE EXTENSION IF NOT EXISTS "${ext}";`);
-        this.logger.log(
-          `PostgreSQL extension '${ext}' is active in uninest_db.`,
-        );
+        this.logger.log(`Extension PostgreSQL '${ext}' đang hoạt động.`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
         this.logger.warn(
-          `PostgreSQL extension '${ext}' is not installed locally: ${message}. Application will use native fallbacks.`,
+          `Extension PostgreSQL '${ext}' chưa được cài đặt: ${message}. Ứng dụng sẽ dùng phương án dự phòng.`,
         );
       }
     }
