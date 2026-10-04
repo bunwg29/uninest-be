@@ -1,0 +1,21 @@
+{
+  "keywords": [
+    { "keyword": "đm", "action": "block" },
+    { "keyword": "địt", "action": "block" },
+    { "keyword": "đụ", "action": "block" },
+    { "keyword": "đéo", "action": "block" },
+    { "keyword": "vcl", "action": "block" },
+    { "keyword": "vkl", "action": "block" },
+    { "keyword": "clgt", "action": "block" },
+    { "keyword": "cặc", "action": "block" },
+    { "keyword": "lồn", "action": "block" },
+    { "keyword": "óc chó", "action": "block" },
+    { "keyword": "con chó", "action": "warn" },
+    { "keyword": "ngu", "action": "warn" },
+    { "keyword": "chuyển khoản trước", "action": "warn" },
+    { "keyword": "cọc trước", "action": "warn" },
+    { "keyword": "stk", "action": "warn" },
+    { "keyword": "số tài khoản", "action": "warn" },
+    { "keyword": "zalo", "action": "warn" }
+  ]
+}
