@@ -432,6 +432,33 @@ export class ListingsService {
     });
   }
 
+  async getPublicRooms() {
+    const listings = await this.listingRepository.find({
+      relations: {
+        images: true,
+        listingAmenities: true,
+      },
+    });
+
+    return listings.map((listing) => this.toPublicRoom(listing));
+  }
+
+  async getPublicRoom(id: string) {
+    const listing = await this.listingRepository.findOne({
+      where: { id },
+      relations: {
+        images: true,
+        listingAmenities: true,
+      },
+    });
+
+    if (!listing) {
+      throw new NotFoundException('Không tìm thấy phòng trọ');
+    }
+
+    return this.toPublicRoom(listing);
+  }
+
   private async deleteImagesFromStorage(imageKeys: string[]): Promise<void> {
     await Promise.all(
       imageKeys.map((key) => this.storageService.deleteFile(key)),
@@ -487,6 +514,45 @@ export class ListingsService {
       longitude: listing.location.coordinates[0],
       amenityIds: listing.listingAmenities?.map((item) => item.amenityId) ?? [],
       viewingSchedule: listing.viewingSchedule ?? undefined,
+    };
+  }
+
+  private toPublicRoom(listing: Listing) {
+    const images = [...(listing.images ?? [])].sort(
+      (first, second) => first.sortOrder - second.sortOrder,
+    );
+    const coverImage = images.find((image) => image.isCover) ?? images[0];
+
+    return {
+      id: listing.id,
+      title: listing.title,
+      description: listing.description,
+      address: listing.fullAddress,
+      streetAddress: listing.streetAddress,
+      provinceCode: listing.provinceCode,
+      wardCode: listing.wardCode,
+      latitude: listing.location.coordinates[1],
+      longitude: listing.location.coordinates[0],
+      price: Number(listing.price),
+      area: Number(listing.area),
+      roomType: listing.roomType,
+      maxOccupants: listing.maxOccupants,
+      electricPrice: listing.electricPrice
+        ? Number(listing.electricPrice)
+        : null,
+      waterPrice: listing.waterPrice ? Number(listing.waterPrice) : null,
+      deposit: listing.deposit ? Number(listing.deposit) : null,
+      imageUrl: coverImage
+        ? this.storageService.getPublicUrl(coverImage.url)
+        : null,
+      imageUrls: images.map((image) =>
+        this.storageService.getPublicUrl(image.url),
+      ),
+      amenityIds: listing.listingAmenities?.map((item) => item.amenityId) ?? [],
+      status: listing.status,
+      isActive: listing.status === ListingStatus.ACTIVE,
+      createdAt: listing.createdAt,
+      updatedAt: listing.updatedAt,
     };
   }
 }
