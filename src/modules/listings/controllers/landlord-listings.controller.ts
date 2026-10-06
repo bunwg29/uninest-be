@@ -75,12 +75,12 @@ export class LandlordListingsController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Xoá mềm tin đăng thuộc chủ trọ' })
   async remove(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<void> {
-    await this.listingsService.deleteListing(userId, id);
+  ) {
+    return this.listingsService.deleteListing(userId, id);
   }
 }

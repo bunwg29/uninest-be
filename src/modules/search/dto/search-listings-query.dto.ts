@@ -172,7 +172,7 @@ export class SearchListingsQueryDto {
   })
   @IsOptional()
   @IsIn(SEARCH_SORT_VALUES, { message: 'Cách sắp xếp không hợp lệ' })
-  sortBy: SearchSort = 'newest';
+  sortBy: SearchSort = 'relevance';
 
   @ApiPropertyOptional({ minimum: 1, default: SEARCH_DEFAULTS.PAGE })
   @IsOptional()

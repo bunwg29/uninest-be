@@ -7,10 +7,10 @@ import {
   Listing,
   ListingAmenity,
   ListingImage,
+  ListingReport,
 } from './entities';
 import { ListingsController } from './controllers/listings.controller';
 import { LandlordListingsController } from './controllers/landlord-listings.controller';
-import { RoomsController } from './controllers/rooms.controller';
 import { ListingsService } from './services/listings.service';
 
 @Module({
@@ -21,15 +21,12 @@ import { ListingsService } from './services/listings.service';
       Amenity,
       Favorite,
       ListingAmenity,
+      ListingReport,
       Province,
       Ward,
     ]),
   ],
-  controllers: [
-    ListingsController,
-    LandlordListingsController,
-    RoomsController,
-  ],
+  controllers: [ListingsController, LandlordListingsController],
   providers: [ListingsService],
   exports: [ListingsService],
 })

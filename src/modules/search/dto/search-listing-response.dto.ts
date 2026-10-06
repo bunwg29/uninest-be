@@ -8,14 +8,6 @@ export class SearchListingLocationDto {
   longitude!: number;
 }
 
-export class SearchListingStatsDto {
-  @ApiProperty({ example: 0 })
-  views!: number;
-
-  @ApiProperty({ example: 0 })
-  saved!: number;
-}
-
 export class SearchListingItemDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -65,8 +57,11 @@ export class SearchListingItemDto {
   @ApiProperty({ example: 'active' })
   status!: 'active';
 
-  @ApiProperty({ type: SearchListingStatsDto })
-  stats!: SearchListingStatsDto;
+  @ApiProperty({ enum: ['available', 'holding', 'rented', 'paused'] })
+  availability!: 'available' | 'holding' | 'rented' | 'paused';
+
+  @ApiPropertyOptional({ format: 'date-time', nullable: true })
+  holdExpiresAt?: string | null;
 
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;
@@ -86,9 +81,26 @@ export class SearchPaginationDto {
   totalPages!: number;
 }
 
+export class SearchSuggestionDto {
+  @ApiProperty({ example: 'expand_radius' })
+  type!: 'expand_radius' | 'relax_filters';
+
+  @ApiPropertyOptional({ description: 'Bán kính gợi ý (km)' })
+  radiusKm?: number;
+
+  @ApiProperty()
+  message!: string;
+}
+
 export class SearchListingsResponseDto {
   @ApiProperty({ type: [SearchListingItemDto] })
   items!: SearchListingItemDto[];
+
+  @ApiProperty()
+  hasResults!: boolean;
+
+  @ApiPropertyOptional({ type: SearchSuggestionDto })
+  suggestion?: SearchSuggestionDto;
 
   @ApiProperty({ type: SearchPaginationDto })
   pagination!: SearchPaginationDto;

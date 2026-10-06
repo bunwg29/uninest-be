@@ -4,4 +4,5 @@ export enum ListingStatus {
   REJECTED = 'rejected',
   HIDDEN = 'hidden',
   RENTED = 'rented',
+  PAUSED = 'paused',
 }

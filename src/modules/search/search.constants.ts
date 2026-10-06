@@ -1,4 +1,5 @@
 export const SEARCH_SORT_VALUES = [
+  'relevance',
   'newest',
   'price_asc',
   'price_desc',

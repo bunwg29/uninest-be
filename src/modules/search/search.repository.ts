@@ -1,10 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { DataSource, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { R2StorageService } from '@core/storage';
-import { Listing, ListingStatus } from '@modules/listings/entities';
-import { SearchListingItemDto, SearchListingsResponseDto } from './dto';
 import {
+  findActiveHolds,
+  type ListingHoldInfo,
+} from '@modules/booking/booking-availability';
+import { Favorite, Listing, ListingStatus } from '@modules/listings/entities';
+import {
+  SearchListingItemDto,
+  SearchListingsResponseDto,
+  SearchSuggestionDto,
+} from './dto';
+import {
+  SEARCH_DEFAULTS,
   SEARCH_LISTING_GEOGRAPHY_SQL,
   SEARCH_REFERENCE_POINT_SQL,
   SEARCH_ROOM_TYPE_DATABASE_VALUES,
@@ -25,6 +34,7 @@ export class ListingsSearchRepository {
     @InjectRepository(Listing)
     private readonly listingRepository: Repository<Listing>,
     private readonly storageService: R2StorageService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async search(
@@ -43,6 +53,8 @@ export class ListingsSearchRepository {
     if (rows.length === 0) {
       return {
         items: [],
+        hasResults: false,
+        suggestion: this.createSuggestion(query),
         pagination: {
           page: query.page,
           limit: query.limit,
@@ -52,6 +64,72 @@ export class ListingsSearchRepository {
       };
     }
 
+    const items = await this.hydrateRows(rows);
+
+    return {
+      items,
+      hasResults: true,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages: Math.ceil(total / query.limit),
+      },
+    };
+  }
+
+  async listFavorites(
+    userId: string,
+    page: number,
+    limit: number,
+  ): Promise<SearchListingsResponseDto> {
+    const favoritesQuery = this.listingRepository
+      .createQueryBuilder('listing')
+      .select('listing.id', 'id')
+      .innerJoin(
+        Favorite,
+        'favorite',
+        'favorite.listing_id = listing.id AND favorite.user_id = :userId',
+        { userId },
+      )
+      .where('listing.status = :activeStatus', {
+        activeStatus: ListingStatus.ACTIVE,
+      })
+      .andWhere('listing.deletedAt IS NULL');
+    const total = await favoritesQuery.clone().getCount();
+    const rows = await favoritesQuery
+      .orderBy('favorite.created_at', 'DESC')
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany<SearchListingRow>();
+    const items = await this.hydrateRows(rows);
+
+    return {
+      items,
+      hasResults: items.length > 0,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async listFavoriteIds(userId: string): Promise<string[]> {
+    const favorites = await this.dataSource.getRepository(Favorite).find({
+      select: { listingId: true },
+      where: { userId },
+    });
+
+    return favorites.map((favorite) => favorite.listingId);
+  }
+
+  private async hydrateRows(
+    rows: SearchListingRow[],
+  ): Promise<SearchListingItemDto[]> {
+    if (rows.length === 0) return [];
+
     const listingIds = rows.map((row) => row.id);
     const listings = await this.listingRepository.find({
       where: { id: In(listingIds) },
@@ -60,21 +138,51 @@ export class ListingsSearchRepository {
     const listingsById = new Map(
       listings.map((listing) => [listing.id, listing]),
     );
-    const items = rows.flatMap((row) => {
+    const holds = await findActiveHolds(this.dataSource, listingIds);
+
+    return rows.flatMap((row) => {
       const listing = listingsById.get(row.id);
 
-      return listing ? [this.toSearchListing(listing, row)] : [];
+      return listing
+        ? [this.toSearchListing(listing, row, holds.get(listing.id))]
+        : [];
     });
+  }
 
-    return {
-      items,
-      pagination: {
-        page: query.page,
-        limit: query.limit,
-        total,
-        totalPages: Math.ceil(total / query.limit),
-      },
-    };
+  private createSuggestion(
+    query: NormalizedSearchQuery,
+  ): SearchSuggestionDto | undefined {
+    if (
+      query.radiusKm !== undefined &&
+      query.radiusKm < SEARCH_DEFAULTS.MAX_RADIUS_KM
+    ) {
+      const radiusKm = Math.min(
+        query.radiusKm * 2,
+        SEARCH_DEFAULTS.MAX_RADIUS_KM,
+      );
+
+      return {
+        type: 'expand_radius',
+        radiusKm,
+        message: `Thử mở rộng bán kính tìm kiếm lên ${radiusKm} km.`,
+      };
+    }
+
+    const hasFilters =
+      query.keyword !== undefined ||
+      query.minPrice !== undefined ||
+      query.maxPrice !== undefined ||
+      query.minArea !== undefined ||
+      query.maxArea !== undefined ||
+      query.roomTypes.length > 0 ||
+      query.amenities.length > 0;
+
+    return hasFilters
+      ? {
+          type: 'relax_filters',
+          message: 'Thử nới lỏng khoảng giá, loại phòng hoặc tiện ích.',
+        }
+      : undefined;
   }
 
   private createFilteredQuery(
@@ -189,17 +297,41 @@ export class ListingsSearchRepository {
         listingsQuery.orderBy(SEARCH_DISTANCE_SQL, 'ASC');
         break;
       case 'newest':
-      default:
         listingsQuery.orderBy('listing.createdAt', 'DESC');
+        break;
+      case 'relevance':
+      default:
+        this.applyRelevanceSort(listingsQuery, query);
         break;
     }
 
     listingsQuery.addOrderBy('listing.id', 'ASC');
   }
 
+  private applyRelevanceSort(
+    listingsQuery: SelectQueryBuilder<Listing>,
+    query: NormalizedSearchQuery,
+  ): void {
+    if (query.keyword) {
+      listingsQuery
+        .addSelect(
+          'CASE WHEN unaccent(listing.title) ILIKE unaccent(:keyword) THEN 0 ELSE 1 END',
+          'keywordRank',
+        )
+        .orderBy('"keywordRank"', 'ASC');
+    }
+
+    if (query.latitude !== undefined) {
+      listingsQuery.addOrderBy(SEARCH_DISTANCE_SQL, 'ASC');
+    }
+
+    listingsQuery.addOrderBy('listing.createdAt', 'DESC');
+  }
+
   private toSearchListing(
     listing: Listing,
     row: SearchListingRow,
+    hold?: ListingHoldInfo,
   ): SearchListingItemDto {
     const images = [...(listing.images ?? [])].sort(
       (first, second) => first.sortOrder - second.sortOrder,
@@ -237,12 +369,22 @@ export class ListingsSearchRepository {
       },
       distanceMeters,
       isHighlighted: false,
-      isReserved: false,
+      isReserved: hold !== undefined,
+      availability: this.getAvailability(listing, hold),
+      holdExpiresAt: hold?.expiresAt.toISOString() ?? null,
       capacity: listing.maxOccupants,
       description: listing.description ?? undefined,
       status: 'active',
-      stats: { views: 0, saved: 0 },
       createdAt: listing.createdAt.toISOString(),
     };
+  }
+
+  private getAvailability(
+    listing: Listing,
+    hold?: ListingHoldInfo,
+  ): SearchListingItemDto['availability'] {
+    if (listing.status === ListingStatus.RENTED) return 'rented';
+
+    return hold ? 'holding' : 'available';
   }
 }

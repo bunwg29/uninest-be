@@ -76,7 +76,7 @@ void describe('normalizeSearchQuery', () => {
 
     assert.equal(normalizedQuery.page, 1);
     assert.equal(normalizedQuery.limit, 10);
-    assert.equal(normalizedQuery.sortBy, 'newest');
+    assert.equal(normalizedQuery.sortBy, 'relevance');
     assert.equal(normalizedQuery.radiusKm, 5);
   });
 

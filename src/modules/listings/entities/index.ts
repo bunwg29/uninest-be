@@ -5,3 +5,4 @@ export * from './listing';
 export * from './listing-amenity';
 export * from './listing-image';
 export * from './listing-status';
+export * from './listing-report';

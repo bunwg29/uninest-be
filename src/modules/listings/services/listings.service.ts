@@ -1,22 +1,36 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import {
+  ACTIVE_BOOKING_STATUSES,
+  Booking,
+  findActiveHolds,
+  type ListingHoldInfo,
+} from '@modules/booking';
 import { UserRoleType } from '@common/constants';
 import { R2StorageService } from '@core/storage';
 import { Province, Ward } from '@modules/locations/entities';
+import { User } from '@modules/users/entities';
 import {
   Amenity,
   Favorite,
   Listing,
   ListingAmenity,
   ListingImage,
+  ListingReport,
   ListingStatus,
 } from '../entities';
-import { CreateListingDto, LandlordListingsQueryDto } from '../dtos';
+import {
+  CreateListingDto,
+  LandlordListingsQueryDto,
+  ReportListingDto,
+} from '../dtos';
 
 const VIEW_THROTTLE_MINUTES = 30;
 const VIEW_THROTTLE_MILLISECONDS = VIEW_THROTTLE_MINUTES * 60 * 1000;
@@ -42,6 +56,8 @@ export class ListingsService {
   ) {}
 
   async createListing(userId: string, dto: CreateListingDto): Promise<Listing> {
+    await this.assertLandlordVerified(userId);
+
     const province = await this.provinceRepository.findOneBy({
       code: dto.provinceCode,
     });
@@ -61,6 +77,8 @@ export class ListingsService {
         'Phường/xã không thuộc tỉnh/thành phố đã chọn',
       );
     }
+
+    await this.assertImagesValid(dto.images?.map((image) => image.key));
 
     const amenityIds = [...new Set(dto.amenityIds ?? [])];
     const amenities = amenityIds.length
@@ -208,6 +226,7 @@ export class ListingsService {
       [ListingStatus.REJECTED]: 0,
       [ListingStatus.HIDDEN]: 0,
       [ListingStatus.RENTED]: 0,
+      [ListingStatus.PAUSED]: 0,
       deleted: 0,
     };
 
@@ -260,7 +279,16 @@ export class ListingsService {
 
     this.assertCanAccessListing(listing, userId, roleId);
 
-    return this.toListingDetail(listing, isFavorite);
+    const holds = await findActiveHolds(this.dataSource, [listing.id]);
+    const canSeeStats =
+      listing.ownerId === userId || roleId === UserRoleType.ADMIN;
+
+    return this.toListingDetail(
+      listing,
+      isFavorite,
+      holds.get(listing.id),
+      canSeeStats,
+    );
   }
 
   async recordView(userId: string, roleId: UserRoleType, id: string) {
@@ -270,6 +298,8 @@ export class ListingsService {
 
     const throttleKey = `${userId}:${id}`;
     const currentTime = Date.now();
+
+    this.pruneViewThrottle(currentTime);
     const throttleExpiration = this.viewThrottleExpirations.get(throttleKey);
 
     if (throttleExpiration && throttleExpiration > currentTime) {
@@ -326,6 +356,37 @@ export class ListingsService {
     };
   }
 
+  async reportListing(userId: string, id: string, dto: ReportListingDto) {
+    const listing = await this.listingRepository.findOneBy({ id });
+
+    this.assertActiveListing(listing);
+
+    if (listing.ownerId === userId) {
+      throw new BadRequestException('Bạn không thể báo cáo tin đăng của mình');
+    }
+
+    const reportRepository = this.dataSource.getRepository(ListingReport);
+    const existingReport = await reportRepository.existsBy({
+      listingId: id,
+      reporterId: userId,
+    });
+
+    if (existingReport) {
+      throw new ConflictException('Bạn đã báo cáo tin đăng này trước đó');
+    }
+
+    await reportRepository.save(
+      reportRepository.create({
+        listingId: id,
+        reporterId: userId,
+        reason: dto.reason,
+        note: dto.note?.trim() || null,
+      }),
+    );
+
+    return { listingId: id, reported: true };
+  }
+
   async removeFavorite(userId: string, id: string): Promise<void> {
     const listing = await this.listingRepository.findOneBy({ id });
 
@@ -350,10 +411,12 @@ export class ListingsService {
 
     const canHide =
       status === ListingStatus.HIDDEN &&
-      listing.status === ListingStatus.ACTIVE;
+      (listing.status === ListingStatus.ACTIVE ||
+        listing.status === ListingStatus.PAUSED);
     const canShow =
       status === ListingStatus.ACTIVE &&
-      listing.status === ListingStatus.HIDDEN;
+      (listing.status === ListingStatus.HIDDEN ||
+        listing.status === ListingStatus.PAUSED);
     const isUnchanged = listing.status === status;
 
     if (!canHide && !canShow && !isUnchanged) {
@@ -393,6 +456,8 @@ export class ListingsService {
       );
     }
 
+    await this.assertImagesValid(dto.images?.map((image) => image.key));
+
     const amenityIds = [...new Set(dto.amenityIds ?? [])];
     const amenities = amenityIds.length
       ? await this.amenityRepository.findBy({ id: In(amenityIds) })
@@ -431,6 +496,16 @@ export class ListingsService {
           .filter((key): key is string => key !== null)
           .filter((key) => !nextImageKeys.has(key));
 
+        const isKeyFieldChanged =
+          Number(listing.price) !== dto.price ||
+          Number(listing.area) !== dto.area;
+        const nextStatus =
+          listing.status === ListingStatus.PENDING ||
+          listing.status === ListingStatus.REJECTED ||
+          isKeyFieldChanged
+            ? ListingStatus.PENDING
+            : listing.status;
+
         Object.assign(listing, {
           title: dto.title,
           description: dto.description ?? null,
@@ -451,7 +526,7 @@ export class ListingsService {
             type: 'Point',
             coordinates: [dto.longitude, dto.latitude],
           },
-          status: ListingStatus.PENDING,
+          status: nextStatus,
           viewingSchedule: dto.viewingSchedule
             ? { ...dto.viewingSchedule }
             : null,
@@ -503,7 +578,7 @@ export class ListingsService {
     return updatedListing;
   }
 
-  async deleteListing(userId: string, id: string): Promise<void> {
+  async deleteListing(userId: string, id: string) {
     const listing = await this.listingRepository.findOneBy({
       id,
       ownerId: userId,
@@ -513,7 +588,22 @@ export class ListingsService {
       throw new NotFoundException('Không tìm thấy tin đăng của bạn');
     }
 
+    const activeBookingCount = await this.dataSource
+      .getRepository(Booking)
+      .count({
+        where: { listingId: id, status: In(ACTIVE_BOOKING_STATUSES) },
+      });
+
+    if (activeBookingCount > 0) {
+      listing.status = ListingStatus.PAUSED;
+      await this.listingRepository.save(listing);
+
+      return { deleted: false, status: ListingStatus.PAUSED };
+    }
+
     await this.listingRepository.softRemove(listing);
+
+    return { deleted: true, status: null };
   }
 
   async getAmenities(): Promise<Amenity[]> {
@@ -521,33 +611,6 @@ export class ListingsService {
       where: { isActive: true },
       order: { group: 'ASC', id: 'ASC' },
     });
-  }
-
-  async getPublicRooms() {
-    const listings = await this.listingRepository.find({
-      relations: {
-        images: true,
-        listingAmenities: true,
-      },
-    });
-
-    return listings.map((listing) => this.toPublicRoom(listing));
-  }
-
-  async getPublicRoom(id: string) {
-    const listing = await this.listingRepository.findOne({
-      where: { id },
-      relations: {
-        images: true,
-        listingAmenities: true,
-      },
-    });
-
-    if (!listing) {
-      throw new NotFoundException('Không tìm thấy phòng trọ');
-    }
-
-    return this.toPublicRoom(listing);
   }
 
   private createDetailQuery(id: string) {
@@ -596,7 +659,12 @@ export class ListingsService {
     }
   }
 
-  private toListingDetail(listing: Listing, isFavorite: boolean) {
+  private toListingDetail(
+    listing: Listing,
+    isFavorite: boolean,
+    hold: ListingHoldInfo | undefined,
+    canSeeStats: boolean,
+  ) {
     const images = [...(listing.images ?? [])].sort(
       (first, second) => first.sortOrder - second.sortOrder,
     );
@@ -652,7 +720,11 @@ export class ListingsService {
       status: listing.status,
       viewingSchedule: listing.viewingSchedule,
       averageRating: null,
-      viewCount: listing.viewCount,
+      viewCount: canSeeStats ? listing.viewCount : null,
+      availability: this.getAvailability(listing, hold),
+      hold: hold
+        ? { expiresAt: hold.expiresAt, daysLeft: hold.daysLeft }
+        : null,
       isFavorite,
       createdAt: listing.createdAt,
       updatedAt: listing.updatedAt,
@@ -717,42 +789,42 @@ export class ListingsService {
     };
   }
 
-  private toPublicRoom(listing: Listing) {
-    const images = [...(listing.images ?? [])].sort(
-      (first, second) => first.sortOrder - second.sortOrder,
-    );
-    const coverImage = images.find((image) => image.isCover) ?? images[0];
+  private getAvailability(listing: Listing, hold?: ListingHoldInfo) {
+    if (listing.status === ListingStatus.RENTED) return 'rented';
 
-    return {
-      id: listing.id,
-      title: listing.title,
-      description: listing.description,
-      address: listing.fullAddress,
-      streetAddress: listing.streetAddress,
-      provinceCode: listing.provinceCode,
-      wardCode: listing.wardCode,
-      latitude: listing.location.coordinates[1],
-      longitude: listing.location.coordinates[0],
-      price: Number(listing.price),
-      area: Number(listing.area),
-      roomType: listing.roomType,
-      maxOccupants: listing.maxOccupants,
-      electricPrice: listing.electricPrice
-        ? Number(listing.electricPrice)
-        : null,
-      waterPrice: listing.waterPrice ? Number(listing.waterPrice) : null,
-      deposit: listing.deposit ? Number(listing.deposit) : null,
-      imageUrl: coverImage
-        ? this.storageService.getPublicUrl(coverImage.url)
-        : null,
-      imageUrls: images.map((image) =>
-        this.storageService.getPublicUrl(image.url),
-      ),
-      amenityIds: listing.listingAmenities?.map((item) => item.amenityId) ?? [],
-      status: listing.status,
-      isActive: listing.status === ListingStatus.ACTIVE,
-      createdAt: listing.createdAt,
-      updatedAt: listing.updatedAt,
-    };
+    if (listing.status === ListingStatus.PAUSED) return 'paused';
+
+    return hold ? 'holding' : 'available';
+  }
+
+  private async assertImagesValid(keys: string[] | undefined): Promise<void> {
+    const newKeys = (keys ?? []).filter((key) => key.startsWith('listings/'));
+
+    await Promise.all(
+      newKeys.map((key) => this.storageService.assertValidImageObject(key)),
+    );
+  }
+
+  private async assertLandlordVerified(userId: string): Promise<void> {
+    const landlord = await this.dataSource.getRepository(User).findOne({
+      select: { id: true, landlordVerifiedAt: true },
+      where: { id: userId },
+    });
+
+    if (!landlord?.landlordVerifiedAt) {
+      throw new ForbiddenException({
+        error: 'LANDLORD_NOT_VERIFIED',
+        message:
+          'Tài khoản đang ở trạng thái "Chờ xác minh". Vui lòng hoàn thiện thông tin xác minh trước khi đăng tin',
+      });
+    }
+  }
+
+  private pruneViewThrottle(currentTime: number): void {
+    if (this.viewThrottleExpirations.size < 5000) return;
+
+    this.viewThrottleExpirations.forEach((expiration, key) => {
+      if (expiration <= currentTime) this.viewThrottleExpirations.delete(key);
+    });
   }
 }

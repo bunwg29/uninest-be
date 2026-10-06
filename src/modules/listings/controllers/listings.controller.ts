@@ -25,6 +25,7 @@ import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import {
   CreateListingDto,
   LandlordListingsQueryDto,
+  ReportListingDto,
   UpdateListingStatusDto,
 } from '../dtos';
 import { ListingsService } from '../services/listings.service';
@@ -153,6 +154,20 @@ export class ListingsController {
     await this.listingsService.removeFavorite(userId, id);
   }
 
+  @Post(':id/reports')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRoleType.STUDENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Báo cáo tin đăng vi phạm (D-09)' })
+  async reportListing(
+    @CurrentUser('userId') userId: string,
+    @Param('id', LISTING_ID_PIPE) id: string,
+    @Body() dto: ReportListingDto,
+  ) {
+    return this.listingsService.reportListing(userId, id, dto);
+  }
+
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoleType.LANDLORD)
@@ -180,15 +195,18 @@ export class ListingsController {
   }
 
   @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRoleType.LANDLORD)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Xoá mềm tin đăng của chủ trọ' })
+  @ApiOperation({
+    summary:
+      'Xoá mềm tin đăng; tin đã có lịch hẹn/giữ chỗ chuyển sang "Ngừng nhận yêu cầu"',
+  })
   async remove(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<void> {
-    await this.listingsService.deleteListing(userId, id);
+  ) {
+    return this.listingsService.deleteListing(userId, id);
   }
 }
