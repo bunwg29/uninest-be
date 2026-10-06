@@ -161,17 +161,6 @@ export class BookingService {
         );
       }
 
-      const holdingCount = await queryRunner.manager.count(Booking, {
-        where: { listingId: listing.id, status: BookingStatus.HOLDING },
-      });
-
-      if (holdingCount > 0) {
-        throw new ConflictException({
-          error: 'LISTING_HELD',
-          message: 'Phòng đang được sinh viên khác giữ chỗ',
-        });
-      }
-
       const duplicateCount = await queryRunner.manager.count(Booking, {
         where: {
           listingId: listing.id,

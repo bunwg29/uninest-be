@@ -23,46 +23,50 @@
 - **Xác thực OTP (One-Time Password)**:
   - Mã OTP gồm 6 chữ số phục vụ kích hoạt tài khoản đăng ký mới, đăng nhập nhanh và xác thực quên mật khẩu.
   - Thời hạn mã OTP: 5 phút. Cooldown gửi lại mã: 60 giây.
-  - Giới hạn thử sai mã OTP tối đa 5 lần; khi vượt quá giới hạn, mã sẽ bị vô hiệu và yêu cầu người dùng gửi lại mã mới.
+  - Giới hạn thử sai mã OTP tối đa 5 lần; khi vượt quá giới hạn, mã bị vô hiệu và khoá thao tác xác thực/gửi lại 60 giây (HTTP 429 kèm số giây còn lại).
+  - Mã OTP được lưu trong PostgreSQL dạng băm SHA-256 (`otp_codes.code_hash`, kèm `expires_at`, `attempts`, `locked_until`), không lưu plaintext và không dùng Redis.
 - **Quản lý Phiên & Thu hồi Token (Token Revocation)**:
-  - Cơ chế JWT gồm Access Token ngắn hạn (15 phút) và Refresh Token dài hạn (7 ngày).
+  - Cơ chế JWT gồm Access Token hiệu lực 1 giờ và Refresh Token tối đa 30 ngày không hoạt động (xoay vòng mỗi lần làm mới); endpoint làm mới là `POST /auth/refresh` (giữ alias `/auth/refresh-token`).
   - Khi người dùng đăng xuất (`POST /api/v1/auth/logout`), backend lập tức đánh dấu thu hồi `is_revoked = true` cho refresh token tương ứng, ngăn chặn tuyệt đối việc tái sử dụng token bị đánh cắp.
 - **Quên mật khẩu & Đặt lại mật khẩu**:
   - Luồng chuẩn 3 bước: Yêu cầu mã OTP qua số điện thoại -> Xác minh OTP -> Đặt mật khẩu mới (tối thiểu 8 ký tự, có ít nhất một chữ số và một chữ in hoa).
 - **Phân quyền (RBAC)**: Hỗ trợ 3 vai trò `student`, `landlord`, `admin`. Kiểm soát truy cập API qua Guard (`JwtAuthGuard`, `RolesGuard`) và Decorator (`@Roles`, `@CurrentUser`).
 - **Chuẩn hoá Ngôn ngữ**: 100% thông báo thành công, ngoại lệ (`HttpException`), lỗi validation và thông điệp lỗi trong API envelope đều sử dụng Tiếng Việt thống nhất, rõ nghĩa và đồng bộ với Mobile App.
+- **Chủ trọ "Chờ xác minh"**: Chủ trọ mới đăng ký chưa có `users.landlord_verified_at` nên bị từ chối tạo tin (`LANDLORD_NOT_VERIFIED`) cho tới khi gửi `POST /profile/landlord-verification` (số CCCD/CMND 9 hoặc 12 chữ số, địa chỉ liên hệ tuỳ chọn). `GET /profile` trả `verificationStatus` (`pending_verification` | `verified`) và số liệu thật (`savedRooms`, `appointments`).
 - **Hồ sơ cá nhân**: Cập nhật thông tin người dùng, ảnh đại diện (avatar upload lên Cloudflare R2), xác thực số điện thoại, đổi mật khẩu.
 - **Bảo mật**: Mật khẩu mã hóa bằng bcrypt/argon2; cơ chế JWT gồm Access Token ngắn hạn và Refresh Token lưu trữ an toàn.
 - **Bảo mật**: Mật khẩu mã hóa bằng bcrypt/argon2 an toàn.
 
 ### B. Quản lý Tin đăng Phòng trọ (`listings`)
 
-- **Danh sách công khai**: `GET /api/v1/rooms` trả toàn bộ tin chưa xóa cho màn Tìm trọ; `GET /api/v1/rooms/:id` trả chi tiết để bắt đầu booking. Hai API không yêu cầu đăng nhập và dùng `listing.id` làm `resourceId` xuyên suốt luồng đặt lịch.
+- **Tin công khai**: sinh viên xem qua `GET /listings/search` và `GET /listings/:id` (đã có kiểm tra quyền theo trạng thái); API `/rooms` cũ đã gỡ vì lộ cả tin chưa duyệt.
 - **Đăng tin & Cập nhật**: Chủ trọ (`landlord`) tạo tin mới gồm tiêu đề, mô tả, giá thuê, tiền cọc, diện tích, loại phòng, địa chỉ chi tiết, tiện nghi đi kèm, ảnh phòng (upload R2).
 - **Lịch xem phòng**: Chủ trọ thiết lập các buổi sáng, chiều, tối có thể xem phòng cho từng ngày trong tuần; lịch được lưu cùng tin đăng và trả về khi chỉnh sửa.
 - **Vòng đời tin đăng (Lifecycle)**:
   - Mới tạo mặc định ở trạng thái chờ duyệt (`pending`).
   - Quản trị viên (`admin`) xét duyệt chuyển sang `active` hoặc từ chối (`rejected`).
   - Chủ trọ có thể chủ động ẩn tin (`hidden`) hoặc đánh dấu phòng đã được thuê (`rented`).
+  - Sửa giá hoặc diện tích của tin đã duyệt đưa tin về `pending`; các chỉnh sửa khác giữ nguyên trạng thái. Tin đã có lịch hẹn/giữ chỗ không bị xoá mà chuyển sang `paused` ("Ngừng nhận yêu cầu").
 - **Lưu vết & Xóa mềm**: Hỗ trợ soft delete để lưu vết lịch sử tin đăng phục vụ đối soát và báo cáo.
 
 ### C. Tìm kiếm Không gian & So sánh Phòng trọ (`search`, `comparison`)
 
 - **Tìm kiếm theo bán kính vị trí**: Tích hợp truy vấn không gian (PostGIS) để tìm các phòng trọ nằm trong bán kính xác định quanh trường đại học hoặc tọa độ người dùng.
 - **Bộ lọc đa tiêu chí**: Lọc theo khoảng giá, loại phòng, khoảng cách, tiện ích; sắp xếp theo giá tăng/giảm, tin mới nhất, khoảng cách gần nhất.
+- **Endpoint**: `GET /listings/search` (công khai; `SearchModule` phải được đăng ký trước `ListingsModule` để không bị `GET /listings/:id` chặn). Chỉ trả tin `active`, điều kiện lọc kết hợp AND, sắp xếp mặc định `relevance` (khớp tiêu đề → khoảng cách → mới nhất), ngoài ra `newest`, `price_asc/desc`, `area_asc/desc`, `distance`. Mỗi tin có `availability` (`available` | `holding` | `rented` | `paused`) và `holdExpiresAt`. Không có kết quả: `hasResults=false` kèm `suggestion` (mở rộng bán kính hoặc nới lỏng bộ lọc). Số liệu lượt xem/lưu không công khai.
+- **Phòng đã lưu**: `GET /listings/favorites` (phân trang), `GET /listings/favorites/ids`, `POST|DELETE /listings/:id/favorite`.
+- **Chi tiết tin**: `GET /listings/:id` trả `availability`, `hold {expiresAt, daysLeft}`; `viewCount` chỉ cho chủ tin/Admin; `POST /listings/:id/reports` báo cáo tin (mỗi người một lần).
 - **So sánh phòng trọ**: Hỗ trợ người dùng chọn tối đa 4 phòng trọ để so sánh trực quan về giá, diện tích, chi phí dịch vụ và tiện nghi.
 
 ### D. Đặt lịch Xem phòng & Giữ chỗ (`booking`)
 
-- **Hai hình thức đặt lịch**: Sinh viên tạo yêu cầu hẹn xem phòng trực tiếp (`viewing`) hoặc yêu cầu giữ chỗ (`holding`).
-- **Quy trình xử lý**:
-  - Trạng thái ban đầu: `pending`.
-  - Chủ trọ có quyền chấp nhận (`confirmed`) kèm lời nhắn, hoặc từ chối (`rejected`) có nêu lý do.
-  - Sinh viên có thể chủ động hủy yêu cầu (`cancelled`) khi chưa được xác nhận.
-  - Yêu cầu xem phòng `pending` tự động hết hạn sau 15 phút nếu chưa được xác nhận.
-  - Sinh viên có thể chuyển `pending` sang giữ chỗ (`holding`); yêu cầu giữ chỗ tự động hết hạn sau 7 ngày.
-  - Cron chạy mỗi phút, cập nhật có điều kiện và ghi `booking_events` nên có tính idempotent.
-  - Hủy trước giờ xem dưới 24 giờ bắt buộc nhập lý do.
+- **Trạng thái**: `pending` → `confirmed` | `rejected` | `expired` | `cancelled`; `confirmed` → `holding` | `cancelled`; `holding` → `expired` | `cancelled`.
+- **Yêu cầu xem phòng**: chỉ Sinh viên tạo; mỗi sinh viên chỉ có một lịch đang xử lý cho một phòng; khung giờ không được chồng lấn. Chủ trọ không phản hồi sau 24 giờ (`BOOKING_RESPONSE_HOURS`) thì tự động `expired`; yêu cầu quá giờ hẹn mà chưa xác nhận cũng hết hạn.
+- **Chủ trọ**: `GET /bookings/landlord`, `PATCH /bookings/:id/confirm`, `PATCH /bookings/:id/reject` (bắt buộc lý do), `PATCH /bookings/:id/release` (huỷ giữ chỗ, bắt buộc lý do).
+- **Giữ chỗ**: chỉ từ lịch `confirmed` và sau giờ đã hẹn xem; mỗi phòng tối đa một sinh viên giữ chỗ (khoá dòng tin + ràng buộc duy nhất `uq_bookings_one_holding_per_listing`, trả 409 `LISTING_HELD`). Thời hạn `HOLDING_DAYS` (mặc định 7), hết hạn thì cron trả phòng về còn trống. Trang chi tiết hiển thị ngày hết hạn và số ngày còn lại.
+- **Tin có lịch hẹn/giữ chỗ**: `DELETE` chuyển tin sang `paused` ("Ngừng nhận yêu cầu") thay vì xoá.
+- **Cron nội bộ** (`@nestjs/schedule`, 5 phút, không dùng Redis/BullMQ): cập nhật có điều kiện, ghi `booking_events`, phát `booking.status_changed` (và `booking.created`) để Sprint 3 gắn Notification.
+- Hủy trước giờ xem dưới 24 giờ bắt buộc nhập lý do.
 
 ### E. Nhắn tin Trao đổi 1-1 (`chat`)
 
@@ -70,12 +74,12 @@
 - **Nội dung tin nhắn**: Hỗ trợ gửi tin nhắn văn bản và tệp hình ảnh đính kèm (qua Cloudflare R2). Đánh dấu trạng thái đã đọc/chưa đọc.
 - **Dữ liệu**: bảng `conversations` (duy nhất theo cặp `listing_id` + `student_id`, chỉ sinh viên được khởi tạo) và `messages` (`client_message_id` chống gửi trùng khi gửi lại lúc mất mạng, `image_keys` lưu object key thư mục `chat/`, tối đa 10 ảnh/tin, `read_at`, `recalled_at`). Cả hai bảng dùng soft delete; dữ liệu được lưu tối thiểu 12 tháng.
 - **Realtime**: Socket.IO namespace `/chat`, xác thực bằng JWT access token ở handshake (`auth.token`), từ chối kết nối ngay khi token sai. Sự kiện client gửi: `message.send`, `conversation.read` (có ack theo envelope `{ status, data, error, messages }`). Sự kiện server phát tới cả hai bên: `message.new`, `message.recalled`, `conversation.read`.
-- **REST bổ trợ**: `POST /conversations`, `GET /conversations` (phân trang `page`/`limit` mặc định 20, lọc `all`/`unread`, tìm kiếm phía server theo `keyword`), `GET /conversations/summary`, `GET /conversations/:id`, `DELETE /conversations/:id`, `GET /conversations/:id/messages` (cursor, 30 tin/trang, mới nhất trước), `POST /conversations/:id/messages`, `PATCH /conversations/:id/messages/:messageId` (sửa), `DELETE /conversations/:id/messages/:messageId` (thu hồi), `PATCH /conversations/:id/read`.
+- **REST bổ trợ**: `POST /conversations`, `GET /conversations` (phân trang `page`/`limit` mặc định 20, lọc `all`/`unread`, tìm kiếm phía server theo `keyword`), `GET /conversations/summary`, `GET /conversations/:id`, `DELETE /conversations/:id`, `GET /conversations/:id/messages` (cursor, 30 tin/trang, mới nhất trước), `POST /conversations/:id/messages`, `DELETE /conversations/:id/messages/:messageId` (thu hồi), `PATCH /conversations/:id/read`.
 - **Tải từng phần**: danh sách hội thoại chỉ trả metadata (người đối thoại, tin đăng, tin cuối, số chưa đọc); tin nhắn chỉ được tải khi mở một đoạn chat. Từ khoá tìm kiếm khớp `ILIKE` theo tên người đối thoại hoặc tiêu đề tin đăng (có phân biệt dấu tiếng Việt).
-- **Quy tắc**: chỉ hai người tham gia được xem hội thoại. Người gửi được **thu hồi** (ẩn) hoặc **chỉnh sửa** tin nhắn văn bản của mình trong 24 giờ (`CHAT_LIMITS.EDIT_WINDOW_MS`); tin chỉ có ảnh không sửa được. Nội dung gốc được lưu ở `messages.original_content` khi sửa lần đầu để phục vụ khiếu nại. *Thay đổi so với SRS v1.0 mục 3.6 (trước đây tin nhắn không được sửa); cần ghi vào bảng lịch sử phiên bản SRS.*
+- **Quy tắc**: chỉ hai người tham gia được xem hội thoại. Tin nhắn **không được chỉnh sửa** sau khi gửi (SRS FR-CHAT); người gửi chỉ **thu hồi** (ẩn) tin của chính mình. Nội dung chat được lưu tối thiểu 12 tháng nên khi thu hồi chỉ ẩn nội dung, ảnh trên R2 vẫn được giữ.
 - **Xoá đoạn chat**: xoá theo từng phía (`conversations.student_deleted_at` / `landlord_deleted_at`). Người xoá không còn thấy lịch sử cũ và badge không đếm tin cũ; người kia giữ nguyên dữ liệu (đáp ứng yêu cầu lưu trữ 12 tháng). Có tin nhắn mới thì đoạn chat hiện lại và chỉ chứa tin từ thời điểm đó. Sự kiện `conversation.deleted` chỉ gửi tới các thiết bị của người xoá.
-- **Sự kiện realtime**: ngoài `message.new`, `message.recalled`, `conversation.read` còn có `message.updated` (gửi cho cả hai bên khi sửa tin).
-- **Phương tiện**: chỉ hỗ trợ ảnh (jpeg, png, webp, gif, heic) lưu trên Cloudflare R2 thư mục `chat/`, cơ sở dữ liệu chỉ giữ object key. Chưa hỗ trợ video. Khi thu hồi tin có ảnh, backend xoá các object tương ứng trên R2 (xoá lỗi thì giữ lại key để thử xoá lại ở lần thu hồi kế tiếp); nội dung chữ vẫn được giữ lại theo chính sách lưu vết.
+- **Sự kiện realtime**: ngoài `message.new`, `message.recalled`, `conversation.read` (gửi cho cả hai bên khi sửa tin).
+- **Phương tiện**: chỉ hỗ trợ ảnh jpg/png tối đa 5MB, lưu trên Cloudflare R2 thư mục `chat/`; backend kiểm tra lại định dạng và dung lượng đối tượng sau khi tải lên. Cơ sở dữ liệu chỉ giữ object key. Chưa hỗ trợ video.
 - **Điểm móc thông báo**: mỗi tin nhắn mới phát sự kiện nội bộ `message.created` (`EventEmitter2`) để Notification Pipeline (Sprint 3) đăng ký lắng nghe.
 
 ### F. Diễn đàn Cộng đồng Sinh viên (`forum`)
@@ -111,7 +115,7 @@
 ## 3. Quy trình Lưu trữ Cloudflare R2 (Storage Flow)
 
 1. **Client yêu cầu upload**: Client gọi API `POST /api/v1/storage/presigned-upload-url` kèm `fileName` và `contentType`.
-2. **Server tạo Presigned URL**: Server sử dụng `R2StorageService` (`@aws-sdk/s3-request-presigner`) tạo URL ký trước có thời hạn (ví dụ 15 phút).
+2. **Server tạo Presigned URL**: Server sử dụng `R2StorageService` (`@aws-sdk/s3-request-presigner`) tạo URL ký trước có thời hạn 5 phút (`POST /storage/presign-upload`, yêu cầu đăng nhập; chỉ nhận jpg/png ≤5MB).
 3. **Client upload trực tiếp**: Client gửi HTTP `PUT` chứa binary file trực tiếp lên Cloudflare R2 endpoint. Server hoàn toàn không bị nghẽn băng thông do truyền file trung gian.
 4. **Lưu trữ object key**: Database chỉ lưu object key của ảnh (ví dụ `listings/...jpg` hoặc `avatars/...jpg`). Backend ghép public base URL khi trả response cho client để có thể đổi nhà cung cấp storage mà không phải sửa dữ liệu.
 5. **Dọn ảnh khi cập nhật**: Sau khi cập nhật tin thành công, backend xóa khỏi R2 các ảnh đã bị chủ trọ loại khỏi tin; ảnh của tin bị xóa mềm vẫn được giữ lại theo chính sách lưu vết.

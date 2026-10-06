@@ -296,6 +296,9 @@ export class ListingsService {
 
     this.assertCanAccessListing(listing, userId, roleId);
 
+    const canSeeStats =
+      listing.ownerId === userId || roleId === UserRoleType.ADMIN;
+
     const throttleKey = `${userId}:${id}`;
     const currentTime = Date.now();
 
@@ -304,7 +307,7 @@ export class ListingsService {
 
     if (throttleExpiration && throttleExpiration > currentTime) {
       return {
-        viewCount: listing.viewCount,
+        viewCount: canSeeStats ? listing.viewCount : null,
         incremented: false,
       };
     }
@@ -326,7 +329,7 @@ export class ListingsService {
     const currentListing = await this.listingRepository.findOneByOrFail({ id });
 
     return {
-      viewCount: currentListing.viewCount,
+      viewCount: canSeeStats ? currentListing.viewCount : null,
       incremented: true,
     };
   }

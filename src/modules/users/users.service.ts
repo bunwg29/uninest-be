@@ -31,16 +31,16 @@ export class UsersService {
     userId: string,
     dto: {
       identityNumber: string;
-      provinceCode: string;
-      wardCode: string;
-      streetAddress: string;
+      provinceCode?: string;
+      wardCode?: string;
+      streetAddress?: string;
     },
   ): Promise<User> {
     await this.userRepository.update(userId, {
       identityNumber: dto.identityNumber,
-      provinceCode: dto.provinceCode,
-      wardCode: dto.wardCode,
-      streetAddress: dto.streetAddress.trim(),
+      ...(dto.provinceCode ? { provinceCode: dto.provinceCode } : {}),
+      ...(dto.wardCode ? { wardCode: dto.wardCode } : {}),
+      ...(dto.streetAddress ? { streetAddress: dto.streetAddress.trim() } : {}),
       landlordVerifiedAt: new Date(),
     });
 

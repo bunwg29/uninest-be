@@ -125,19 +125,19 @@ export class LandlordVerificationDto {
   })
   identityNumber!: string;
 
-  @ApiProperty({ example: '48' })
+  @ApiPropertyOptional({ example: '48' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Vui lòng chọn tỉnh/thành phố' })
-  provinceCode!: string;
+  provinceCode?: string;
 
-  @ApiProperty({ example: '20194' })
+  @ApiPropertyOptional({ example: '20194' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Vui lòng chọn phường/xã' })
-  wardCode!: string;
+  wardCode?: string;
 
-  @ApiProperty({ example: '54 Nguyễn Lương Bằng' })
+  @ApiPropertyOptional({ example: '54 Nguyễn Lương Bằng' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Vui lòng nhập địa chỉ liên hệ' })
   @MaxLength(255)
-  streetAddress!: string;
+  streetAddress?: string;
 }
