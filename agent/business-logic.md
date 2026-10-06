@@ -78,6 +78,11 @@
 
 - **Chia sẻ & Tìm người ở ghép**: Sinh viên đăng bài tìm bạn cùng phòng, chia sẻ kinh nghiệm thuê trọ theo khu vực trường đại học.
 - **Tương tác & Kiểm duyệt**: Bình luận, tích hợp bộ lọc từ ngữ thô tục (profanity filter) tự động trước khi lưu trữ, cơ chế báo cáo bài viết vi phạm cho admin xử lý.
+- **Chuyên mục**: `roommate` (Tìm bạn ở ghép), `experience` (Kinh nghiệm thuê trọ), `question` (Hỏi đáp), `area_review` (Review khu vực). Bài `roommate` bắt buộc có tiêu chí ở ghép (giới tính, chi phí/người, ngày dọn vào, tiêu chí, khu vực) và trạng thái `open` (Còn chỗ) / `full` (Đã đủ).
+- **Vòng đời bài viết**: `draft` (lưu nháp, không kiểm duyệt) -> `published` -> `hidden` (Đã ẩn – chờ Admin xử lý). Admin `restore` về `published` hoặc `remove` (xoá mềm). Bình luận: `published` / `hidden`, trả lời tối đa 1 cấp.
+- **Quyền sửa/xoá**: Chỉ tác giả hoặc Admin được sửa/xoá bài viết, bình luận. Tác giả không sửa được nội dung đang bị ẩn.
+- **Bộ lọc nội dung**: `ForumContentModerationInterceptor` kiểm tra tiêu đề, nội dung, ghi chú ở ghép trước khi lưu. Từ khoá cấm lưu ở bảng `forum_banned_keywords` (nạp mặc định từ `modules/forum/data/banned-keywords.json`, Admin quản lý qua API). Hành động `block` luôn bị chặn (422); `warn` (vd: số điện thoại) bị chặn cho tới khi client gửi `acknowledgeWarnings: true`. Số tài khoản ngân hàng luôn bị chặn. `POST /forum/moderation/check` trả về vi phạm + bản đã lược bỏ để client hiển thị cảnh báo trước khi đăng.
+- **Báo cáo & tự động ẩn**: Bảng `forum_reports` tối giản (1 người chỉ báo cáo 1 lần mỗi nội dung, không tự báo cáo). Khi số báo cáo chưa xử lý đạt ngưỡng `FORUM_REPORT_HIDE_THRESHOLD` (mặc định 5) nội dung tự chuyển `hidden`. Sprint 3 sẽ chuẩn hoá thành Report Engine dùng chung.
 
 ### G. Đánh giá Xác thực (`reviews`)
 
