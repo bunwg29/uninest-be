@@ -156,9 +156,16 @@ export class TokenService {
       );
     }
 
-    await this.refreshTokenRepository.update(existingToken.id, {
-      isRevoked: true,
-    });
+    const rotation = await this.refreshTokenRepository.update(
+      { id: existingToken.id, isRevoked: false },
+      { isRevoked: true },
+    );
+
+    if (!rotation.affected) {
+      throw new UnauthorizedException(
+        'Phiên đăng nhập đã được làm mới ở nơi khác. Vui lòng thử lại',
+      );
+    }
 
     const permissions = await this.usersService.getUserPermissions(user.roleId);
 
@@ -181,15 +188,22 @@ export class TokenService {
 
   async revokeToken(rawRefreshToken: string, deviceId?: string): Promise<void> {
     const tokenHash = this.hashToken(rawRefreshToken);
+    const existingToken = await this.refreshTokenRepository.findOne({
+      where: { tokenHash },
+      select: { id: true, userId: true },
+    });
 
-    await this.refreshTokenRepository.update(
-      { tokenHash },
-      { isRevoked: true },
-    );
+    if (!existingToken) {
+      return;
+    }
+
+    await this.refreshTokenRepository.update(existingToken.id, {
+      isRevoked: true,
+    });
 
     if (deviceId) {
       await this.refreshTokenRepository.update(
-        { deviceId, isRevoked: false },
+        { userId: existingToken.userId, deviceId, isRevoked: false },
         { isRevoked: true },
       );
     }

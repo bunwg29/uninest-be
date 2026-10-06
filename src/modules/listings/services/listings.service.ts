@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, QueryFailedError, Repository } from 'typeorm';
 import {
   ACTIVE_BOOKING_STATUSES,
   Booking,
@@ -37,6 +37,8 @@ import {
 
 const VIEW_THROTTLE_MINUTES = 30;
 const VIEW_THROTTLE_MILLISECONDS = VIEW_THROTTLE_MINUTES * 60 * 1000;
+
+const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 @Injectable()
 export class ListingsService {
@@ -413,23 +415,31 @@ export class ListingsService {
       throw new ConflictException('Bạn đã báo cáo tin đăng này trước đó');
     }
 
-    await reportRepository.save(
-      reportRepository.create({
-        listingId: id,
-        reporterId: userId,
-        reason: dto.reason,
-        note: dto.note?.trim() || null,
-      }),
-    );
+    try {
+      await reportRepository.save(
+        reportRepository.create({
+          listingId: id,
+          reporterId: userId,
+          reason: dto.reason,
+          note: dto.note?.trim() || null,
+        }),
+      );
+    } catch (error) {
+      if (
+        error instanceof QueryFailedError &&
+        (error.driverError as { code?: string }).code ===
+          POSTGRES_UNIQUE_VIOLATION
+      ) {
+        throw new ConflictException('Bạn đã báo cáo tin đăng này trước đó');
+      }
+
+      throw error;
+    }
 
     return { listingId: id, reported: true };
   }
 
   async removeFavorite(userId: string, id: string): Promise<void> {
-    const listing = await this.listingRepository.findOneBy({ id });
-
-    this.assertActiveListing(listing);
-
     await this.favoriteRepository.delete({ userId, listingId: id });
   }
 

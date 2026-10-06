@@ -30,7 +30,7 @@ import {
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 const FORUM_IMAGE_KEY_PATTERN = new RegExp(
-  `^${FORUM_CONSTANTS.IMAGE_KEY_PREFIX}[A-Za-z0-9/_.-]+$`,
+  `^${FORUM_CONSTANTS.IMAGE_KEY_PREFIX}(?!.*\\.\\.)[A-Za-z0-9/_.-]+$`,
 );
 
 export const trimString = ({ value }: { value: unknown }) =>

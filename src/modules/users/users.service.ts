@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { ACTIVE_BOOKING_STATUSES, Booking } from '@modules/booking';
-import { Favorite } from '@modules/listings/entities';
+import { Favorite, ListingStatus } from '@modules/listings/entities';
 import { User, RolePermission } from './entities';
 
 @Injectable()
@@ -18,7 +18,16 @@ export class UsersService {
 
   async getProfileStats(userId: string) {
     const [savedRooms, appointments] = await Promise.all([
-      this.dataSource.getRepository(Favorite).count({ where: { userId } }),
+      this.dataSource
+        .getRepository(Favorite)
+        .createQueryBuilder('favorite')
+        .innerJoin('favorite.listing', 'listing')
+        .where('favorite.userId = :userId', { userId })
+        .andWhere('listing.status = :activeStatus', {
+          activeStatus: ListingStatus.ACTIVE,
+        })
+        .andWhere('listing.deletedAt IS NULL')
+        .getCount(),
       this.dataSource.getRepository(Booking).count({
         where: { userId, status: In(ACTIVE_BOOKING_STATUSES) },
       }),

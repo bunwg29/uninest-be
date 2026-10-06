@@ -26,6 +26,8 @@ interface SearchListingRow {
   distanceMeters?: number | string | null;
 }
 
+const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, '\\$&');
+
 const SEARCH_DISTANCE_SQL = `ST_Distance(${SEARCH_LISTING_GEOGRAPHY_SQL}, ${SEARCH_REFERENCE_POINT_SQL})`;
 
 @Injectable()
@@ -53,8 +55,8 @@ export class ListingsSearchRepository {
     if (rows.length === 0) {
       return {
         items: [],
-        hasResults: false,
-        suggestion: this.createSuggestion(query),
+        hasResults: total > 0,
+        suggestion: total === 0 ? this.createSuggestion(query) : undefined,
         pagination: {
           page: query.page,
           limit: query.limit,
@@ -117,12 +119,23 @@ export class ListingsSearchRepository {
   }
 
   async listFavoriteIds(userId: string): Promise<string[]> {
-    const favorites = await this.dataSource.getRepository(Favorite).find({
-      select: { listingId: true },
-      where: { userId },
-    });
+    const rows = await this.listingRepository
+      .createQueryBuilder('listing')
+      .select('listing.id', 'id')
+      .innerJoin(
+        Favorite,
+        'favorite',
+        'favorite.listing_id = listing.id AND favorite.user_id = :userId',
+        { userId },
+      )
+      .where('listing.status = :activeStatus', {
+        activeStatus: ListingStatus.ACTIVE,
+      })
+      .andWhere('listing.deletedAt IS NULL')
+      .orderBy('favorite.created_at', 'DESC')
+      .getRawMany<{ id: string }>();
 
-    return favorites.map((favorite) => favorite.listingId);
+    return rows.map((row) => row.id);
   }
 
   private async hydrateRows(
@@ -199,7 +212,7 @@ export class ListingsSearchRepository {
     if (query.keyword) {
       listingsQuery.andWhere(
         '(unaccent(listing.title) ILIKE unaccent(:keyword) OR unaccent(listing.fullAddress) ILIKE unaccent(:keyword))',
-        { keyword: `%${query.keyword}%` },
+        { keyword: `%${escapeLikePattern(query.keyword)}%` },
       );
     }
 

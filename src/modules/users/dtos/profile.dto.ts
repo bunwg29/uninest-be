@@ -12,10 +12,14 @@ import {
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'Nguyễn Xuân Hoài' })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @MinLength(2, { message: 'Họ và tên tối thiểu 2 ký tự' })
   @MaxLength(50, { message: 'Họ và tên tối đa 50 ký tự' })

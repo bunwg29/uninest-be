@@ -86,7 +86,9 @@ export class AdminForumPostsQueryDto extends PaginationQueryDto {
     default: ForumPostStatus.HIDDEN,
   })
   @IsOptional()
-  @IsEnum(ForumPostStatus, { message: 'Trạng thái bài viết không hợp lệ' })
+  @IsIn([ForumPostStatus.HIDDEN, ForumPostStatus.PUBLISHED], {
+    message: 'Chỉ được lọc bài viết đã đăng hoặc đã bị ẩn',
+  })
   status: ForumPostStatus = ForumPostStatus.HIDDEN;
 
   @ApiPropertyOptional({ enum: ForumCategory })

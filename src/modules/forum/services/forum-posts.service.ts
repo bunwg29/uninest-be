@@ -172,12 +172,16 @@ export class ForumPostsService {
           this.moderationService.extractModeratedContent(dto),
           dto.acknowledgeWarnings === true,
         );
+    const imageKeys = [...new Set(dto.imageKeys ?? [])];
+
+    await this.assertImagesUsable(imageKeys, [], null);
+
     const post = this.postRepository.create({
       authorId: viewer.userId,
       category: dto.category,
       title: dto.title,
       content: dto.content,
-      imageKeys: [...new Set(dto.imageKeys ?? [])],
+      imageKeys,
       roommate,
       roommateStatus: roommate
         ? (dto.roommateStatus ?? RoommateStatus.OPEN)
@@ -223,13 +227,17 @@ export class ForumPostsService {
       post.status === ForumPostStatus.DRAFT && dto.isDraft === false;
     const nextStatus = shouldPublish ? ForumPostStatus.PUBLISHED : post.status;
 
-    post.category = category;
-    post.title = dto.title ?? post.title;
-    post.content = dto.content ?? post.content;
-    post.imageKeys =
+    const nextImageKeys =
       dto.imageKeys !== undefined
         ? [...new Set(dto.imageKeys)]
         : post.imageKeys;
+
+    await this.assertImagesUsable(nextImageKeys, previousImageKeys, post.id);
+
+    post.category = category;
+    post.title = dto.title ?? post.title;
+    post.content = dto.content ?? post.content;
+    post.imageKeys = nextImageKeys;
     post.roommate = roommate;
     post.roommateStatus = roommate
       ? (dto.roommateStatus ?? post.roommateStatus ?? RoommateStatus.OPEN)
@@ -402,6 +410,38 @@ export class ForumPostsService {
 
     return posts.map((post) =>
       this.presenter.toPost(post, viewer, likedPostIds.has(post.id)),
+    );
+  }
+
+  private async assertImagesUsable(
+    nextImageKeys: string[],
+    previousImageKeys: string[],
+    postId: string | null,
+  ): Promise<void> {
+    const previousKeys = new Set(previousImageKeys);
+    const addedKeys = nextImageKeys.filter((key) => !previousKeys.has(key));
+
+    if (!addedKeys.length) {
+      return;
+    }
+
+    const usedQuery = this.postRepository
+      .createQueryBuilder('post')
+      .withDeleted()
+      .where('post.imageKeys && CAST(:addedKeys AS text[])', { addedKeys });
+
+    if (postId) {
+      usedQuery.andWhere('post.id != :postId', { postId });
+    }
+
+    if (await usedQuery.getExists()) {
+      throw new BadRequestException(
+        'Ảnh đã được sử dụng ở bài viết khác, vui lòng tải ảnh mới lên',
+      );
+    }
+
+    await Promise.all(
+      addedKeys.map((key) => this.storageService.assertValidImageObject(key)),
     );
   }
 

@@ -28,6 +28,11 @@ import { User } from '../../users/entities/user';
 import { LocationsService } from '../../locations/locations.service';
 import { R2StorageService } from '@core/storage';
 
+const TOKEN_ISSUING_OTP_TYPES: readonly OtpType[] = [
+  OtpType.REGISTER,
+  OtpType.LOGIN,
+];
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -151,12 +156,24 @@ export class AuthService {
     dto: VerifyOtpDto,
     ipAddress?: string,
   ): Promise<AuthTokenDto> {
+    if (!TOKEN_ISSUING_OTP_TYPES.includes(dto.type)) {
+      throw new BadRequestException(
+        'Loại mã OTP này không dùng để đăng nhập hoặc kích hoạt tài khoản',
+      );
+    }
+
     await this.otpService.verifyOtp(dto.identifier, dto.code, dto.type);
 
     const user = await this.usersService.findByIdentifier(dto.identifier);
 
     if (!user) {
       throw new NotFoundException('Không tìm thấy thông tin tài khoản');
+    }
+
+    if (!user.isActive) {
+      throw new ForbiddenException(
+        'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên',
+      );
     }
 
     if (!user.isVerified) {
@@ -263,7 +280,6 @@ export class AuthService {
   }
 
   async logout(dto: RefreshTokenDto): Promise<{ message: string }> {
-    await this.tokenService.revokeToken(dto.refreshToken);
     await this.tokenService.revokeToken(dto.refreshToken, dto.deviceId);
 
     return { message: 'Đăng xuất thành công' };

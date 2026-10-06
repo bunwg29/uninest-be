@@ -206,6 +206,12 @@ export class UsersController {
       OtpType.PHONE_CHANGE,
     );
 
+    const existingUser = await this.usersService.findByPhone(newPhone);
+
+    if (existingUser && existingUser.id !== userId) {
+      throw new ConflictException('Số điện thoại này đã được sử dụng');
+    }
+
     await this.usersService.update(userId, {
       phone: newPhone,
       phoneVerified: true,

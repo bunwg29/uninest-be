@@ -1,4 +1,6 @@
+import { Transform } from 'class-transformer';
 import {
+  IsEmail,
   IsString,
   IsNotEmpty,
   MinLength,
@@ -16,7 +18,10 @@ export class RegisterDto {
     description: 'Địa chỉ Email (tùy chọn nếu đã cung cấp số điện thoại)',
   })
   @IsOptional()
-  @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
   @MaxLength(150)
   email?: string;
 
@@ -35,6 +40,9 @@ export class RegisterDto {
     example: 'Nguyễn Văn A',
     description: 'Họ và tên người dùng',
   })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsNotEmpty({ message: 'Họ và tên không được để trống' })
   @IsString()
   @MinLength(2, { message: 'Họ và tên tối thiểu 2 ký tự' })
@@ -43,11 +51,14 @@ export class RegisterDto {
 
   @ApiProperty({
     example: 'Abc@123456',
-    description: 'Mật khẩu tài khoản (tối thiểu 6 ký tự)',
+    description: 'Mật khẩu tài khoản (tối thiểu 8 ký tự, gồm chữ cái và số)',
   })
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @IsString()
-  @MinLength(6, { message: 'Mật khẩu phải từ 6 ký tự trở lên' })
+  @MinLength(8, { message: 'Mật khẩu phải từ 8 ký tự trở lên' })
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d)/, {
+    message: 'Mật khẩu phải chứa cả chữ cái và chữ số',
+  })
   @MaxLength(32, { message: 'Mật khẩu tối đa 32 ký tự' })
   password!: string;
 
