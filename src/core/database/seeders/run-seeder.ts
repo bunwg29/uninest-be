@@ -10,6 +10,7 @@ import {
 } from '../../../modules/users/entities';
 import { RefreshToken, OtpCode } from '../../../modules/auth/entities';
 import { Province, Ward } from '../../../modules/locations/entities';
+import { Conversation, Message } from '../../../modules/chat/entities';
 import {
   Amenity,
   Listing,
@@ -20,6 +21,7 @@ import { seedRbac } from './rbac.seeder';
 import { seedLocations } from './locations.seeder';
 import { seedAmenities } from './amenities.seeder';
 import { seedRooms } from './rooms.seeder';
+import { seedChatDemo } from './chat-demo.seeder';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), quiet: true });
 
@@ -53,6 +55,12 @@ const SEEDERS: Record<
     description:
       'Nạp 34 tỉnh/thành phố và 3.321 phường/xã từ dữ liệu đơn vị hành chính Việt Nam',
     fn: seedLocations,
+  },
+  chat: {
+    name: 'Seeder dữ liệu thử chat',
+    description:
+      'Nạp 1 chủ trọ, 1 sinh viên, 1 tin đăng active và 1 hội thoại mẫu để thử chức năng nhắn tin',
+    fn: seedChatDemo,
   },
   rooms: {
     name: 'Seeder 55 phòng trọ',
@@ -111,6 +119,8 @@ async function run() {
       Listing,
       ListingAmenity,
       ListingImage,
+      Conversation,
+      Message,
     ],
     synchronize: isSync,
     namingStrategy: new SnakeNamingStrategy(),
