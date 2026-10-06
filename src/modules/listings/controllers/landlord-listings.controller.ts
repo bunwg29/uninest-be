@@ -19,6 +19,7 @@ import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import {
   CreateListingDto,
   LandlordListingsQueryDto,
+  UpdateListingRentalDto,
   UpdateListingVisibilityDto,
 } from '../dtos';
 import { ListingStatus } from '../entities';
@@ -72,6 +73,16 @@ export class LandlordListingsController {
       id,
       dto.hidden ? ListingStatus.HIDDEN : ListingStatus.ACTIVE,
     );
+  }
+
+  @Patch(':id/rental-status')
+  @ApiOperation({ summary: 'Đánh dấu đã cho thuê hoặc mở lại tin đăng' })
+  async updateRentalStatus(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateListingRentalDto,
+  ) {
+    return this.listingsService.updateRentalStatus(userId, id, dto.rented);
   }
 
   @Delete(':id')

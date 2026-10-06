@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Booking } from '@modules/booking/entities';
 import { Listing, ListingImage } from '@modules/listings/entities';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
@@ -12,7 +13,13 @@ import { ChatService } from './services/chat.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Conversation, Message, Listing, ListingImage]),
+    TypeOrmModule.forFeature([
+      Conversation,
+      Message,
+      Listing,
+      ListingImage,
+      Booking,
+    ]),
     AuthModule,
     UsersModule,
   ],

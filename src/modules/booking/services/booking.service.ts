@@ -99,7 +99,8 @@ export class BookingService {
       string,
       Record<string, boolean>
     > | null;
-    const dayKey = DAY_KEYS[new Date(`${query.date}T12:00:00+07:00`).getDay()];
+    const dayKey =
+      DAY_KEYS[new Date(`${query.date}T12:00:00+07:00`).getUTCDay()];
     const now = new Date();
 
     return SLOT_TIMES.map((time) => {
@@ -160,6 +161,8 @@ export class BookingService {
           'Thời gian xem phòng phải ở trong tương lai',
         );
       }
+
+      this.assertSlotAllowed(listing, startTime);
 
       const duplicateCount = await queryRunner.manager.count(Booking, {
         where: {
@@ -640,6 +643,38 @@ export class BookingService {
     await this.eventRepository.save(
       this.eventRepository.create({ bookingId, eventType, actor, metadata }),
     );
+  }
+
+  private assertSlotAllowed(listing: Listing, startTime: Date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(startTime);
+    const pick = (type: string) =>
+      parts.find((part) => part.type === type)?.value ?? '';
+    const time = `${pick('hour')}:${pick('minute')}`;
+    const date = `${pick('year')}-${pick('month')}-${pick('day')}`;
+
+    if (!SLOT_TIMES.includes(time)) {
+      throw new BadRequestException('Khung giờ xem phòng không hợp lệ');
+    }
+
+    const schedule = listing.viewingSchedule as Record<
+      string,
+      Record<string, boolean>
+    > | null;
+    const dayKey = DAY_KEYS[new Date(`${date}T12:00:00+07:00`).getUTCDay()];
+
+    if (!(schedule?.[dayKey]?.[this.getSlotPeriod(time)] ?? true)) {
+      throw new BadRequestException(
+        'Chủ trọ không nhận xem phòng trong khung giờ này',
+      );
+    }
   }
 
   private getSlotPeriod(time: string) {

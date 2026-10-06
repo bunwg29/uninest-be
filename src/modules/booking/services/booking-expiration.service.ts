@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, Repository } from 'typeorm';
 import {
   BOOKING_ACTORS,
+  BOOKING_DEFAULTS,
   BOOKING_EVENTS,
   type BookingStatusChangedPayload,
 } from '../constants';
@@ -25,6 +26,9 @@ export class BookingExpirationService {
   @Cron('*/5 * * * *')
   async handleExpiredBookings(): Promise<number> {
     const now = new Date();
+    const confirmedDeadline = new Date(
+      now.getTime() - BOOKING_DEFAULTS.HOLDING_DAYS * 24 * 3_600_000,
+    );
     const expiredBookings = await this.bookingRepository.find({
       select: {
         id: true,
@@ -40,6 +44,10 @@ export class BookingExpirationService {
           expiresAt: LessThan(now),
         },
         { status: BookingStatus.PENDING, startTime: LessThan(now) },
+        {
+          status: BookingStatus.CONFIRMED,
+          startTime: LessThan(confirmedDeadline),
+        },
       ],
     });
 
@@ -54,7 +62,11 @@ export class BookingExpirationService {
       .set({ status: BookingStatus.EXPIRED, expiredAt: now, expiresAt: null })
       .whereInIds(ids)
       .andWhere('status IN (:...statuses)', {
-        statuses: [BookingStatus.PENDING, BookingStatus.HOLDING],
+        statuses: [
+          BookingStatus.PENDING,
+          BookingStatus.CONFIRMED,
+          BookingStatus.HOLDING,
+        ],
       })
       .returning('id')
       .execute();

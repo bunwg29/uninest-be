@@ -67,6 +67,14 @@ export class UpdateListingVisibilityDto {
   hidden!: boolean;
 }
 
+export class UpdateListingRentalDto {
+  @ApiProperty({
+    description: 'Đánh dấu đã cho thuê khi true, mở lại tin khi false',
+  })
+  @IsBoolean({ message: 'Trạng thái cho thuê phải là kiểu boolean' })
+  rented!: boolean;
+}
+
 export class UpdateListingStatusDto {
   @ApiProperty({
     enum: [ListingStatus.ACTIVE, ListingStatus.HIDDEN],

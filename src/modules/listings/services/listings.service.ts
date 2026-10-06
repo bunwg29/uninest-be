@@ -10,11 +10,14 @@ import { DataSource, In, Repository } from 'typeorm';
 import {
   ACTIVE_BOOKING_STATUSES,
   Booking,
+  BookingEvent,
+  BookingStatus,
   findActiveHolds,
   type ListingHoldInfo,
 } from '@modules/booking';
 import { UserRoleType } from '@common/constants';
 import { R2StorageService } from '@core/storage';
+import { Conversation } from '@modules/chat/entities';
 import { Province, Ward } from '@modules/locations/entities';
 import { User } from '@modules/users/entities';
 import {
@@ -268,7 +271,18 @@ export class ListingsService {
       throw new NotFoundException('Không tìm thấy tin đăng của bạn');
     }
 
-    return this.toLandlordListing(listing);
+    const [saveCount, contactCount, bookingCount] = await Promise.all([
+      this.favoriteRepository.countBy({ listingId: id }),
+      this.dataSource.getRepository(Conversation).countBy({ listingId: id }),
+      this.dataSource.getRepository(Booking).countBy({ listingId: id }),
+    ]);
+
+    return {
+      ...this.toLandlordListing(listing),
+      saveCount,
+      contactCount,
+      bookingCount,
+    };
   }
 
   async getListingDetail(userId: string, roleId: UserRoleType, id: string) {
@@ -276,6 +290,26 @@ export class ListingsService {
       this.createDetailQuery(id).getOne(),
       this.favoriteRepository.existsBy({ userId, listingId: id }),
     ]);
+
+    const myBooking =
+      roleId === UserRoleType.STUDENT && listing
+        ? await this.findMyActiveBooking(userId, listing.id)
+        : null;
+
+    if (
+      listing &&
+      listing.status !== ListingStatus.ACTIVE &&
+      roleId === UserRoleType.STUDENT &&
+      (await this.hasListingHistory(userId, listing.id))
+    ) {
+      return this.toListingDetail(
+        listing,
+        isFavorite,
+        undefined,
+        false,
+        myBooking,
+      );
+    }
 
     this.assertCanAccessListing(listing, userId, roleId);
 
@@ -288,6 +322,7 @@ export class ListingsService {
       isFavorite,
       holds.get(listing.id),
       canSeeStats,
+      myBooking,
     );
   }
 
@@ -432,6 +467,70 @@ export class ListingsService {
     const updatedListing = await this.listingRepository.save(listing);
 
     return this.toLandlordListing(updatedListing);
+  }
+
+  async updateRentalStatus(userId: string, id: string, rented: boolean) {
+    const listing = await this.listingRepository.findOneBy({
+      id,
+      ownerId: userId,
+    });
+
+    if (!listing) {
+      throw new NotFoundException('Không tìm thấy tin đăng của bạn');
+    }
+
+    if (rented) {
+      if (listing.status === ListingStatus.RENTED) {
+        throw new ConflictException('Tin này đã được đánh dấu là đã cho thuê');
+      }
+
+      if (
+        listing.status !== ListingStatus.ACTIVE &&
+        listing.status !== ListingStatus.PAUSED
+      ) {
+        throw new BadRequestException(
+          'Chỉ tin đang hiển thị mới có thể đánh dấu đã cho thuê',
+        );
+      }
+    } else if (listing.status !== ListingStatus.RENTED) {
+      throw new ConflictException('Tin này chưa được đánh dấu là đã cho thuê');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      listing.status = rented ? ListingStatus.RENTED : ListingStatus.ACTIVE;
+      await manager.save(listing);
+
+      if (!rented) return;
+
+      const openBookings = await manager.find(Booking, {
+        select: { id: true },
+        where: {
+          listingId: id,
+          status: In([BookingStatus.PENDING, BookingStatus.CONFIRMED]),
+        },
+      });
+
+      if (openBookings.length === 0) return;
+
+      const now = new Date();
+
+      await manager.update(
+        Booking,
+        { id: In(openBookings.map((booking) => booking.id)) },
+        { status: BookingStatus.EXPIRED, expiredAt: now, expiresAt: null },
+      );
+      await manager.insert(
+        BookingEvent,
+        openBookings.map((booking) => ({
+          bookingId: booking.id,
+          eventType: BookingStatus.EXPIRED,
+          actor: 'system',
+          metadata: { reason: 'Phòng đã được cho thuê' },
+        })),
+      );
+    });
+
+    return this.toLandlordListing(listing);
   }
 
   async updateListing(
@@ -638,6 +737,40 @@ export class ListingsService {
       .addOrderBy('amenity.id', 'ASC');
   }
 
+  private async findMyActiveBooking(userId: string, listingId: string) {
+    const booking = await this.dataSource.getRepository(Booking).findOne({
+      select: { id: true, status: true, startTime: true, expiresAt: true },
+      where: {
+        listingId,
+        userId,
+        status: In(ACTIVE_BOOKING_STATUSES),
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    return booking
+      ? {
+          id: booking.id,
+          status: booking.status,
+          startTime: booking.startTime,
+          expiresAt: booking.expiresAt,
+        }
+      : null;
+  }
+
+  private async hasListingHistory(userId: string, listingId: string) {
+    const [hasBooking, hasConversation] = await Promise.all([
+      this.dataSource
+        .getRepository(Booking)
+        .exists({ where: { listingId, userId } }),
+      this.dataSource
+        .getRepository(Conversation)
+        .exists({ where: { listingId, studentId: userId } }),
+    ]);
+
+    return hasBooking || hasConversation;
+  }
+
   private assertCanAccessListing(
     listing: Listing | null,
     userId: string,
@@ -667,6 +800,12 @@ export class ListingsService {
     isFavorite: boolean,
     hold: ListingHoldInfo | undefined,
     canSeeStats: boolean,
+    myBooking: {
+      id: string;
+      status: BookingStatus;
+      startTime: Date;
+      expiresAt: Date | null;
+    } | null = null,
   ) {
     const images = [...(listing.images ?? [])].sort(
       (first, second) => first.sortOrder - second.sortOrder,
@@ -729,6 +868,7 @@ export class ListingsService {
         ? { expiresAt: hold.expiresAt, daysLeft: hold.daysLeft }
         : null,
       isFavorite,
+      myBooking,
       createdAt: listing.createdAt,
       updatedAt: listing.updatedAt,
     };

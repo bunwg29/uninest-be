@@ -32,16 +32,20 @@ export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
   @Post()
-  @Roles(UserRoleType.STUDENT)
+  @Roles(UserRoleType.STUDENT, UserRoleType.LANDLORD)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Tạo hoặc mở lại cuộc trò chuyện với chủ trọ từ một tin đăng',
+    summary:
+      'Sinh viên mở cuộc trò chuyện với chủ trọ của tin đăng; chủ trọ mở cuộc trò chuyện với sinh viên đã đặt lịch xem phòng',
   })
   async createOrGet(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('role') role: UserRoleType,
     @Body() dto: CreateConversationDto,
   ) {
-    return this.chatService.createOrGetConversation(userId, dto);
+    return role === UserRoleType.LANDLORD
+      ? this.chatService.createOrGetConversationForLandlord(userId, dto)
+      : this.chatService.createOrGetConversation(userId, dto);
   }
 
   @Get()

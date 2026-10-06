@@ -58,4 +58,20 @@ describe('BookingExpirationService', () => {
     expect(bookingRepository.createQueryBuilder).not.toHaveBeenCalled();
     expect(eventRepository.insert).not.toHaveBeenCalled();
   });
+
+  it('hết hạn lịch đã xác nhận mà sinh viên không giữ chỗ sau thời hạn giữ chỗ', async () => {
+    (bookingRepository.find as jest.Mock).mockResolvedValue([]);
+
+    await service.handleExpiredBookings();
+
+    const conditions = (bookingRepository.find as jest.Mock).mock.calls[0][0]
+      .where as Array<{ status: unknown; startTime?: unknown }>;
+
+    expect(
+      conditions.some(
+        (condition) =>
+          condition.status === 'confirmed' && condition.startTime !== undefined,
+      ),
+    ).toBe(true);
+  });
 });

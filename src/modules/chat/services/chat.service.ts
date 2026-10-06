@@ -8,6 +8,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { R2StorageService } from '@core/storage';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Booking } from '@modules/booking/entities';
 import { createPaginatedResult } from '@common/dtos';
 import {
   Listing,
@@ -96,10 +97,69 @@ export class ChatService {
     private readonly listingRepository: Repository<Listing>,
     @InjectRepository(ListingImage)
     private readonly listingImageRepository: Repository<ListingImage>,
+    @InjectRepository(Booking)
+    private readonly bookingRepository: Repository<Booking>,
     private readonly mapper: ChatMapperService,
     private readonly eventEmitter: EventEmitter2,
     private readonly storageService: R2StorageService,
   ) {}
+
+  async createOrGetConversationForLandlord(
+    landlordId: string,
+    dto: CreateConversationDto,
+  ): Promise<ConversationResponseDto> {
+    if (!dto.studentId) {
+      throw new BadRequestException('Vui lòng chọn sinh viên cần nhắn tin');
+    }
+
+    const listing = await this.listingRepository.findOne({
+      where: { id: dto.listingId },
+    });
+
+    if (!listing || listing.ownerId !== landlordId) {
+      throw new ForbiddenException('Bạn không phải chủ của tin đăng này');
+    }
+
+    const hasBooking = await this.bookingRepository.exists({
+      where: { listingId: listing.id, userId: dto.studentId },
+    });
+
+    if (!hasBooking) {
+      throw new ForbiddenException(
+        'Chỉ có thể nhắn tin với sinh viên đã đặt lịch xem phòng này',
+      );
+    }
+
+    const existing = await this.conversationRepository.findOne({
+      where: { listingId: listing.id, studentId: dto.studentId },
+    });
+
+    if (existing) {
+      return this.getConversation(landlordId, existing.id);
+    }
+
+    try {
+      const created = await this.conversationRepository.save(
+        this.conversationRepository.create({
+          listingId: listing.id,
+          studentId: dto.studentId,
+          landlordId,
+        }),
+      );
+
+      return await this.getConversation(landlordId, created.id);
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        const concurrent = await this.conversationRepository.findOneOrFail({
+          where: { listingId: listing.id, studentId: dto.studentId },
+        });
+
+        return this.getConversation(landlordId, concurrent.id);
+      }
+
+      throw error;
+    }
+  }
 
   async createOrGetConversation(
     studentId: string,
