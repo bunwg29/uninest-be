@@ -65,7 +65,7 @@ const SEEDERS: Record<
   rooms: {
     name: 'Seeder 55 phòng trọ',
     description:
-      'Nạp dữ liệu phân quyền, tiện ích, địa giới, 5 chủ trọ và 55 phòng trọ mẫu',
+      'Nạp dữ liệu phân quyền, tiện ích, địa giới, tài khoản mẫu và 55 phòng trọ',
     fn: seedRoomsWithDependencies,
   },
 };
