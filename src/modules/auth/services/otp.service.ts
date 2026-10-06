@@ -1,13 +1,24 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { createHash, randomInt } from 'node:crypto';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository } from 'typeorm';
 import { OtpCode, OtpType } from '../entities/otp-code';
+
+const OTP_RULES = {
+  TTL_MS: 5 * 60 * 1000,
+  MAX_ATTEMPTS: 5,
+  LOCK_MS: 60 * 1000,
+} as const;
 
 @Injectable()
 export class OtpService {
   private readonly logger = new Logger(OtpService.name);
-  private readonly OTP_TTL_MS = 5 * 60 * 1000;
-  private readonly MAX_ATTEMPTS = 5;
 
   constructor(
     @InjectRepository(OtpCode)
@@ -19,31 +30,39 @@ export class OtpService {
     type: OtpType = OtpType.REGISTER,
   ): Promise<{ expiresAt: Date; code: string }> {
     const cleanIdentifier = identifier.trim().toLowerCase();
-
-    await this.otpRepository.update(
-      {
-        identifier: cleanIdentifier,
-        type,
-        isUsed: false,
-      },
-      {
-        isUsed: true,
-      },
-    );
-
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + this.OTP_TTL_MS);
-
-    const otp = this.otpRepository.create({
-      identifier: cleanIdentifier,
-      code,
-      type,
-      expiresAt,
-      isUsed: false,
-      attempts: 0,
+    const latestOtp = await this.otpRepository.findOne({
+      where: { identifier: cleanIdentifier, type },
+      order: { createdAt: 'DESC' },
     });
 
-    await this.otpRepository.save(otp);
+    if (latestOtp) {
+      const resendAvailableAt = Math.max(
+        latestOtp.createdAt.getTime() + OTP_RULES.LOCK_MS,
+        latestOtp.lockedUntil?.getTime() ?? 0,
+      );
+
+      this.assertNotLocked(resendAvailableAt, 'gửi lại mã OTP');
+    }
+
+    await this.otpRepository.update(
+      { identifier: cleanIdentifier, type, isUsed: false },
+      { isUsed: true },
+    );
+
+    const code = randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + OTP_RULES.TTL_MS);
+
+    await this.otpRepository.save(
+      this.otpRepository.create({
+        identifier: cleanIdentifier,
+        codeHash: this.hashCode(cleanIdentifier, code),
+        type,
+        expiresAt,
+        isUsed: false,
+        attempts: 0,
+        lockedUntil: null,
+      }),
+    );
 
     this.logger.log(
       `[OTP Service] Ma OTP gui toi [${cleanIdentifier}] (Muc dich: ${type}) la: ${code} (Het han luc: ${expiresAt.toLocaleTimeString()})`,
@@ -58,37 +77,43 @@ export class OtpService {
     type: OtpType = OtpType.REGISTER,
   ): Promise<boolean> {
     const cleanIdentifier = identifier.trim().toLowerCase();
-    const cleanCode = code.trim();
-
     const otp = await this.otpRepository.findOne({
-      where: {
-        identifier: cleanIdentifier,
-        type,
-        isUsed: false,
-        expiresAt: MoreThan(new Date()),
-      },
+      where: { identifier: cleanIdentifier, type, isUsed: false },
       order: { createdAt: 'DESC' },
     });
 
     if (!otp) {
       throw new BadRequestException(
-        'Mã OTP không hợp lệ, đã được sử dụng hoặc đã hết hạn',
+        'Mã OTP không hợp lệ hoặc đã được sử dụng. Vui lòng yêu cầu mã mới',
       );
     }
 
-    if (otp.attempts >= this.MAX_ATTEMPTS) {
+    this.assertNotLocked(otp.lockedUntil?.getTime() ?? 0, 'xác thực OTP');
+
+    if (otp.expiresAt.getTime() <= Date.now()) {
       await this.otpRepository.update(otp.id, { isUsed: true });
       throw new BadRequestException(
-        'Mã OTP đã bị vô hiệu hoá do nhập sai quá 5 lần. Vui lòng yêu cầu mã mới',
+        'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới',
       );
     }
 
-    if (otp.code !== cleanCode) {
-      await this.otpRepository.increment({ id: otp.id }, 'attempts', 1);
-      const remaining = this.MAX_ATTEMPTS - (otp.attempts + 1);
+    if (otp.codeHash !== this.hashCode(cleanIdentifier, code.trim())) {
+      const attempts = otp.attempts + 1;
 
+      if (attempts >= OTP_RULES.MAX_ATTEMPTS) {
+        await this.otpRepository.update(otp.id, {
+          attempts,
+          isUsed: true,
+          lockedUntil: new Date(Date.now() + OTP_RULES.LOCK_MS),
+        });
+        throw new BadRequestException(
+          'Bạn đã nhập sai quá 5 lần. Vui lòng chờ 60 giây rồi yêu cầu gửi lại mã mới',
+        );
+      }
+
+      await this.otpRepository.update(otp.id, { attempts });
       throw new BadRequestException(
-        `Mã OTP không chính xác. Bạn còn ${remaining} lần thử`,
+        `Mã OTP không chính xác. Bạn còn ${OTP_RULES.MAX_ATTEMPTS - attempts} lần thử`,
       );
     }
 
@@ -98,5 +123,20 @@ export class OtpService {
     );
 
     return true;
+  }
+
+  private assertNotLocked(availableAtMs: number, action: string): void {
+    const remainingMs = availableAtMs - Date.now();
+
+    if (remainingMs > 0) {
+      throw new HttpException(
+        `Vui lòng chờ ${Math.ceil(remainingMs / 1000)} giây để ${action}`,
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  private hashCode(identifier: string, code: string): string {
+    return createHash('sha256').update(`${identifier}:${code}`).digest('hex');
   }
 }

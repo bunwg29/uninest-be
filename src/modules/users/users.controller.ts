@@ -11,8 +11,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '@common/decorators';
-import { JwtAuthGuard } from '@common/guards';
+import { UserRoleType } from '@common/constants';
+import { CurrentUser, Roles } from '@common/decorators';
+import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import { R2StorageService } from '@core/storage';
 import { OtpService } from '../auth/services/otp.service';
 import { OtpType } from '../auth/entities/otp-code';
@@ -21,6 +22,7 @@ import { UsersService } from './users.service';
 import {
   ConfirmAvatarDto,
   PresignAvatarDto,
+  LandlordVerificationDto,
   ProfileResponseDto,
   RequestPhoneOtpDto,
   UpdateProfileDto,
@@ -49,7 +51,10 @@ export class UsersController {
       throw new BadRequestException('Không tìm thấy hồ sơ cá nhân');
     }
 
-    return this.mapProfile(user);
+    return this.mapProfile(
+      user,
+      await this.usersService.getProfileStats(userId),
+    );
   }
 
   @Patch()
@@ -74,7 +79,31 @@ export class UsersController {
       interestedAreas: dto.interestedAreas,
     });
 
-    return this.mapProfile(user);
+    return this.mapProfile(
+      user,
+      await this.usersService.getProfileStats(userId),
+    );
+  }
+
+  @Post('landlord-verification')
+  @Roles(UserRoleType.LANDLORD)
+  @UseGuards(RolesGuard)
+  @ApiOperation({
+    summary: 'Chủ trọ gửi thông tin xác minh cơ bản để được phép đăng tin',
+  })
+  async submitLandlordVerification(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: LandlordVerificationDto,
+  ): Promise<ProfileResponseDto> {
+    const user = await this.usersService.completeLandlordVerification(
+      userId,
+      dto,
+    );
+
+    return this.mapProfile(
+      user,
+      await this.usersService.getProfileStats(userId),
+    );
   }
 
   @Post('avatar/presign')
@@ -111,9 +140,7 @@ export class UsersController {
       throw new BadRequestException('Ảnh đại diện không thuộc tài khoản này');
     }
 
-    if (!(await this.r2StorageService.objectExists(dto.objectKey))) {
-      throw new BadRequestException('Không tìm thấy ảnh đã tải lên');
-    }
+    await this.r2StorageService.assertValidImageObject(dto.objectKey);
 
     const user = await this.usersService.findById(userId);
 
@@ -187,7 +214,10 @@ export class UsersController {
     return { phone: newPhone, phoneVerified: true };
   }
 
-  private mapProfile(user: User): ProfileResponseDto {
+  private mapProfile(
+    user: User,
+    stats: ProfileResponseDto['stats'],
+  ): ProfileResponseDto {
     return {
       id: user.id,
       name: user.fullName,
@@ -202,7 +232,13 @@ export class UsersController {
       bio: user.bio,
       interestedAreas: user.interestedAreas || [],
       role: user.role?.code || 'student',
-      stats: { savedRooms: 0, appointments: 0, reviews: 0 },
+      stats,
+      verificationStatus:
+        user.roleId === UserRoleType.LANDLORD
+          ? user.landlordVerifiedAt
+            ? 'verified'
+            : 'pending_verification'
+          : null,
       createdAt: user.createdAt,
     };
   }

@@ -1,24 +1,39 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '@common/guards';
 import { R2StorageService } from './r2-storage.service';
 import { CreatePresignedUploadUrlDto } from './dtos/presigned-upload';
 import { PresignedUploadUrlResponse } from './r2-storage.interface';
 
 @ApiTags('Storage')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('storage')
 export class StorageController {
   constructor(private readonly storageService: R2StorageService) {}
 
-  @Post('presigned-upload-url')
+  @Post(['presign-upload', 'presigned-upload-url'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Generate presigned URL for direct image upload to Cloudflare R2',
+    summary: 'Tạo presigned URL (hiệu lực 5 phút) để tải ảnh trực tiếp lên R2',
     description:
-      'Returns a temporary presigned PUT URL allowing mobile client to upload image directly to R2 bucket without routing binary data through the server.',
+      'Chỉ nhận ảnh jpg/png tối đa 5MB. Backend kiểm tra lại định dạng và dung lượng đối tượng sau khi tải lên.',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'Presigned upload URL generated successfully',
+    description: 'Tạo presigned URL thành công',
   })
   async createPresignedUploadUrl(
     @Body() dto: CreatePresignedUploadUrlDto,

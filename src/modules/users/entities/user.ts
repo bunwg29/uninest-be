@@ -78,6 +78,17 @@ export class User {
   @Column({ type: 'boolean', name: 'is_verified', default: false })
   isVerified!: boolean;
 
+  @Column({
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    name: 'identity_number',
+  })
+  identityNumber!: string | null;
+
+  @Column({ type: 'timestamptz', name: 'landlord_verified_at', nullable: true })
+  landlordVerifiedAt!: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 

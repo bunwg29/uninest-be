@@ -108,10 +108,36 @@ export class ProfileResponseDto {
   @ApiPropertyOptional() bio!: string | null;
   @ApiProperty({ type: [String] }) interestedAreas!: string[];
   @ApiProperty() role!: string;
+  @ApiPropertyOptional({ enum: ['pending_verification', 'verified'] })
+  verificationStatus!: 'pending_verification' | 'verified' | null;
   @ApiProperty() stats!: {
     savedRooms: number;
     appointments: number;
     reviews: number;
   };
   @ApiProperty() createdAt!: Date;
+}
+
+export class LandlordVerificationDto {
+  @ApiProperty({ example: '048200012345', description: 'Số CCCD/CMND' })
+  @Matches(/^(\d{9}|\d{12})$/, {
+    message: 'Số CCCD/CMND phải gồm 9 hoặc 12 chữ số',
+  })
+  identityNumber!: string;
+
+  @ApiProperty({ example: '48' })
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng chọn tỉnh/thành phố' })
+  provinceCode!: string;
+
+  @ApiProperty({ example: '20194' })
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng chọn phường/xã' })
+  wardCode!: string;
+
+  @ApiProperty({ example: '54 Nguyễn Lương Bằng' })
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng nhập địa chỉ liên hệ' })
+  @MaxLength(255)
+  streetAddress!: string;
 }

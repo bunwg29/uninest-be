@@ -1,9 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
+import { STORAGE_LIMITS } from '../storage.constants';
 
 export class CreatePresignedUploadUrlDto {
   @ApiProperty({
-    description: 'Original file name with extension',
+    description: 'Tên tệp gốc',
     example: 'room-photo-1.jpg',
   })
   @IsString()
@@ -11,23 +21,39 @@ export class CreatePresignedUploadUrlDto {
   fileName!: string;
 
   @ApiProperty({
-    description: 'MIME type of the image file',
+    description: 'Loại tệp ảnh, chỉ nhận jpg hoặc png',
     example: 'image/jpeg',
+    enum: STORAGE_LIMITS.ALLOWED_IMAGE_TYPES,
   })
   @IsString()
-  @Matches(/^image\/(jpeg|png|webp|gif|heic)$/, {
-    message:
-      'Chỉ hỗ trợ các định dạng ảnh (jpeg, png, webp, gif, heic) khi tải lên ảnh phòng hoặc ảnh đại diện',
+  @IsIn([...STORAGE_LIMITS.ALLOWED_IMAGE_TYPES], {
+    message: 'Chỉ hỗ trợ ảnh định dạng jpg hoặc png',
   })
   contentType!: string;
 
   @ApiPropertyOptional({
-    description: 'Folder/prefix where image is stored',
+    description: 'Dung lượng ảnh theo byte, tối đa 5MB',
+    example: 1048576,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(STORAGE_LIMITS.MAX_IMAGE_BYTES, {
+    message: 'Mỗi ảnh có dung lượng tối đa 5MB',
+  })
+  fileSize?: number;
+
+  @ApiPropertyOptional({
+    description: 'Thư mục lưu ảnh theo mục đích sử dụng',
     example: 'listings',
-    enum: ['listings', 'avatars', 'chat'],
+    enum: ['listings', 'avatars', 'chat', 'forum'],
     default: 'listings',
   })
   @IsOptional()
   @IsString()
+  @IsIn(['listings', 'avatars', 'chat', 'forum'], {
+    message: 'Thư mục lưu ảnh không hợp lệ',
+  })
   folder?: string;
 }

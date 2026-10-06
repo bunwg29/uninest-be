@@ -110,7 +110,7 @@ export class AuthController {
   }
 
   @Public()
-  @Post('refresh-token')
+  @Post(['refresh', 'refresh-token'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Làm mới Access Token bằng Refresh Token',

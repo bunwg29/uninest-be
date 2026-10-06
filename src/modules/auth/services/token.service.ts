@@ -21,8 +21,8 @@ export interface JwtPayload {
 @Injectable()
 export class TokenService {
   private readonly logger = new Logger(TokenService.name);
-  private readonly ACCESS_EXPIRES_IN_SEC: number = 15 * 60;
-  private readonly REFRESH_EXPIRES_IN_DAYS: number = 7;
+  private readonly ACCESS_EXPIRES_IN_SEC: number = 60 * 60;
+  private readonly REFRESH_EXPIRES_IN_DAYS: number = 30;
 
   constructor(
     private readonly jwtService: JwtService,

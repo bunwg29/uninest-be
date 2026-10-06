@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -14,6 +14,7 @@ import {
   PresignedUploadUrlResponse,
   PresignedDownloadUrlResponse,
 } from './r2-storage.interface';
+import { STORAGE_LIMITS } from './storage.constants';
 
 @Injectable()
 export class R2StorageService {
@@ -66,13 +67,11 @@ export class R2StorageService {
   }
 
   async generatePresignedUploadUrlForImage(
-    fileName: string,
+    _fileName: string,
     contentType: string,
     folder: string = 'listings',
   ): Promise<PresignedUploadUrlResponse> {
-    const rawExt = fileName.includes('.') ? fileName.split('.').pop() : 'jpg';
-    const sanitizedExt =
-      rawExt?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const sanitizedExt = contentType === 'image/png' ? 'png' : 'jpg';
     const randomId = randomUUID();
     const cleanFolder =
       folder
@@ -85,14 +84,15 @@ export class R2StorageService {
     return this.getPresignedUploadUrl({
       key,
       contentType,
-      expiresInSeconds: 900,
+      expiresInSeconds: STORAGE_LIMITS.PRESIGN_EXPIRES_SECONDS,
     });
   }
 
   async getPresignedUploadUrl(
     options: PresignedUploadUrlOptions,
   ): Promise<PresignedUploadUrlResponse> {
-    const expiresIn = options.expiresInSeconds ?? 900;
+    const expiresIn =
+      options.expiresInSeconds ?? STORAGE_LIMITS.PRESIGN_EXPIRES_SECONDS;
 
     if (!this.isConfigured || !this.s3Client) {
       return {
@@ -233,6 +233,33 @@ export class R2StorageService {
 
       return false;
     }
+  }
+
+  async assertValidImageObject(key: string): Promise<void> {
+    if (!this.isConfigured || !this.s3Client) return;
+
+    try {
+      const head = await this.s3Client.send(
+        new HeadObjectCommand({ Bucket: this.bucketName, Key: key }),
+      );
+      const contentType = head.ContentType?.toLowerCase() ?? '';
+      const contentLength = head.ContentLength ?? 0;
+      const isAllowedType = (
+        STORAGE_LIMITS.ALLOWED_IMAGE_TYPES as readonly string[]
+      ).includes(contentType);
+
+      if (isAllowedType && contentLength <= STORAGE_LIMITS.MAX_IMAGE_BYTES) {
+        return;
+      }
+
+      await this.deleteFile(key);
+    } catch {
+      throw new BadRequestException('Không tìm thấy ảnh đã tải lên');
+    }
+
+    throw new BadRequestException(
+      'Ảnh phải là jpg hoặc png và có dung lượng tối đa 5MB',
+    );
   }
 
   async objectExists(key: string): Promise<boolean> {

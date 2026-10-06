@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, In, Repository } from 'typeorm';
+import { ACTIVE_BOOKING_STATUSES, Booking } from '@modules/booking';
+import { Favorite } from '@modules/listings/entities';
 import { User, RolePermission } from './entities';
 
 @Injectable()
@@ -10,7 +12,44 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(RolePermission)
     private readonly rolePermissionRepository: Repository<RolePermission>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
+
+  async getProfileStats(userId: string) {
+    const [savedRooms, appointments] = await Promise.all([
+      this.dataSource.getRepository(Favorite).count({ where: { userId } }),
+      this.dataSource.getRepository(Booking).count({
+        where: { userId, status: In(ACTIVE_BOOKING_STATUSES) },
+      }),
+    ]);
+
+    return { savedRooms, appointments, reviews: 0 };
+  }
+
+  async completeLandlordVerification(
+    userId: string,
+    dto: {
+      identityNumber: string;
+      provinceCode: string;
+      wardCode: string;
+      streetAddress: string;
+    },
+  ): Promise<User> {
+    await this.userRepository.update(userId, {
+      identityNumber: dto.identityNumber,
+      provinceCode: dto.provinceCode,
+      wardCode: dto.wardCode,
+      streetAddress: dto.streetAddress.trim(),
+      landlordVerifiedAt: new Date(),
+    });
+
+    const user = await this.findById(userId);
+
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    return user;
+  }
 
   async findById(id: string): Promise<User | null> {
     return this.userRepository.findOne({

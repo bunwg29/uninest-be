@@ -22,8 +22,8 @@ export class OtpCode {
   @Column({ type: 'varchar', length: 150 })
   identifier!: string;
 
-  @Column({ type: 'varchar', length: 6 })
-  code!: string;
+  @Column({ type: 'varchar', length: 64, name: 'code_hash' })
+  codeHash!: string;
 
   @Column({ type: 'varchar', length: 20, default: OtpType.REGISTER })
   type!: OtpType;
@@ -37,6 +37,9 @@ export class OtpCode {
 
   @Column({ type: 'smallint', default: 0 })
   attempts!: number;
+
+  @Column({ type: 'timestamptz', name: 'locked_until', nullable: true })
+  lockedUntil!: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
