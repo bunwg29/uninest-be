@@ -29,7 +29,6 @@ import type {
   ConversationReadEvent,
   MessageCreatedEvent,
   MessageRecalledEvent,
-  MessageUpdatedEvent,
 } from '../services/chat.service';
 
 interface SocketAck<T> {
@@ -166,15 +165,6 @@ export class ChatGateway
     this.emitToParticipants(
       event.participantIds,
       CHAT_SOCKET_EVENTS.MESSAGE_RECALLED,
-      event.message,
-    );
-  }
-
-  @OnEvent(CHAT_EVENTS.MESSAGE_UPDATED)
-  broadcastMessageUpdated(event: MessageUpdatedEvent): void {
-    this.emitToParticipants(
-      event.participantIds,
-      CHAT_SOCKET_EVENTS.MESSAGE_UPDATED,
       event.message,
     );
   }

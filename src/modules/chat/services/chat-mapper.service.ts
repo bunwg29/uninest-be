@@ -34,7 +34,6 @@ export class ChatMapperService {
         : message.imageKeys.map((key) => this.storageService.getPublicUrl(key)),
       isRecalled,
       readAt: message.readAt,
-      editedAt: message.editedAt,
       createdAt: message.createdAt,
     };
   }

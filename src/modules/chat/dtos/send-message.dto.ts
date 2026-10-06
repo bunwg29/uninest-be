@@ -2,7 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
-  IsNotEmpty,
   IsOptional,
   IsString,
   IsUUID,
@@ -58,17 +57,4 @@ export class MarkConversationReadDto {
   @ApiProperty({ description: 'Mã cuộc hội thoại cần đánh dấu đã đọc' })
   @IsUUID('4', { message: 'Mã cuộc hội thoại không hợp lệ' })
   conversationId!: string;
-}
-
-export class EditMessageDto {
-  @ApiProperty({
-    description: 'Nội dung mới của tin nhắn',
-    maxLength: CHAT_LIMITS.MAX_CONTENT_LENGTH,
-  })
-  @IsString({ message: 'Nội dung tin nhắn phải là chuỗi ký tự' })
-  @IsNotEmpty({ message: 'Nội dung tin nhắn không được để trống' })
-  @MaxLength(CHAT_LIMITS.MAX_CONTENT_LENGTH, {
-    message: `Nội dung tin nhắn tối đa ${CHAT_LIMITS.MAX_CONTENT_LENGTH} ký tự`,
-  })
-  content!: string;
 }

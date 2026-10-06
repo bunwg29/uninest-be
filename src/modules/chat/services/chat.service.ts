@@ -2,13 +2,12 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { R2StorageService } from '@core/storage';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { R2StorageService } from '@core/storage';
 import { createPaginatedResult } from '@common/dtos';
 import {
   Listing,
@@ -22,7 +21,6 @@ import {
   ConversationSummaryResponseDto,
   ConversationsQueryDto,
   CreateConversationDto,
-  EditMessageDto,
   MarkReadResponseDto,
   MessagesPageResponseDto,
   MessagesQueryDto,
@@ -42,11 +40,6 @@ export interface MessageCreatedEvent {
 }
 
 export interface MessageRecalledEvent {
-  message: ChatMessageResponseDto;
-  participantIds: [string, string];
-}
-
-export interface MessageUpdatedEvent {
   message: ChatMessageResponseDto;
   participantIds: [string, string];
 }
@@ -94,8 +87,6 @@ export interface SendMessageResult {
 
 @Injectable()
 export class ChatService {
-  private readonly logger = new Logger(ChatService.name);
-
   constructor(
     @InjectRepository(Conversation)
     private readonly conversationRepository: Repository<Conversation>,
@@ -106,8 +97,8 @@ export class ChatService {
     @InjectRepository(ListingImage)
     private readonly listingImageRepository: Repository<ListingImage>,
     private readonly mapper: ChatMapperService,
-    private readonly storageService: R2StorageService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly storageService: R2StorageService,
   ) {}
 
   async createOrGetConversation(
@@ -344,6 +335,10 @@ export class ChatService {
       return { message: this.mapper.toMessage(duplicate), isDuplicate: true };
     }
 
+    await Promise.all(
+      imageKeys.map((key) => this.storageService.assertValidImageObject(key)),
+    );
+
     let saved: Message;
 
     try {
@@ -464,25 +459,12 @@ export class ChatService {
     }
 
     if (message.recalledAt) {
-      await this.deleteMessageImages(message);
-
       return this.mapper.toMessage(message);
-    }
-
-    const elapsedMs = Date.now() - message.createdAt.getTime();
-
-    if (elapsedMs > CHAT_LIMITS.RECALL_WINDOW_MS) {
-      throw new BadRequestException(
-        'Chỉ có thể thu hồi tin nhắn trong vòng 24 giờ sau khi gửi',
-      );
     }
 
     message.recalledAt = new Date();
 
     const saved = await this.messageRepository.save(message);
-
-    await this.deleteMessageImages(saved);
-
     const response = this.mapper.toMessage(saved);
 
     const event: MessageRecalledEvent = {
@@ -491,77 +473,6 @@ export class ChatService {
     };
 
     this.eventEmitter.emit(CHAT_EVENTS.MESSAGE_RECALLED, event);
-
-    return response;
-  }
-
-  async editMessage(
-    userId: string,
-    conversationId: string,
-    messageId: string,
-    dto: EditMessageDto,
-  ): Promise<ChatMessageResponseDto> {
-    const conversation = await this.findParticipantConversation(
-      userId,
-      conversationId,
-    );
-
-    const message = await this.messageRepository.findOne({
-      where: { id: messageId, conversationId },
-    });
-
-    if (!message) {
-      throw new NotFoundException('Không tìm thấy tin nhắn');
-    }
-
-    if (message.senderId !== userId) {
-      throw new ForbiddenException(
-        'Bạn chỉ có thể chỉnh sửa tin nhắn của mình',
-      );
-    }
-
-    if (message.recalledAt) {
-      throw new BadRequestException(
-        'Không thể chỉnh sửa tin nhắn đã được thu hồi',
-      );
-    }
-
-    if (!message.content) {
-      throw new BadRequestException(
-        'Chỉ có thể chỉnh sửa tin nhắn có nội dung văn bản',
-      );
-    }
-
-    if (Date.now() - message.createdAt.getTime() > CHAT_LIMITS.EDIT_WINDOW_MS) {
-      throw new BadRequestException(
-        'Chỉ có thể chỉnh sửa tin nhắn trong vòng 24 giờ sau khi gửi',
-      );
-    }
-
-    const content = dto.content.trim();
-
-    if (!content) {
-      throw new BadRequestException('Nội dung tin nhắn không được để trống');
-    }
-
-    if (content === message.content) {
-      return this.mapper.toMessage(message);
-    }
-
-    message.originalContent = message.originalContent ?? message.content;
-    message.content = content;
-    message.editedAt = new Date();
-
-    const response = this.mapper.toMessage(
-      await this.messageRepository.save(message),
-    );
-
-    const event: MessageUpdatedEvent = {
-      message: response,
-      participantIds: this.getParticipantIds(conversation),
-    };
-
-    this.eventEmitter.emit(CHAT_EVENTS.MESSAGE_UPDATED, event);
 
     return response;
   }
@@ -589,39 +500,6 @@ export class ChatService {
     this.eventEmitter.emit(CHAT_EVENTS.CONVERSATION_DELETED, event);
 
     return { conversationId };
-  }
-
-  private async deleteMessageImages(message: Message): Promise<void> {
-    const keys = message.imageKeys.filter((key) =>
-      key.startsWith(CHAT_LIMITS.IMAGE_KEY_PREFIX),
-    );
-
-    if (keys.length === 0) {
-      return;
-    }
-
-    try {
-      const results = await Promise.all(
-        keys.map(async (key) => ({
-          key,
-          isDeleted: await this.storageService.deleteFile(key),
-        })),
-      );
-
-      const remainingKeys = results
-        .filter(({ isDeleted }) => !isDeleted)
-        .map(({ key }) => key);
-
-      await this.messageRepository.update(message.id, {
-        imageKeys: remainingKeys,
-      });
-
-      message.imageKeys = remainingKeys;
-    } catch (error) {
-      this.logger.warn(
-        `Không thể xoá ảnh của tin nhắn ${message.id} trên R2: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
   }
 
   private async findParticipantConversation(
