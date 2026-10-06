@@ -274,7 +274,11 @@ export class BookingService {
   async findOne(userId: string, id: string) {
     const booking = await this.bookingRepository.findOne({
       where: { id },
-      relations: { listing: { images: true }, events: true, user: true },
+      relations: {
+        listing: { images: true, owner: true },
+        events: true,
+        user: true,
+      },
     });
 
     if (!booking) {
@@ -736,6 +740,13 @@ export class BookingService {
               avatarUrl: booking.user.avatarUrl ?? null,
             }
           : null,
+      landlord: booking.listing?.owner
+        ? {
+            id: booking.listing.owner.id,
+            fullName: booking.listing.owner.fullName,
+            avatarUrl: booking.listing.owner.avatarUrl ?? null,
+          }
+        : null,
       listing: booking.listing
         ? {
             id: booking.listing.id,
