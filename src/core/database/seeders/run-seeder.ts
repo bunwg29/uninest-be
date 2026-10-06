@@ -2,28 +2,27 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
-import {
-  Role,
-  Permission,
-  RolePermission,
-  User,
-} from '../../../modules/users/entities';
-import { RefreshToken, OtpCode } from '../../../modules/auth/entities';
-import { Province, Ward } from '../../../modules/locations/entities';
-import { Conversation, Message } from '../../../modules/chat/entities';
-import {
-  Amenity,
-  Listing,
-  ListingAmenity,
-  ListingImage,
-} from '../../../modules/listings/entities';
 import { seedRbac } from './rbac.seeder';
 import { seedLocations } from './locations.seeder';
 import { seedAmenities } from './amenities.seeder';
 import { seedRooms } from './rooms.seeder';
 import { seedChatDemo } from './chat-demo.seeder';
+import { seedDaNang } from './danang.seeder';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), quiet: true });
+
+async function seedDaNangWithDependencies(
+  dataSource: DataSource,
+): Promise<void> {
+  await seedRbac(dataSource);
+  await seedAmenities(dataSource);
+  await seedLocations(dataSource).catch((error: unknown) => {
+    console.warn(
+      `[Seeder địa giới] Bỏ qua do lỗi: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
+  await seedDaNang(dataSource);
+}
 
 async function seedRoomsWithDependencies(
   dataSource: DataSource,
@@ -61,6 +60,12 @@ const SEEDERS: Record<
     description:
       'Nạp 1 chủ trọ, 1 sinh viên, 1 tin đăng active và 1 hội thoại mẫu để thử chức năng nhắn tin',
     fn: seedChatDemo,
+  },
+  danang: {
+    name: 'Seeder tin đăng Đà Nẵng',
+    description:
+      'Nạp tin đăng quanh các trường đại học tại Đà Nẵng (đủ 4 trạng thái), tài khoản 3 vai trò; thêm --bulk[=N] để sinh khối lượng lớn (mặc định 5.000 tin)',
+    fn: seedDaNangWithDependencies,
   },
   rooms: {
     name: 'Seeder 55 phòng trọ',
@@ -107,20 +112,7 @@ async function run() {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE || 'uninest_db',
     entities: [
-      Role,
-      Permission,
-      RolePermission,
-      User,
-      RefreshToken,
-      OtpCode,
-      Province,
-      Ward,
-      Amenity,
-      Listing,
-      ListingAmenity,
-      ListingImage,
-      Conversation,
-      Message,
+      path.resolve(__dirname, '../../../modules/**/entities/*.{ts,js}'),
     ],
     synchronize: isSync,
     namingStrategy: new SnakeNamingStrategy(),
