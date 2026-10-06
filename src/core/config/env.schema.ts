@@ -86,6 +86,18 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   JWT_REFRESH_EXPIRES_IN?: string = '7d';
+
+  @IsNumber()
+  @IsOptional()
+  HOLD_DURATION_MINUTES: number = 15;
+
+  @IsNumber()
+  @IsOptional()
+  HOLDING_DAYS: number = 7;
+
+  @IsNumber()
+  @IsOptional()
+  CANCEL_FREE_HOURS: number = 24;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

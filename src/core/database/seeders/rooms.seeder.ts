@@ -67,6 +67,13 @@ interface LandlordSeedData {
   fullName: string;
 }
 
+interface StudentSeedData {
+  id: string;
+  email: string;
+  phone: string;
+  fullName: string;
+}
+
 interface SeededRoom {
   listingId: string;
   room: RoomSeedData;
@@ -86,7 +93,15 @@ const ROOMS_DATA_PATH = path.resolve(__dirname, 'data/rooms-data.json');
 const EXPECTED_ROOM_COUNT = 55;
 const MAXIMUM_UNIVERSITY_DISTANCE_METERS = 3000;
 const LANDLORD_PASSWORD = 'UniNest@123';
+const STUDENT_PASSWORD = 'UniNest@123';
 const PASSWORD_HASH_ROUNDS = 10;
+
+const STUDENT: StudentSeedData = {
+  id: '22222222-2222-4222-8222-222222222001',
+  email: 'sinhvien@uninest.local',
+  phone: '0900000001',
+  fullName: 'Sinh viên UniNest',
+};
 
 const UNIVERSITY_CENTERS: Record<UniversityCode, UniversityCenter> = {
   DHQG_TPHCM: { latitude: 10.8700123, longitude: 106.8021432 },
@@ -415,6 +430,41 @@ async function seedLandlords(
   return ownerIds;
 }
 
+async function seedStudent(dataSource: DataSource): Promise<void> {
+  const userRepository = dataSource.getRepository(User);
+  const passwordHash = await bcrypt.hash(
+    STUDENT_PASSWORD,
+    PASSWORD_HASH_ROUNDS,
+  );
+  const existingStudent = await userRepository.findOne({
+    where: { email: STUDENT.email },
+  });
+  const studentData: Partial<User> = {
+    email: STUDENT.email,
+    phone: STUDENT.phone,
+    passwordHash,
+    fullName: STUDENT.fullName,
+    roleId: UserRoleType.STUDENT,
+    isActive: true,
+    isVerified: true,
+    phoneVerified: true,
+    avatarUrl: null,
+    school: null,
+    bio: null,
+    interestedAreas: null,
+    provinceCode: null,
+    wardCode: null,
+    streetAddress: null,
+    fullAddress: null,
+  };
+  const student = existingStudent
+    ? userRepository.merge(existingStudent, studentData)
+    : userRepository.create({ id: STUDENT.id, ...studentData });
+
+  await userRepository.save(student);
+  console.log('Đã bảo đảm tài khoản sinh viên mẫu');
+}
+
 function getAmenityIds(room: RoomSeedData): number[] {
   const amenityIds = AMENITY_IDS_BY_FIELD.filter(
     ([field]) => room.amenities[field],
@@ -625,6 +675,9 @@ export async function seedRooms(dataSource: DataSource): Promise<void> {
   validateRoomsData(rooms);
 
   const ownerIds = await seedLandlords(dataSource);
+
+  await seedStudent(dataSource);
+
   const seededRooms = await dataSource.transaction(async (manager) => {
     const results: SeededRoom[] = [];
 

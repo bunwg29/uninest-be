@@ -10,6 +10,7 @@ import {
 } from './entities';
 import { ListingsController } from './controllers/listings.controller';
 import { LandlordListingsController } from './controllers/landlord-listings.controller';
+import { RoomsController } from './controllers/rooms.controller';
 import { ListingsService } from './services/listings.service';
 
 @Module({
@@ -24,7 +25,11 @@ import { ListingsService } from './services/listings.service';
       Ward,
     ]),
   ],
-  controllers: [ListingsController, LandlordListingsController],
+  controllers: [
+    ListingsController,
+    LandlordListingsController,
+    RoomsController,
+  ],
   providers: [ListingsService],
   exports: [ListingsService],
 })

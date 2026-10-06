@@ -37,6 +37,7 @@
 
 ### B. Quản lý Tin đăng Phòng trọ (`listings`)
 
+- **Danh sách công khai**: `GET /api/v1/rooms` trả toàn bộ tin chưa xóa cho màn Tìm trọ; `GET /api/v1/rooms/:id` trả chi tiết để bắt đầu booking. Hai API không yêu cầu đăng nhập và dùng `listing.id` làm `resourceId` xuyên suốt luồng đặt lịch.
 - **Đăng tin & Cập nhật**: Chủ trọ (`landlord`) tạo tin mới gồm tiêu đề, mô tả, giá thuê, tiền cọc, diện tích, loại phòng, địa chỉ chi tiết, tiện nghi đi kèm, ảnh phòng (upload R2).
 - **Lịch xem phòng**: Chủ trọ thiết lập các buổi sáng, chiều, tối có thể xem phòng cho từng ngày trong tuần; lịch được lưu cùng tin đăng và trả về khi chỉnh sửa.
 - **Vòng đời tin đăng (Lifecycle)**:
@@ -58,7 +59,10 @@
   - Trạng thái ban đầu: `pending`.
   - Chủ trọ có quyền chấp nhận (`confirmed`) kèm lời nhắn, hoặc từ chối (`rejected`) có nêu lý do.
   - Sinh viên có thể chủ động hủy yêu cầu (`cancelled`) khi chưa được xác nhận.
-  - Tự động hết hạn/hủy bỏ (`expired`) sau khoảng thời gian quy định nếu chủ trọ không phản hồi.
+  - Yêu cầu xem phòng `pending` tự động hết hạn sau 15 phút nếu chưa được xác nhận.
+  - Sinh viên có thể chuyển `pending` sang giữ chỗ (`holding`); yêu cầu giữ chỗ tự động hết hạn sau 7 ngày.
+  - Cron chạy mỗi phút, cập nhật có điều kiện và ghi `booking_events` nên có tính idempotent.
+  - Hủy trước giờ xem dưới 24 giờ bắt buộc nhập lý do.
 
 ### E. Nhắn tin Trao đổi 1-1 (`chat`)
 
