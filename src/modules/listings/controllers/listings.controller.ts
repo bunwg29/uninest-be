@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -27,6 +28,11 @@ import {
   UpdateListingStatusDto,
 } from '../dtos';
 import { ListingsService } from '../services/listings.service';
+
+const LISTING_ID_PIPE = new ParseUUIDPipe({
+  exceptionFactory: () =>
+    new BadRequestException('Mã định danh tin đăng không hợp lệ'),
+});
 
 @ApiTags('Listings')
 @Controller('listings')
@@ -89,6 +95,62 @@ export class ListingsController {
       page: result.pagination.page,
       totalPages: result.pagination.totalPages,
     };
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRoleType.STUDENT, UserRoleType.LANDLORD, UserRoleType.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy chi tiết tin đăng' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Lấy chi tiết tin đăng thành công',
+  })
+  async getDetail(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('roleId') roleId: UserRoleType,
+    @Param('id', LISTING_ID_PIPE) id: string,
+  ) {
+    return this.listingsService.getListingDetail(userId, roleId, id);
+  }
+
+  @Patch(':id/view')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRoleType.STUDENT, UserRoleType.LANDLORD, UserRoleType.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Ghi nhận lượt xem tin đăng' })
+  async recordView(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('roleId') roleId: UserRoleType,
+    @Param('id', LISTING_ID_PIPE) id: string,
+  ) {
+    return this.listingsService.recordView(userId, roleId, id);
+  }
+
+  @Post(':id/favorite')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRoleType.STUDENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lưu tin đăng vào danh sách yêu thích' })
+  async addFavorite(
+    @CurrentUser('userId') userId: string,
+    @Param('id', LISTING_ID_PIPE) id: string,
+  ) {
+    return this.listingsService.addFavorite(userId, id);
+  }
+
+  @Delete(':id/favorite')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRoleType.STUDENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bỏ lưu tin đăng khỏi danh sách yêu thích' })
+  async removeFavorite(
+    @CurrentUser('userId') userId: string,
+    @Param('id', LISTING_ID_PIPE) id: string,
+  ): Promise<void> {
+    await this.listingsService.removeFavorite(userId, id);
   }
 
   @Patch(':id/status')
