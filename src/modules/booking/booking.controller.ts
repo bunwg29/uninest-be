@@ -13,10 +13,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, Public } from '@common/decorators';
-import { JwtAuthGuard } from '@common/guards';
+import { CurrentUser, Public, Roles } from '@common/decorators';
+import { UserRoleType } from '@common/constants';
+import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import {
   BookingListQueryDto,
+  BookingReasonDto,
   BookingSlotsQueryDto,
   CancelBookingDto,
   CreateBookingDto,
@@ -36,7 +38,8 @@ export class BookingController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @Roles(UserRoleType.STUDENT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Tạo yêu cầu xem phòng' })
   create(@CurrentUser('userId') userId: string, @Body() dto: CreateBookingDto) {
@@ -44,7 +47,8 @@ export class BookingController {
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @Roles(UserRoleType.STUDENT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách lịch hẹn của người dùng hiện tại' })
   findAll(
@@ -54,8 +58,22 @@ export class BookingController {
     return this.bookingService.findAll(userId, query);
   }
 
+  @Get('landlord')
+  @Roles(UserRoleType.LANDLORD)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Chủ trọ xem yêu cầu xem phòng của các tin mình đăng',
+  })
+  findAllForLandlord(
+    @CurrentUser('userId') userId: string,
+    @Query() query: BookingListQueryDto,
+  ) {
+    return this.bookingService.findAllForLandlord(userId, query);
+  }
+
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy chi tiết lịch hẹn và dòng thời gian' })
   findOne(
@@ -66,7 +84,8 @@ export class BookingController {
   }
 
   @Patch(':id/confirm')
-  @UseGuards(JwtAuthGuard)
+  @Roles(UserRoleType.LANDLORD)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Chủ trọ xác nhận lịch hẹn' })
   confirm(
@@ -76,10 +95,37 @@ export class BookingController {
     return this.bookingService.confirm(userId, id);
   }
 
-  @Patch(':id/hold')
-  @UseGuards(JwtAuthGuard)
+  @Patch(':id/reject')
+  @Roles(UserRoleType.LANDLORD)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Chuyển yêu cầu sang trạng thái giữ chỗ' })
+  @ApiOperation({ summary: 'Chủ trọ từ chối lịch hẹn kèm lý do' })
+  reject(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: BookingReasonDto,
+  ) {
+    return this.bookingService.reject(userId, id, dto);
+  }
+
+  @Patch(':id/release')
+  @Roles(UserRoleType.LANDLORD)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Chủ trọ hủy giữ chỗ kèm lý do' })
+  release(
+    @CurrentUser('userId') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: BookingReasonDto,
+  ) {
+    return this.bookingService.release(userId, id, dto);
+  }
+
+  @Patch(':id/hold')
+  @Roles(UserRoleType.STUDENT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Sinh viên giữ chỗ sau khi đã xem phòng' })
   hold(
     @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
@@ -89,7 +135,8 @@ export class BookingController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
+  @Roles(UserRoleType.STUDENT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Hủy lịch hẹn' })
   cancel(

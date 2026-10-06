@@ -3,18 +3,19 @@ import { BookingStatus } from '../entities';
 const TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   [BookingStatus.PENDING]: [
     BookingStatus.CONFIRMED,
+    BookingStatus.REJECTED,
+    BookingStatus.EXPIRED,
+    BookingStatus.CANCELLED,
+  ],
+  [BookingStatus.CONFIRMED]: [
     BookingStatus.HOLDING,
-    BookingStatus.EXPIRED,
     BookingStatus.CANCELLED,
-  ],
-  [BookingStatus.HOLDING]: [
-    BookingStatus.CONFIRMED,
     BookingStatus.EXPIRED,
-    BookingStatus.CANCELLED,
   ],
-  [BookingStatus.CONFIRMED]: [BookingStatus.CANCELLED],
+  [BookingStatus.HOLDING]: [BookingStatus.EXPIRED, BookingStatus.CANCELLED],
   [BookingStatus.EXPIRED]: [],
   [BookingStatus.CANCELLED]: [],
+  [BookingStatus.REJECTED]: [],
 };
 
 export const isBookingTransitionAllowed = (
@@ -34,3 +35,6 @@ export const isCancellationReasonRequired = (
   now: Date,
   cancelFreeHours: number,
 ) => (startTime.getTime() - now.getTime()) / 3_600_000 < cancelFreeHours;
+
+export const canHoldAfterViewing = (startTime: Date, now: Date) =>
+  now.getTime() >= startTime.getTime();

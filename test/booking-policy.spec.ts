@@ -38,7 +38,16 @@ describe('Quy tắc đặt lịch', () => {
       ),
     ).toBe(true);
     expect(
+      isBookingTransitionAllowed(
+        BookingStatus.CONFIRMED,
+        BookingStatus.HOLDING,
+      ),
+    ).toBe(true);
+    expect(
       isBookingTransitionAllowed(BookingStatus.PENDING, BookingStatus.HOLDING),
+    ).toBe(false);
+    expect(
+      isBookingTransitionAllowed(BookingStatus.PENDING, BookingStatus.REJECTED),
     ).toBe(true);
     expect(
       isBookingTransitionAllowed(

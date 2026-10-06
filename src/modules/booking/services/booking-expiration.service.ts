@@ -1,7 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, Repository } from 'typeorm';
+import {
+  BOOKING_ACTORS,
+  BOOKING_EVENTS,
+  type BookingStatusChangedPayload,
+} from '../constants';
 import { Booking, BookingEvent, BookingStatus } from '../entities';
 
 @Injectable()
@@ -13,17 +19,28 @@ export class BookingExpirationService {
     private readonly bookingRepository: Repository<Booking>,
     @InjectRepository(BookingEvent)
     private readonly eventRepository: Repository<BookingEvent>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  @Cron('*/1 * * * *')
+  @Cron('*/5 * * * *')
   async handleExpiredBookings(): Promise<number> {
     const now = new Date();
     const expiredBookings = await this.bookingRepository.find({
-      select: { id: true },
-      where: {
-        status: In([BookingStatus.PENDING, BookingStatus.HOLDING]),
-        expiresAt: LessThan(now),
+      select: {
+        id: true,
+        listingId: true,
+        userId: true,
+        status: true,
+        listing: { ownerId: true },
       },
+      relations: { listing: true },
+      where: [
+        {
+          status: In([BookingStatus.PENDING, BookingStatus.HOLDING]),
+          expiresAt: LessThan(now),
+        },
+        { status: BookingStatus.PENDING, startTime: LessThan(now) },
+      ],
     });
 
     if (expiredBookings.length === 0) {
@@ -39,23 +56,37 @@ export class BookingExpirationService {
       .andWhere('status IN (:...statuses)', {
         statuses: [BookingStatus.PENDING, BookingStatus.HOLDING],
       })
-      .andWhere('expires_at < :now', { now })
       .returning('id')
       .execute();
     const affected = result.affected ?? 0;
-    const affectedIds = (result.raw as Array<{ id: string }>).map(
-      (booking) => booking.id,
+    const affectedIds = new Set(
+      (result.raw as Array<{ id: string }>).map((booking) => booking.id),
     );
 
-    if (affectedIds.length > 0) {
+    if (affectedIds.size > 0) {
       await this.eventRepository.insert(
-        affectedIds.map((bookingId) => ({
+        [...affectedIds].map((bookingId) => ({
           bookingId,
-          eventType: 'expired',
-          actor: 'system',
+          eventType: BookingStatus.EXPIRED,
+          actor: BOOKING_ACTORS.SYSTEM,
           metadata: null,
         })),
       );
+
+      expiredBookings
+        .filter((booking) => affectedIds.has(booking.id))
+        .forEach((booking) => {
+          this.eventEmitter.emit(BOOKING_EVENTS.STATUS_CHANGED, {
+            bookingId: booking.id,
+            listingId: booking.listingId,
+            studentId: booking.userId,
+            landlordId: booking.listing.ownerId,
+            from: booking.status,
+            to: BookingStatus.EXPIRED,
+            actor: BOOKING_ACTORS.SYSTEM,
+            reason: null,
+          } satisfies BookingStatusChangedPayload);
+        });
     }
 
     this.logger.log(

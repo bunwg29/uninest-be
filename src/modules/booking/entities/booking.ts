@@ -19,6 +19,10 @@ import { BookingStatus } from './booking-status';
 @Index('idx_bookings_listing_time', ['listingId', 'startTime', 'endTime'])
 @Index('idx_bookings_status_expires', ['status', 'expiresAt'])
 @Index('idx_bookings_user_status', ['userId', 'status'])
+@Index('uq_bookings_one_holding_per_listing', ['listingId'], {
+  unique: true,
+  where: `"status" = 'holding' AND "deleted_at" IS NULL`,
+})
 export class Booking {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -68,6 +72,9 @@ export class Booking {
 
   @Column({ type: 'timestamptz', name: 'expired_at', nullable: true })
   expiredAt!: Date | null;
+
+  @Column({ type: 'timestamptz', name: 'rejected_at', nullable: true })
+  rejectedAt!: Date | null;
 
   @Column({ type: 'timestamptz', name: 'cancelled_at', nullable: true })
   cancelledAt!: Date | null;

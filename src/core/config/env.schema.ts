@@ -77,7 +77,7 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  JWT_ACCESS_EXPIRES_IN?: string = '15m';
+  JWT_ACCESS_EXPIRES_IN?: string = '1h';
 
   @IsString()
   @IsOptional()
@@ -85,11 +85,11 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  JWT_REFRESH_EXPIRES_IN?: string = '7d';
+  JWT_REFRESH_EXPIRES_IN?: string = '30d';
 
   @IsNumber()
   @IsOptional()
-  HOLD_DURATION_MINUTES: number = 15;
+  BOOKING_RESPONSE_HOURS: number = 24;
 
   @IsNumber()
   @IsOptional()

@@ -1,3 +1,4 @@
+import type { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Repository } from 'typeorm';
 jest.mock('@nestjs/schedule', () => ({ Cron: () => () => undefined }));
 jest.mock('@nestjs/typeorm', () => ({
@@ -24,21 +25,30 @@ describe('BookingExpirationService', () => {
   const eventRepository = {
     insert: jest.fn(),
   } as unknown as Repository<BookingEvent>;
+  const eventEmitter = { emit: jest.fn() } as unknown as EventEmitter2;
   const service = new BookingExpirationService(
     bookingRepository,
     eventRepository,
+    eventEmitter,
   );
 
   beforeEach(() => jest.clearAllMocks());
 
   it('hết hạn các lịch quá hạn và ghi sự kiện đúng một lần', async () => {
     (bookingRepository.find as jest.Mock).mockResolvedValue([
-      { id: 'booking-1' },
+      {
+        id: 'booking-1',
+        listingId: 'listing-1',
+        userId: 'student-1',
+        status: 'pending',
+        listing: { ownerId: 'landlord-1' },
+      },
     ]);
     execute.mockResolvedValue({ affected: 1, raw: [{ id: 'booking-1' }] });
 
     await expect(service.handleExpiredBookings()).resolves.toBe(1);
     expect(eventRepository.insert).toHaveBeenCalledTimes(1);
+    expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
   });
 
   it('chạy lặp an toàn khi không còn lịch quá hạn', async () => {
