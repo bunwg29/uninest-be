@@ -5,10 +5,12 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
+import { UserRoleType } from '@common/constants';
 import { R2StorageService } from '@core/storage';
 import { Province, Ward } from '@modules/locations/entities';
 import {
   Amenity,
+  Favorite,
   Listing,
   ListingAmenity,
   ListingImage,
@@ -16,11 +18,18 @@ import {
 } from '../entities';
 import { CreateListingDto, LandlordListingsQueryDto } from '../dtos';
 
+const VIEW_THROTTLE_MINUTES = 30;
+const VIEW_THROTTLE_MILLISECONDS = VIEW_THROTTLE_MINUTES * 60 * 1000;
+
 @Injectable()
 export class ListingsService {
+  private readonly viewThrottleExpirations = new Map<string, number>();
+
   constructor(
     @InjectRepository(Amenity)
     private readonly amenityRepository: Repository<Amenity>,
+    @InjectRepository(Favorite)
+    private readonly favoriteRepository: Repository<Favorite>,
     @InjectRepository(Listing)
     private readonly listingRepository: Repository<Listing>,
     @InjectRepository(Province)
@@ -243,6 +252,88 @@ export class ListingsService {
     return this.toLandlordListing(listing);
   }
 
+  async getListingDetail(userId: string, roleId: UserRoleType, id: string) {
+    const [listing, isFavorite] = await Promise.all([
+      this.createDetailQuery(id).getOne(),
+      this.favoriteRepository.existsBy({ userId, listingId: id }),
+    ]);
+
+    this.assertCanAccessListing(listing, userId, roleId);
+
+    return this.toListingDetail(listing, isFavorite);
+  }
+
+  async recordView(userId: string, roleId: UserRoleType, id: string) {
+    const listing = await this.listingRepository.findOneBy({ id });
+
+    this.assertCanAccessListing(listing, userId, roleId);
+
+    const throttleKey = `${userId}:${id}`;
+    const currentTime = Date.now();
+    const throttleExpiration = this.viewThrottleExpirations.get(throttleKey);
+
+    if (throttleExpiration && throttleExpiration > currentTime) {
+      return {
+        viewCount: listing.viewCount,
+        incremented: false,
+      };
+    }
+
+    const nextExpiration = currentTime + VIEW_THROTTLE_MILLISECONDS;
+
+    this.viewThrottleExpirations.set(throttleKey, nextExpiration);
+
+    try {
+      await this.listingRepository.increment({ id }, 'viewCount', 1);
+    } catch (error) {
+      if (this.viewThrottleExpirations.get(throttleKey) === nextExpiration) {
+        this.viewThrottleExpirations.delete(throttleKey);
+      }
+
+      throw error;
+    }
+
+    const currentListing = await this.listingRepository.findOneByOrFail({ id });
+
+    return {
+      viewCount: currentListing.viewCount,
+      incremented: true,
+    };
+  }
+
+  async addFavorite(userId: string, id: string) {
+    const listing = await this.listingRepository.findOneBy({ id });
+
+    this.assertActiveListing(listing);
+
+    await this.favoriteRepository
+      .createQueryBuilder()
+      .insert()
+      .into(Favorite)
+      .values({ userId, listingId: id })
+      .orIgnore()
+      .execute();
+
+    const favorite = await this.favoriteRepository.findOneByOrFail({
+      userId,
+      listingId: id,
+    });
+
+    return {
+      listingId: id,
+      isFavorite: true,
+      createdAt: favorite.createdAt,
+    };
+  }
+
+  async removeFavorite(userId: string, id: string): Promise<void> {
+    const listing = await this.listingRepository.findOneBy({ id });
+
+    this.assertActiveListing(listing);
+
+    await this.favoriteRepository.delete({ userId, listingId: id });
+  }
+
   async updateListingStatus(
     userId: string,
     id: string,
@@ -459,6 +550,115 @@ export class ListingsService {
     return this.toPublicRoom(listing);
   }
 
+  private createDetailQuery(id: string) {
+    return this.listingRepository
+      .createQueryBuilder('listing')
+      .leftJoinAndSelect('listing.images', 'image')
+      .leftJoinAndSelect('listing.listingAmenities', 'listingAmenity')
+      .leftJoinAndSelect('listingAmenity.amenity', 'amenity')
+      .leftJoinAndSelect('listing.province', 'province')
+      .leftJoinAndSelect('listing.ward', 'ward')
+      .leftJoin('listing.owner', 'owner')
+      .addSelect([
+        'owner.id',
+        'owner.fullName',
+        'owner.avatarUrl',
+        'owner.bio',
+        'owner.isVerified',
+      ])
+      .where('listing.id = :id', { id })
+      .orderBy('image.sortOrder', 'ASC')
+      .addOrderBy('amenity.group', 'ASC')
+      .addOrderBy('amenity.id', 'ASC');
+  }
+
+  private assertCanAccessListing(
+    listing: Listing | null,
+    userId: string,
+    roleId: UserRoleType,
+  ): asserts listing is Listing {
+    const canAccess =
+      listing &&
+      (listing.status === ListingStatus.ACTIVE ||
+        listing.ownerId === userId ||
+        roleId === UserRoleType.ADMIN);
+
+    if (!canAccess) {
+      throw new NotFoundException('Không tìm thấy tin đăng');
+    }
+  }
+
+  private assertActiveListing(
+    listing: Listing | null,
+  ): asserts listing is Listing {
+    if (!listing || listing.status !== ListingStatus.ACTIVE) {
+      throw new NotFoundException('Không tìm thấy tin đăng');
+    }
+  }
+
+  private toListingDetail(listing: Listing, isFavorite: boolean) {
+    const images = [...(listing.images ?? [])].sort(
+      (first, second) => first.sortOrder - second.sortOrder,
+    );
+    const amenities = (listing.listingAmenities ?? [])
+      .filter((item) => item.amenity)
+      .map((item) => ({
+        id: item.amenity.id,
+        name: item.amenity.name,
+        group: item.amenity.group,
+      }));
+
+    return {
+      id: listing.id,
+      title: listing.title,
+      description: listing.description,
+      roomType: listing.roomType,
+      price: Number(listing.price),
+      area: Number(listing.area),
+      maxOccupants: listing.maxOccupants,
+      electricPrice: listing.electricPrice
+        ? Number(listing.electricPrice)
+        : null,
+      waterPrice: listing.waterPrice ? Number(listing.waterPrice) : null,
+      deposit: listing.deposit ? Number(listing.deposit) : null,
+      address: {
+        streetAddress: listing.streetAddress,
+        fullAddress: listing.fullAddress,
+        provinceCode: listing.provinceCode,
+        provinceName: listing.province?.fullName ?? null,
+        wardCode: listing.wardCode,
+        wardName: listing.ward?.fullName ?? null,
+      },
+      location: {
+        latitude: listing.location.coordinates[1],
+        longitude: listing.location.coordinates[0],
+      },
+      images: images.map((image) => ({
+        id: image.id,
+        url: this.storageService.getPublicUrl(image.url),
+        isCover: image.isCover,
+        sortOrder: image.sortOrder,
+      })),
+      amenities,
+      landlord: {
+        id: listing.owner.id,
+        fullName: listing.owner.fullName,
+        avatarUrl: listing.owner.avatarUrl
+          ? this.storageService.getPublicUrl(listing.owner.avatarUrl)
+          : null,
+        bio: listing.owner.bio,
+        isVerified: listing.owner.isVerified,
+      },
+      status: listing.status,
+      viewingSchedule: listing.viewingSchedule,
+      averageRating: null,
+      viewCount: listing.viewCount,
+      isFavorite,
+      createdAt: listing.createdAt,
+      updatedAt: listing.updatedAt,
+    };
+  }
+
   private async deleteImagesFromStorage(imageKeys: string[]): Promise<void> {
     await Promise.all(
       imageKeys.map((key) => this.storageService.deleteFile(key)),
@@ -493,7 +693,7 @@ export class ListingsService {
       imageKeys,
       status: listing.deletedAt ? 'deleted' : listing.status,
       isFeatured: false,
-      viewCount: 0,
+      viewCount: listing.viewCount,
       contactCount: 0,
       saveCount: 0,
       holdingStatus: false,

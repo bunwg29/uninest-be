@@ -68,11 +68,25 @@
 
 - **Hội thoại gắn liền tin đăng**: Tạo luồng trao đổi trực tiếp giữa sinh viên và chủ trọ của một phòng cụ thể.
 - **Nội dung tin nhắn**: Hỗ trợ gửi tin nhắn văn bản và tệp hình ảnh đính kèm (qua Cloudflare R2). Đánh dấu trạng thái đã đọc/chưa đọc.
+- **Dữ liệu**: bảng `conversations` (duy nhất theo cặp `listing_id` + `student_id`, chỉ sinh viên được khởi tạo) và `messages` (`client_message_id` chống gửi trùng khi gửi lại lúc mất mạng, `image_keys` lưu object key thư mục `chat/`, tối đa 10 ảnh/tin, `read_at`, `recalled_at`). Cả hai bảng dùng soft delete; dữ liệu được lưu tối thiểu 12 tháng.
+- **Realtime**: Socket.IO namespace `/chat`, xác thực bằng JWT access token ở handshake (`auth.token`), từ chối kết nối ngay khi token sai. Sự kiện client gửi: `message.send`, `conversation.read` (có ack theo envelope `{ status, data, error, messages }`). Sự kiện server phát tới cả hai bên: `message.new`, `message.recalled`, `conversation.read`.
+- **REST bổ trợ**: `POST /conversations`, `GET /conversations` (phân trang `page`/`limit` mặc định 20, lọc `all`/`unread`, tìm kiếm phía server theo `keyword`), `GET /conversations/summary`, `GET /conversations/:id`, `DELETE /conversations/:id`, `GET /conversations/:id/messages` (cursor, 30 tin/trang, mới nhất trước), `POST /conversations/:id/messages`, `PATCH /conversations/:id/messages/:messageId` (sửa), `DELETE /conversations/:id/messages/:messageId` (thu hồi), `PATCH /conversations/:id/read`.
+- **Tải từng phần**: danh sách hội thoại chỉ trả metadata (người đối thoại, tin đăng, tin cuối, số chưa đọc); tin nhắn chỉ được tải khi mở một đoạn chat. Từ khoá tìm kiếm khớp `ILIKE` theo tên người đối thoại hoặc tiêu đề tin đăng (có phân biệt dấu tiếng Việt).
+- **Quy tắc**: chỉ hai người tham gia được xem hội thoại. Người gửi được **thu hồi** (ẩn) hoặc **chỉnh sửa** tin nhắn văn bản của mình trong 24 giờ (`CHAT_LIMITS.EDIT_WINDOW_MS`); tin chỉ có ảnh không sửa được. Nội dung gốc được lưu ở `messages.original_content` khi sửa lần đầu để phục vụ khiếu nại. *Thay đổi so với SRS v1.0 mục 3.6 (trước đây tin nhắn không được sửa); cần ghi vào bảng lịch sử phiên bản SRS.*
+- **Xoá đoạn chat**: xoá theo từng phía (`conversations.student_deleted_at` / `landlord_deleted_at`). Người xoá không còn thấy lịch sử cũ và badge không đếm tin cũ; người kia giữ nguyên dữ liệu (đáp ứng yêu cầu lưu trữ 12 tháng). Có tin nhắn mới thì đoạn chat hiện lại và chỉ chứa tin từ thời điểm đó. Sự kiện `conversation.deleted` chỉ gửi tới các thiết bị của người xoá.
+- **Sự kiện realtime**: ngoài `message.new`, `message.recalled`, `conversation.read` còn có `message.updated` (gửi cho cả hai bên khi sửa tin).
+- **Phương tiện**: chỉ hỗ trợ ảnh (jpeg, png, webp, gif, heic) lưu trên Cloudflare R2 thư mục `chat/`, cơ sở dữ liệu chỉ giữ object key. Chưa hỗ trợ video. Khi thu hồi tin có ảnh, backend xoá các object tương ứng trên R2 (xoá lỗi thì giữ lại key để thử xoá lại ở lần thu hồi kế tiếp); nội dung chữ vẫn được giữ lại theo chính sách lưu vết.
+- **Điểm móc thông báo**: mỗi tin nhắn mới phát sự kiện nội bộ `message.created` (`EventEmitter2`) để Notification Pipeline (Sprint 3) đăng ký lắng nghe.
 
 ### F. Diễn đàn Cộng đồng Sinh viên (`forum`)
 
 - **Chia sẻ & Tìm người ở ghép**: Sinh viên đăng bài tìm bạn cùng phòng, chia sẻ kinh nghiệm thuê trọ theo khu vực trường đại học.
 - **Tương tác & Kiểm duyệt**: Bình luận, tích hợp bộ lọc từ ngữ thô tục (profanity filter) tự động trước khi lưu trữ, cơ chế báo cáo bài viết vi phạm cho admin xử lý.
+- **Chuyên mục**: `roommate` (Tìm bạn ở ghép), `experience` (Kinh nghiệm thuê trọ), `question` (Hỏi đáp), `area_review` (Review khu vực). Bài `roommate` bắt buộc có tiêu chí ở ghép (giới tính, chi phí/người, ngày dọn vào, tiêu chí, khu vực) và trạng thái `open` (Còn chỗ) / `full` (Đã đủ).
+- **Vòng đời bài viết**: `draft` (lưu nháp, không kiểm duyệt) -> `published` -> `hidden` (Đã ẩn – chờ Admin xử lý). Admin `restore` về `published` hoặc `remove` (xoá mềm). Bình luận: `published` / `hidden`, trả lời tối đa 1 cấp.
+- **Quyền sửa/xoá**: Chỉ tác giả hoặc Admin được sửa/xoá bài viết, bình luận. Tác giả không sửa được nội dung đang bị ẩn.
+- **Bộ lọc nội dung**: `ForumContentModerationInterceptor` kiểm tra tiêu đề, nội dung, ghi chú ở ghép trước khi lưu. Từ khoá cấm lưu ở bảng `forum_banned_keywords` (nạp mặc định từ `modules/forum/data/banned-keywords.json`, Admin quản lý qua API). Hành động `block` luôn bị chặn (422); `warn` (vd: số điện thoại) bị chặn cho tới khi client gửi `acknowledgeWarnings: true`. Số tài khoản ngân hàng luôn bị chặn. `POST /forum/moderation/check` trả về vi phạm + bản đã lược bỏ để client hiển thị cảnh báo trước khi đăng.
+- **Báo cáo & tự động ẩn**: Bảng `forum_reports` tối giản (1 người chỉ báo cáo 1 lần mỗi nội dung, không tự báo cáo). Khi số báo cáo chưa xử lý đạt ngưỡng `FORUM_REPORT_HIDE_THRESHOLD` (mặc định 5) nội dung tự chuyển `hidden`. Sprint 3 sẽ chuẩn hoá thành Report Engine dùng chung.
 
 ### G. Đánh giá Xác thực (`reviews`)
 
