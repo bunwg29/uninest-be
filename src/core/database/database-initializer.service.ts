@@ -31,7 +31,7 @@ export class DatabaseInitializerService implements OnModuleInit {
       const message = error instanceof Error ? error.message : String(error);
 
       this.logger.warn(
-        `Không thể khởi tạo index tìm kiếm tin đăng: ${message}`,
+        `Failed to initialize listing search indexes: ${message}`,
       );
     }
   }
@@ -53,7 +53,7 @@ export class DatabaseInitializerService implements OnModuleInit {
       const message = error instanceof Error ? error.message : String(error);
 
       this.logger.warn(
-        `Không thể chuyển URL storage cũ sang object key: ${message}`,
+        `Failed to migrate legacy storage URLs to object keys: ${message}`,
       );
     }
   }
@@ -67,7 +67,9 @@ export class DatabaseInitializerService implements OnModuleInit {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
-      this.logger.warn(`Không thể cập nhật cột lịch xem phòng: ${message}`);
+      this.logger.warn(
+        `Failed to update the viewing schedule column: ${message}`,
+      );
     }
   }
 
@@ -81,7 +83,7 @@ export class DatabaseInitializerService implements OnModuleInit {
 
       if (check.length > 0 && check[0]?.data_type === 'uuid') {
         this.logger.log(
-          'Phát hiện bảng amenities dùng id UUID cũ. Đang tự động chuyển đổi sang kiểu số (smallint)...',
+          'Detected legacy amenities table with UUID ids. Converting to numeric ids (smallint)...',
         );
 
         await this.dataSource.query(`
@@ -104,14 +106,14 @@ export class DatabaseInitializerService implements OnModuleInit {
         `);
 
         this.logger.log(
-          'Đã chuyển đổi cấu trúc bảng amenities sang kiểu số (smallint) thành công.',
+          'Amenities table converted to numeric ids (smallint) successfully.',
         );
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
       this.logger.warn(
-        `Lỗi khi kiểm tra/chuyển đổi schema amenities: ${message}`,
+        `Failed to check or convert the amenities schema: ${message}`,
       );
     }
   }
@@ -122,12 +124,12 @@ export class DatabaseInitializerService implements OnModuleInit {
     for (const ext of extensions) {
       try {
         await this.dataSource.query(`CREATE EXTENSION IF NOT EXISTS "${ext}";`);
-        this.logger.log(`Extension PostgreSQL '${ext}' đang hoạt động.`);
+        this.logger.log(`PostgreSQL extension '${ext}' is active.`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
 
         this.logger.warn(
-          `Extension PostgreSQL '${ext}' chưa được cài đặt: ${message}. Ứng dụng sẽ dùng phương án dự phòng.`,
+          `PostgreSQL extension '${ext}' is not installed: ${message}. The application will use fallbacks.`,
         );
       }
     }
