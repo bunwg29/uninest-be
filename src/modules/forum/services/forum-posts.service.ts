@@ -295,7 +295,11 @@ export class ForumPostsService {
   }
 
   async unlikePost(viewer: ForumViewer, postId: string) {
-    await this.findPublishedPost(postId);
+    const existingPost = await this.postRepository.findOneBy({ id: postId });
+
+    if (!existingPost) {
+      throw new NotFoundException('Không tìm thấy bài viết');
+    }
 
     return this.dataSource.transaction(async (manager) => {
       const deleteResult = await manager.delete(ForumLike, {

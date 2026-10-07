@@ -202,6 +202,10 @@ export class ForumCommentsService {
       throw new NotFoundException('Không tìm thấy bình luận được trả lời');
     }
 
+    if (parent.status !== ForumCommentStatus.PUBLISHED) {
+      throw new NotFoundException('Bình luận được trả lời không còn hiển thị');
+    }
+
     return parent.parentId ?? parent.id;
   }
 }
