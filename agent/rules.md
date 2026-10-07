@@ -79,7 +79,8 @@
 
 ### [MANDATE-9] 100% TIẾNG VIỆT THỐNG NHẤT TOÀN HỆ THỐNG
 
-- **Quy chuẩn thông báo**: Toàn bộ exception message, validation message (`class-validator`), interceptor response message và log cảnh báo gửi tới client **BẮT BUỘC PHẢI BẰNG TIẾNG VIỆT 100%**.
+- **Quy chuẩn thông báo**: Toàn bộ exception message, validation message (`class-validator`) và interceptor response message gửi tới client **BẮT BUỘC PHẢI BẰNG TIẾNG VIỆT 100%**.
+- **Ngoại lệ - log nội bộ**: Log phía server (`Logger`, `console.*` trong seeder) **BẮT BUỘC PHẢI BẰNG TIẾNG ANH** để dễ tìm kiếm và dùng với công cụ giám sát. Mã lỗi máy đọc dùng tiếng Anh viết hoa. Mô tả Swagger giữ tiếng Việt.
 - Không viết lẫn lộn tiếng Anh trong các chuỗi thông báo lỗi trả về cho client/người dùng.
 - Thống nhất các thuật ngữ nghiệp vụ (ví dụ: "Số điện thoại hoặc mật khẩu không chính xác", "Không tìm thấy vai trò", "Quyền hạn đã tồn tại", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn").
 

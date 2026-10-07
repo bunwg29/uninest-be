@@ -7,8 +7,9 @@
 ## 1. 8 NGUYÊN TẮC VÀNG BẮT BUỘC (CRITICAL MANDATES)
 
 1. **100% TIẾNG VIỆT THỐNG NHẤT**:
-   - Toàn bộ exception message (`HttpException`), message validation (`class-validator`), interceptor response message và log cảnh báo **PHẢI DÙNG TIẾNG VIỆT 100%**.
+   - Toàn bộ exception message (`HttpException`), message validation (`class-validator`) và interceptor response message trả về client **PHẢI DÙNG TIẾNG VIỆT 100%**.
    - Cấm viết thông báo lỗi bằng tiếng Anh lẫn lộn.
+   - **Ngoại lệ**: log nội bộ phía server (`Logger`, `console.*` trong seeder) **PHẢI DÙNG TIẾNG ANH**, mã lỗi máy đọc (`error: 'INVALID_COORDINATES'`) viết hoa tiếng Anh. Mô tả Swagger giữ tiếng Việt.
 2. **KIỂM TRA NHÁNH GIT TRƯỚC KHI CODE (BRANCH RESPONSIBILITY)**:
    - Dự án chia nhánh theo tính năng (`feat/sp1-base-backend-local`, `feat/sp1-api-auth-rbac`, ...).
    - Xác định file cần sửa thuộc nhánh nào -> Checkout đúng nhánh đó -> Code & Test -> Commit chuẩn Conventional Commits kèm Task ID -> Push lên `origin`.
