@@ -65,7 +65,7 @@ export class OtpService {
     );
 
     this.logger.log(
-      `[OTP Service] Ma OTP gui toi [${cleanIdentifier}] (Muc dich: ${type}) la: ${code} (Het han luc: ${expiresAt.toLocaleTimeString()})`,
+      `[OTP Service] OTP sent to [${cleanIdentifier}] (purpose: ${type}): ${code} (expires at: ${expiresAt.toLocaleTimeString()})`,
     );
 
     return { expiresAt, code };
@@ -119,7 +119,7 @@ export class OtpService {
 
     await this.otpRepository.update(otp.id, { isUsed: true });
     this.logger.log(
-      `[OTP Service] Xac thuc thanh cong OTP cho [${cleanIdentifier}] (${type})`,
+      `[OTP Service] OTP verified for [${cleanIdentifier}] (${type})`,
     );
 
     return true;

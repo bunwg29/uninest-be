@@ -131,7 +131,7 @@ export class TokenService {
 
     if (existingToken.isRevoked) {
       this.logger.warn(
-        `[Security] Phat hien reuse refresh token da bi thu hoi cua user: ${existingToken.userId}. Dang thu hoi toan bo session!`,
+        `[Security] Reuse of a revoked refresh token detected for user: ${existingToken.userId}. Revoking all sessions!`,
       );
       await this.revokeAllUserTokens(existingToken.userId);
       throw new UnauthorizedException(
