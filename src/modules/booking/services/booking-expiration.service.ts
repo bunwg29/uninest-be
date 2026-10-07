@@ -102,7 +102,7 @@ export class BookingExpirationService {
     }
 
     this.logger.log(
-      `[CRON] Đã hết hạn ${affected} lịch hẹn lúc ${now.toISOString()}`,
+      `[CRON] Expired ${affected} bookings at ${now.toISOString()}`,
     );
 
     return affected;
