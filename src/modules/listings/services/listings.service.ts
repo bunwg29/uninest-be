@@ -725,8 +725,41 @@ export class ListingsService {
     });
   }
 
-  private createDetailQuery(id: string) {
-    return this.listingRepository
+  async getDetailsForComparison(userId: string, ids: string[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const [listings, favorites, holds] = await Promise.all([
+      Promise.all(ids.map((id) => this.createDetailQuery(id, true).getOne())),
+      this.favoriteRepository.find({
+        where: { userId, listingId: In(ids) },
+        select: { listingId: true },
+      }),
+      findActiveHolds(this.dataSource, ids),
+    ]);
+    const favoriteIds = new Set(favorites.map((item) => item.listingId));
+
+    return listings.flatMap((listing) =>
+      listing
+        ? [
+            {
+              status: listing.status,
+              isDeleted: listing.deletedAt !== null,
+              detail: this.toListingDetail(
+                listing,
+                favoriteIds.has(listing.id),
+                holds.get(listing.id),
+                false,
+              ),
+            },
+          ]
+        : [],
+    );
+  }
+
+  private createDetailQuery(id: string, withDeleted = false) {
+    const query = this.listingRepository
       .createQueryBuilder('listing')
       .leftJoinAndSelect('listing.images', 'image')
       .leftJoinAndSelect('listing.listingAmenities', 'listingAmenity')
@@ -745,6 +778,8 @@ export class ListingsService {
       .orderBy('image.sortOrder', 'ASC')
       .addOrderBy('amenity.group', 'ASC')
       .addOrderBy('amenity.id', 'ASC');
+
+    return withDeleted ? query.withDeleted() : query;
   }
 
   private async findMyActiveBooking(userId: string, listingId: string) {
