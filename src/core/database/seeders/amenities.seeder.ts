@@ -4,7 +4,7 @@ import { Amenity, AmenityGroup } from '../../../modules/listings/entities';
 export async function seedAmenities(dataSource: DataSource): Promise<void> {
   const amenityRepo = dataSource.getRepository(Amenity);
 
-  console.log('[Seeder tiện ích] Bắt đầu nạp danh mục tiện ích...');
+  console.log('[Amenities seeder] Seeding amenity catalog...');
 
   const amenitiesToSeed: {
     id: number;
@@ -100,7 +100,5 @@ export async function seedAmenities(dataSource: DataSource): Promise<void> {
     );
   }
 
-  console.log(
-    `[Seeder tiện ích] Đã nạp thành công ${amenitiesToSeed.length} tiện ích.`,
-  );
+  console.log(`[Amenities seeder] Seeded ${amenitiesToSeed.length} amenities.`);
 }

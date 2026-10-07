@@ -24,9 +24,7 @@ export async function seedLocations(dataSource: DataSource): Promise<void> {
   const provinceRepo = dataSource.getRepository(Province);
   const wardRepo = dataSource.getRepository(Ward);
 
-  console.log(
-    '[Seeder địa giới] Bắt đầu nạp dữ liệu đơn vị hành chính Việt Nam...',
-  );
+  console.log('[Locations seeder] Seeding Vietnam administrative units...');
 
   const possiblePaths = [
     path.resolve(process.cwd(), '../full_json_generated_data_vn_units.json'),
@@ -52,13 +50,13 @@ export async function seedLocations(dataSource: DataSource): Promise<void> {
     );
   }
 
-  console.log(`[Seeder địa giới] Đang đọc dữ liệu từ: ${jsonPath}`);
+  console.log(`[Locations seeder] Reading data from: ${jsonPath}`);
 
   const fileContent = fs.readFileSync(jsonPath, 'utf-8');
   const rawProvinces = JSON.parse(fileContent) as unknown as RawProvince[];
 
   console.log(
-    `[Seeder địa giới] Tìm thấy ${rawProvinces.length} tỉnh/thành phố trong bộ dữ liệu.`,
+    `[Locations seeder] Found ${rawProvinces.length} provinces in the dataset.`,
   );
 
   const provincesData: Partial<Province>[] = [];
@@ -86,17 +84,13 @@ export async function seedLocations(dataSource: DataSource): Promise<void> {
     }
   }
 
-  console.log(
-    `[Seeder địa giới] Đang lưu ${provincesData.length} tỉnh/thành phố...`,
-  );
+  console.log(`[Locations seeder] Saving ${provincesData.length} provinces...`);
 
   await provinceRepo.upsert(provincesData, ['code']);
 
+  console.log(`[Locations seeder] Saved ${provincesData.length} provinces.`);
   console.log(
-    `[Seeder địa giới] Đã lưu thành công ${provincesData.length} tỉnh/thành phố.`,
-  );
-  console.log(
-    `[Seeder địa giới] Đang lưu ${wardsData.length} phường/xã (chia thành từng nhóm 500 mục)...`,
+    `[Locations seeder] Saving ${wardsData.length} wards (in batches of 500)...`,
   );
 
   const BATCH_SIZE = 500;
@@ -107,9 +101,9 @@ export async function seedLocations(dataSource: DataSource): Promise<void> {
     await wardRepo.upsert(batch, ['code']);
 
     console.log(
-      `   + Đã nạp nhóm phường/xã: ${Math.min(i + BATCH_SIZE, wardsData.length)}/${wardsData.length}`,
+      `   + Wards saved: ${Math.min(i + BATCH_SIZE, wardsData.length)}/${wardsData.length}`,
     );
   }
 
-  console.log('[Seeder địa giới] Hoàn thành nạp dữ liệu đơn vị hành chính!');
+  console.log('[Locations seeder] Administrative units seeded!');
 }

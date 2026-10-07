@@ -425,7 +425,7 @@ async function seedLandlords(
     ownerIds.set(landlord.id, savedLandlord.id);
   }
 
-  console.log(`Đã bảo đảm ${LANDLORDS.length} tài khoản chủ trọ mẫu`);
+  console.log(`Ensured ${LANDLORDS.length} sample landlord accounts`);
 
   return ownerIds;
 }
@@ -462,7 +462,7 @@ async function seedStudent(dataSource: DataSource): Promise<void> {
     : userRepository.create({ id: STUDENT.id, ...studentData });
 
   await userRepository.save(student);
-  console.log('Đã bảo đảm tài khoản sinh viên mẫu');
+  console.log('Ensured sample student account');
 }
 
 function getAmenityIds(room: RoomSeedData): number[] {
@@ -640,15 +640,15 @@ async function verifySeededRooms(
     .addSelect('MAX(listing.price)', 'maximumPrice')
     .getRawOne<AggregateResult>();
 
-  console.log('\nKết quả kiểm tra tương đương:');
+  console.log('\nEquivalent verification result:');
   console.log('SELECT COUNT(*), MIN(price), MAX(price) FROM listings;');
   console.log({
-    soLuong: Number(aggregate?.count ?? 0),
-    giaThapNhat: Number(aggregate?.minimumPrice ?? 0),
-    giaCaoNhat: Number(aggregate?.maximumPrice ?? 0),
+    count: Number(aggregate?.count ?? 0),
+    minPrice: Number(aggregate?.minimumPrice ?? 0),
+    maxPrice: Number(aggregate?.maximumPrice ?? 0),
   });
 
-  console.log('\nBa phòng mẫu:');
+  console.log('\nThree sample rooms:');
 
   for (const seededRoom of [seededRooms[0], seededRooms[15], seededRooms[33]]) {
     if (!seededRoom) {
@@ -661,10 +661,10 @@ async function verifySeededRooms(
     );
 
     console.log({
-      tieuDe: seededRoom.room.title,
-      diaChi: seededRoom.room.address,
-      gia: seededRoom.room.price,
-      khoangCachDenTruong: `${Math.round(distance)} m`,
+      title: seededRoom.room.title,
+      address: seededRoom.room.address,
+      price: seededRoom.room.price,
+      distanceToSchool: `${Math.round(distance)} m`,
     });
   }
 }
@@ -690,5 +690,5 @@ export async function seedRooms(dataSource: DataSource): Promise<void> {
 
   await verifySeededRooms(dataSource, seededRooms);
 
-  console.log('\nĐã nạp 55 phòng trọ thành công');
+  console.log('\nSeeded 55 rooms successfully');
 }

@@ -11,7 +11,7 @@ export async function seedRbac(dataSource: DataSource): Promise<void> {
   const permissionRepo = dataSource.getRepository(Permission);
   const rolePermissionRepo = dataSource.getRepository(RolePermission);
 
-  console.log('[Seeder phân quyền] Bắt đầu nạp dữ liệu phân quyền...');
+  console.log('[RBAC seeder] Seeding roles and permissions...');
 
   const rolesToSeed: {
     id: UserRoleType;
@@ -44,7 +44,7 @@ export async function seedRbac(dataSource: DataSource): Promise<void> {
 
     if (!existing) {
       await roleRepo.save(roleRepo.create(r));
-      console.log(`   + Đã tạo vai trò: [${r.id}] ${r.code} - ${r.name}`);
+      console.log(`   + Role created: [${r.id}] ${r.code} - ${r.name}`);
     }
   }
 
@@ -160,7 +160,7 @@ export async function seedRbac(dataSource: DataSource): Promise<void> {
 
     if (!perm) {
       perm = await permissionRepo.save(permissionRepo.create(p));
-      console.log(`   + Đã tạo quyền: ${p.code} (${p.name})`);
+      console.log(`   + Permission created: ${p.code} (${p.name})`);
     }
 
     permissionMap.set(p.code, perm);
@@ -215,9 +215,9 @@ export async function seedRbac(dataSource: DataSource): Promise<void> {
     }
 
     console.log(
-      `   [Đạt] Vai trò [${roleId}] đã được cấu hình ${permCodes.length} quyền`,
+      `   [OK] Role [${roleId}] configured with ${permCodes.length} permissions`,
     );
   }
 
-  console.log('[Seeder phân quyền] Hoàn thành nạp dữ liệu phân quyền!');
+  console.log('[RBAC seeder] Roles and permissions seeded!');
 }

@@ -214,12 +214,12 @@ export async function seedChatDemo(dataSource: DataSource): Promise<void> {
 
   await ensureConversation(dataSource, listing, student, landlord);
 
-  console.log('\n[Seeder chat] Đã tạo dữ liệu thử nghiệm chat:');
+  console.log('\n[Chat seeder] Chat demo data created:');
   console.log(
-    `  Chủ trọ : ${DEMO_LANDLORD.phone} / ${DEMO_PASSWORD} (${DEMO_LANDLORD.fullName})`,
+    `  Landlord: ${DEMO_LANDLORD.phone} / ${DEMO_PASSWORD} (${DEMO_LANDLORD.fullName})`,
   );
   console.log(
-    `  Sinh viên: ${DEMO_STUDENT.phone} / ${DEMO_PASSWORD} (${DEMO_STUDENT.fullName})`,
+    `  Student : ${DEMO_STUDENT.phone} / ${DEMO_PASSWORD} (${DEMO_STUDENT.fullName})`,
   );
-  console.log(`  Tin đăng active: "${listing.title}" (${listing.id})`);
+  console.log(`  Active listing: "${listing.title}" (${listing.id})`);
 }

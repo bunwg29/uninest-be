@@ -273,7 +273,7 @@ async function ensureWards(dataSource: DataSource): Promise<MainWard[]> {
         ),
       );
       console.log(
-        `[Seeder Đà Nẵng] Dữ liệu địa giới thiếu, đã bổ sung ${missing.length} phường dùng cho môi trường phát triển`,
+        `[Da Nang seeder] Location data was incomplete, added ${missing.length} wards for the development environment`,
       );
     }
 
@@ -508,7 +508,7 @@ export async function seedDaNang(dataSource: DataSource): Promise<void> {
   );
 
   console.log(
-    `[Seeder Đà Nẵng] Tin mẫu: ${baseCreated} tin mới (tổng cần có ${baseTotal}), ${wards.length} phường chính`,
+    `[Da Nang seeder] Sample listings: ${baseCreated} created (${baseTotal} required in total), ${wards.length} main wards`,
   );
 
   if (bulkCount > 0) {
@@ -522,11 +522,11 @@ export async function seedDaNang(dataSource: DataSource): Promise<void> {
     );
 
     console.log(
-      `[Seeder Đà Nẵng] Chế độ bulk: ${bulkCreated} tin mới (mục tiêu ${bulkCount})`,
+      `[Da Nang seeder] Bulk mode: ${bulkCreated} listings created (target ${bulkCount})`,
     );
   }
 
   console.log(
-    `[Seeder Đà Nẵng] Tài khoản mẫu (mật khẩu ${SEED_PASSWORD}): Sinh viên ${STUDENT_ACCOUNTS[0].phone}, Chủ trọ ${LANDLORDS[0].phone}, Chủ trọ chờ xác minh ${LANDLORDS[4].phone}, Admin ${ADMIN_ACCOUNT.phone}`,
+    `[Da Nang seeder] Sample accounts (password ${SEED_PASSWORD}): Student ${STUDENT_ACCOUNTS[0].phone}, Landlord ${LANDLORDS[0].phone}, Unverified landlord ${LANDLORDS[4].phone}, Admin ${ADMIN_ACCOUNT.phone}`,
   );
 }

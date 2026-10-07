@@ -18,7 +18,7 @@ async function seedDaNangWithDependencies(
   await seedAmenities(dataSource);
   await seedLocations(dataSource).catch((error: unknown) => {
     console.warn(
-      `[Seeder địa giới] Bỏ qua do lỗi: ${error instanceof Error ? error.message : String(error)}`,
+      `[Locations seeder] Skipped due to error: ${error instanceof Error ? error.message : String(error)}`,
     );
   });
   await seedDaNang(dataSource);
@@ -79,11 +79,11 @@ async function run() {
   const arg = process.argv[2]?.trim().toLowerCase();
 
   if (!arg) {
-    console.log('\n[Trình nạp dữ liệu] Thiếu tên seeder cần chạy.');
-    console.log('\nCách dùng:');
-    console.log('   npm run seed -- <ten_seeder>');
-    console.log('   (Ví dụ: npm run seed -- rooms)');
-    console.log('\nDanh sách các seeder có sẵn:');
+    console.log('\n[Seeder runner] Missing the name of the seeder to run.');
+    console.log('\nUsage:');
+    console.log('   npm run seed -- <seeder_name>');
+    console.log('   (Example: npm run seed -- rooms)');
+    console.log('\nAvailable seeders:');
 
     for (const [key, item] of Object.entries(SEEDERS)) {
       console.log(`   - ${key}: ${item.name} (${item.description})`);
@@ -96,8 +96,8 @@ async function run() {
   const seeder = SEEDERS[cleanKey];
 
   if (!seeder) {
-    console.log(`\n[Trình nạp dữ liệu] Không tìm thấy seeder: "${arg}"`);
-    console.log('Các seeder hợp lệ: ' + Object.keys(SEEDERS).join(', '));
+    console.log(`\n[Seeder runner] Seeder not found: "${arg}"`);
+    console.log('Valid seeders: ' + Object.keys(SEEDERS).join(', '));
     process.exit(1);
   }
 
@@ -120,16 +120,16 @@ async function run() {
 
   try {
     console.log(
-      `\n[Trình nạp dữ liệu] Đang kết nối cơ sở dữ liệu ${process.env.DB_DATABASE || 'uninest_db'}...`,
+      `\n[Seeder runner] Connecting to database ${process.env.DB_DATABASE || 'uninest_db'}...`,
     );
     await dataSource.initialize();
-    console.log(`[Trình nạp dữ liệu] Bắt đầu chạy ${seeder.name}...`);
+    console.log(`[Seeder runner] Running ${seeder.name}...`);
 
     await seeder.fn(dataSource);
 
-    console.log('[Trình nạp dữ liệu] Hoàn thành thành công!\n');
+    console.log('[Seeder runner] Completed successfully!\n');
   } catch (error) {
-    console.error('[Trình nạp dữ liệu] Lỗi trong quá trình nạp:', error);
+    console.error('[Seeder runner] Seeding failed:', error);
     process.exit(1);
   } finally {
     if (dataSource.isInitialized) {
