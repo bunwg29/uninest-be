@@ -12,7 +12,6 @@ export async function seedAmenities(dataSource: DataSource): Promise<void> {
     group: AmenityGroup;
     isActive: boolean;
   }[] = [
-    // Nhóm 0: Nội thất (FURNITURE)
     { id: 1, name: 'Điều hòa', group: AmenityGroup.FURNITURE, isActive: true },
     { id: 2, name: 'Tủ lạnh', group: AmenityGroup.FURNITURE, isActive: true },
     {
@@ -29,7 +28,6 @@ export async function seedAmenities(dataSource: DataSource): Promise<void> {
       isActive: true,
     },
 
-    // Nhóm 1: Tiện ích (FACILITY)
     {
       id: 6,
       name: 'WiFi miễn phí',
@@ -41,7 +39,6 @@ export async function seedAmenities(dataSource: DataSource): Promise<void> {
     { id: 9, name: 'Sân phơi', group: AmenityGroup.FACILITY, isActive: true },
     { id: 10, name: 'Ban công', group: AmenityGroup.FACILITY, isActive: true },
 
-    // Nhóm 2: An ninh (SECURITY)
     {
       id: 11,
       name: 'Camera an ninh',
@@ -61,7 +58,6 @@ export async function seedAmenities(dataSource: DataSource): Promise<void> {
       isActive: true,
     },
 
-    // Nhóm 3: Phòng (ROOM_FEATURE)
     {
       id: 14,
       name: 'WC riêng',

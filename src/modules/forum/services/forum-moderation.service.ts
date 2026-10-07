@@ -392,7 +392,6 @@ export class ForumModerationService implements OnModuleInit {
       .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       .replace(/ /g, '\\s+');
 
-    // Biên từ theo Unicode để "ngu" không khớp nhầm trong "người", "nguyễn".
     return {
       keyword,
       action: source.action,
