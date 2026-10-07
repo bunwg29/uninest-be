@@ -283,7 +283,7 @@ export class ForumModerationService implements OnModuleInit {
       const message = error instanceof Error ? error.message : String(error);
 
       this.logger.warn(
-        `Không đọc được từ khoá cấm từ cơ sở dữ liệu, dùng cấu hình JSON: ${message}`,
+        `Could not read banned keywords from the database, falling back to JSON config: ${message}`,
       );
       sources = this.readDefaultKeywords();
     }
@@ -332,12 +332,12 @@ export class ForumModerationService implements OnModuleInit {
         .execute();
 
       this.logger.log(
-        `Đã nạp ${defaultKeywords.length} từ khoá cấm mặc định từ cấu hình JSON.`,
+        `Loaded ${defaultKeywords.length} default banned keywords from JSON config.`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
-      this.logger.warn(`Không thể nạp từ khoá cấm mặc định: ${message}`);
+      this.logger.warn(`Failed to load default banned keywords: ${message}`);
     }
   }
 
@@ -370,7 +370,7 @@ export class ForumModerationService implements OnModuleInit {
       const message = error instanceof Error ? error.message : String(error);
 
       this.logger.warn(
-        `Không đọc được file từ khoá cấm ${filePath}: ${message}`,
+        `Could not read banned keywords file ${filePath}: ${message}`,
       );
 
       return [];

@@ -466,7 +466,7 @@ export class ForumPostsService {
 
     if (results.some((isDeleted) => !isDeleted)) {
       this.logger.warn(
-        `Không thể xoá một số ảnh bài viết khỏi R2: ${removedKeys.join(', ')}`,
+        `Failed to delete some post images from R2: ${removedKeys.join(', ')}`,
       );
     }
   }
