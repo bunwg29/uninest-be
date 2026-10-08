@@ -217,7 +217,7 @@ export class ListingsSearchRepository {
 
     if (query.keyword) {
       listingsQuery.andWhere(
-        '(unaccent(listing.title) ILIKE unaccent(:keyword) OR unaccent(listing.fullAddress) ILIKE unaccent(:keyword))',
+        '(uninest_unaccent(listing.title) ILIKE uninest_unaccent(:keyword) OR uninest_unaccent(listing.fullAddress) ILIKE uninest_unaccent(:keyword))',
         { keyword: `%${escapeLikePattern(query.keyword)}%` },
       );
     }
@@ -334,7 +334,7 @@ export class ListingsSearchRepository {
     if (query.keyword) {
       listingsQuery
         .addSelect(
-          'CASE WHEN unaccent(listing.title) ILIKE unaccent(:keyword) THEN 0 ELSE 1 END',
+          'CASE WHEN uninest_unaccent(listing.title) ILIKE uninest_unaccent(:keyword) THEN 0 ELSE 1 END',
           'keywordRank',
         )
         .orderBy('"keywordRank"', 'ASC');

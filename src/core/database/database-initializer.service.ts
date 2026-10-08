@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { KEYWORD_SEARCH_SQL } from './keyword-search.sql';
 
 @Injectable()
 export class DatabaseInitializerService implements OnModuleInit {
@@ -9,6 +10,7 @@ export class DatabaseInitializerService implements OnModuleInit {
 
   async onModuleInit() {
     await this.initializeExtensions();
+    await this.initializeKeywordSearchIndexes();
     await this.migrateListingsSearchSchema();
     await this.migrateListingsViewingScheduleSchema();
     await this.migrateStorageReferencesToObjectKeys();
@@ -118,8 +120,25 @@ export class DatabaseInitializerService implements OnModuleInit {
     }
   }
 
+  private async initializeKeywordSearchIndexes() {
+    try {
+      await this.dataSource.query(KEYWORD_SEARCH_SQL);
+      this.logger.log('Keyword search trigram indexes are ready.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      this.logger.warn(`Failed to prepare keyword search indexes: ${message}`);
+    }
+  }
+
   private async initializeExtensions() {
-    const extensions = ['uuid-ossp', 'postgis', 'vector', 'unaccent'];
+    const extensions = [
+      'uuid-ossp',
+      'postgis',
+      'vector',
+      'unaccent',
+      'pg_trgm',
+    ];
 
     for (const ext of extensions) {
       try {
