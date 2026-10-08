@@ -29,7 +29,7 @@ export class StorageController {
   @ApiOperation({
     summary: 'Tạo presigned URL (hiệu lực 5 phút) để tải ảnh trực tiếp lên R2',
     description:
-      'Chỉ nhận ảnh jpg/png tối đa 5MB. Backend kiểm tra lại định dạng và dung lượng đối tượng sau khi tải lên.',
+      'Chỉ nhận ảnh jpg/png tối đa 100MB. Backend kiểm tra lại định dạng và dung lượng đối tượng sau khi tải lên.',
   })
   @ApiResponse({
     status: HttpStatus.OK,

@@ -79,7 +79,7 @@ export class PresignAvatarDto {
   @ApiProperty({ example: 1048576 })
   @IsInt()
   @Min(1, { message: 'Dung lượng ảnh phải lớn hơn 0' })
-  @Max(5 * 1024 * 1024, { message: 'Ảnh đại diện tối đa 5MB' })
+  @Max(100 * 1024 * 1024, { message: 'Ảnh đại diện tối đa 100MB' })
   fileSize!: number;
 }
 

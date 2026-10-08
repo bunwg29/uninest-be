@@ -32,7 +32,7 @@ export class CreatePresignedUploadUrlDto {
   contentType!: string;
 
   @ApiPropertyOptional({
-    description: 'Dung lượng ảnh theo byte, tối đa 5MB',
+    description: 'Dung lượng ảnh theo byte, tối đa 100MB',
     example: 1048576,
   })
   @IsOptional()
@@ -40,7 +40,7 @@ export class CreatePresignedUploadUrlDto {
   @IsInt()
   @Min(1)
   @Max(STORAGE_LIMITS.MAX_IMAGE_BYTES, {
-    message: 'Mỗi ảnh có dung lượng tối đa 5MB',
+    message: 'Mỗi ảnh có dung lượng tối đa 100MB',
   })
   fileSize?: number;
 

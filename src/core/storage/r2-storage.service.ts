@@ -258,7 +258,7 @@ export class R2StorageService {
     }
 
     throw new BadRequestException(
-      'Ảnh phải là jpg hoặc png và có dung lượng tối đa 5MB',
+      'Ảnh phải là jpg hoặc png và có dung lượng tối đa 100MB',
     );
   }
 
