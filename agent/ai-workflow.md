@@ -1,63 +1,78 @@
-# AI Backend Implementation Workflow
+# Quy trình làm việc của AI — uninest-be
 
-Mọi AI coding assistant và thành viên dự án phải tuân thủ nghiêm ngặt quy trình 7 bước sau khi tiếp nhận yêu cầu code backend:
+> Làm **đúng thứ tự** các bước. Không bỏ bước. Gặp điều kiện "DỪNG" thì hỏi người dùng, không tự đoán.
 
-```
-[1. Check Mandates & Boundaries] -> [2. Inspect Entities & Base Services] -> [3. Implement Module (DTO, Entity, Service, Controller)]
-  -> [4. Verify & Test Endpoints] -> [5. Run Format, Lint & Typecheck] -> [6. Update Docs & Migrations] -> [7. Confirm to User]
-```
+---
 
-## Bước 1: Kiểm tra Ràng buộc, Ranh giới & Ràng buộc Bắt buộc
-- Đọc [**`agent/rules.md`**](./rules.md):
-  - **KIỂM TRA NHÁNH GIT PHỤ TRÁCH**: Xác định file/tính năng sắp sửa thuộc trách nhiệm của nhánh Git nào. Luôn checkout đúng nhánh trước khi code (`feat/sp1-base-backend-local`, `feat/sp1-api-auth-rbac`, ...).
-  - **SỬ DỤNG MODULE SẴN CÓ**: Chỉ code trong các module `@modules/*` và hạ tầng `@core/*`, `@common/*` sẵn có.
-  - **100% TIẾNG VIỆT THỐNG NHẤT**: Toàn bộ message, exception, validation error đều dùng tiếng Việt.
-  - **100% VALIDATION QUA DTO**: Không bao giờ nhận body/params kiểu `any`.
-  - **HẰNG SỐ IN HOA**: Mọi hằng số mới phải viết kiểu `UPPER_SNAKE_CASE`.
-  - **KHÔNG COMMENT BỪA BÃI**: Để code tự tường minh, không comment giải thích các dòng code hiển nhiên.
-  - **KHOẢNG CÁCH DÒNG LOGIC**: Luôn có dòng trống phân cách giữa các block biến, hàm, if/else, return.
-- Đọc [**`agent/business-logic.md`**](./business-logic.md): Kiểm tra xem tính năng có thuộc danh sách **Out of scope** (không build) hay không.
+## Bước 1 — Hiểu yêu cầu và xác định nghiệp vụ
 
-## Bước 2: Rà soát & Tái sử dụng Hạ tầng Hiện có
-- Tra cứu `@core/database` để tái sử dụng kết nối TypeORM và naming strategy.
-- Tra cứu `@core/storage` để dùng `R2StorageService` cho các tác vụ media/ảnh.
-- Tra cứu `@common` để dùng `HttpExceptionFilter`, `AllExceptionsFilter`, `TransformInterceptor`, `@CurrentUser`, `@Roles`.
+1. Xác định yêu cầu thuộc **mã FR / TASK-ID** nào (tra `business-logic.md`).
+2. Đọc mục nghiệp vụ tương ứng: quy tắc bắt buộc, con số, trạng thái, API.
+3. Tra mục **2. Ngoài phạm vi** và **3. Quyết định đã chốt**.
 
-## Bước 3: Triển khai Module theo Kiến trúc Screaming
-- Đặt code vào đúng thư mục module: `src/modules/<module-name>/`:
-  - `dto/`: Request & Response DTOs với decorator `class-validator` và `@nestjs/swagger`.
-  - `entities/`: TypeORM entities độc lập cho từng module.
-  - `controllers/`: Routing, HTTP methods, Swagger docs, gọi Service xử lý.
-  - `services/`: Nghiệp vụ domain chính, truy vấn database qua TypeORM Repository.
-  - `<module-name>.module.ts`: Khai báo TypeOrmModule.forFeature, providers, controllers, exports.
-  - `index.ts`: Barrel export của module.
-- Khai báo module mới vào `app.module.ts`.
+**DỪNG và hỏi khi:**
+- Yêu cầu nằm ngoài phạm vi, mâu thuẫn với `business-logic.md`, hoặc không có trong file.
+- Phải đổi API đang được app dùng (đường dẫn, tên trường, kiểu dữ liệu).
+- Cần cài thư viện mới, dịch vụ ngoài mới, hoặc dùng Redis cho việc không phải Thông báo.
+- Cần xoá dữ liệu, xoá cột, đổi kiểu cột có dữ liệu.
 
-## Bước 4: Kiểm thử Endpoint & Database
-- Khởi chạy dev server hoặc kiểm tra endpoint:
-  - Kiểm tra kết quả trả về đúng chuẩn envelope `{ status: true, data: ..., error: null, messages: ... }`.
-  - Khi lỗi: `{ status: false, data: null, error: ..., messages: ... }`.
-  - Kiểm tra DTO validation chặn đúng dữ liệu sai (400 Bad Request kèm chi tiết lỗi trong messages).
-  - Kiểm tra Swagger docs hiển thị đầy đủ schema tại `/api/docs`.
+## Bước 2 — Khảo sát code hiện có (bắt buộc trước khi viết)
 
-## Bước 5: Tự động Định dạng & Kiểm tra Type, Lint
-Bắt buộc chạy đầy đủ các lệnh sau để tự động format khoảng cách dòng, dọn import thừa và xác minh 0 lỗi:
+1. Đọc `reuse-catalog.md`.
+2. `grep` entity, service, endpoint, hằng số liên quan. Đọc module tương tự đã làm (xem mục 5 của `reuse-catalog.md`).
+3. Kiểm tra app (`../uninest-app/src/features/<feature>/services`) đang gọi API này thế nào nếu sửa API có sẵn.
+4. Liệt kê: dùng lại gì, mở rộng gì, tạo mới gì (và vì sao).
+
+## Bước 3 — Viết code
+
+Thứ tự gợi ý: entity → migration → DTO → service (nghiệp vụ + kiểm tra quyền) → controller (guard, role, Swagger) → sự kiện/cron/socket nếu cần → test.
+
+- Tuân thủ toàn bộ `rules.md` (R1–R12).
+- Làm **đúng phạm vi được giao**. Thấy lỗi khác → ghi lại để báo, không tự sửa lan man.
+- Thêm thứ dùng chung → cập nhật `reuse-catalog.md`.
+- Thêm/đổi endpoint, trạng thái, con số đã được duyệt → cập nhật `business-logic.md` và **copy nguyên file sang `../uninest-app/agent/`**.
+- Thêm biến môi trường → `env.schema.ts` + `.env.example`.
+
+## Bước 4 — Tự kiểm tra
+
 ```bash
 npm run lint:fix
 npm run format
 npm run typecheck
 npm run lint
-npm run format:check
+npm test
 ```
-Đảm bảo **0 lỗi TypeScript, 0 lỗi ESLint**.
+Đổi entity → thêm:
+```bash
+npm run migration:generate -- src/core/database/migrations/<TenMigration>
+npm run migration:run
+npm run migration:revert
+npm run migration:run
+```
+Tất cả phải **0 lỗi**. Lỗi có sẵn từ trước, không liên quan → báo lại, không tự sửa.
 
-## Bước 6: Cập nhật Tài liệu Nghiệp vụ (nếu có thay đổi)
-- Nếu tính năng bổ sung trạng thái enum mới, bảng dữ liệu mới hoặc luồng logic mới, cập nhật vào `agent/business-logic.md`.
+Gọi thử endpoint (Swagger `/api/docs` hoặc curl): đúng envelope, đúng mã lỗi, DTO chặn dữ liệu sai, **sai vai trò bị từ chối**.
 
-## Bước 7: Báo cáo cho Người dùng
-- Tóm tắt ngắn gọn các việc đã làm, danh sách endpoint mới, đường dẫn file thay đổi (có markdown link trực tiếp) và kết quả kiểm tra type/lint.
-## Bước 7: Commit Chuẩn & Báo cáo cho Người dùng
-- Kiểm tra `git status` đảm bảo chỉ chứa các file thuộc đúng phạm vi trách nhiệm của nhánh hiện tại.
-- Tạo commit với message chuẩn Conventional Commits kèm mã Task ID (ví dụ: `feat(auth): implement token revocation (TSK-SP1-02)`).
-- Chờ người dùng cho phép ("Allow") trước khi commit hoặc push.
-- Tóm tắt ngắn gọn các việc đã làm, danh sách endpoint mới, đường dẫn file thay đổi (có markdown link trực tiếp) và kết quả kiểm tra build/lint.
+## Bước 5 — Rà lại trước khi báo cáo
+
+- [ ] Đúng nghiệp vụ, đúng con số trong `business-logic.md`
+- [ ] Mọi endpoint mới có guard + role (hoặc `@Public` có lý do), có kiểm tra sở hữu
+- [ ] DTO đủ validation tiếng Việt + Swagger
+- [ ] Đổi entity đã có migration chạy/revert được
+- [ ] Không SQL ghép chuỗi, không N+1, danh sách có phân trang
+- [ ] Không trả dữ liệu nhạy cảm
+- [ ] Log tiếng Anh, message client tiếng Việt
+- [ ] Không comment, không `any`, không `console.log`, không code chết
+- [ ] Có test cho nghiệp vụ cốt lõi
+
+## Bước 6 — Commit (chỉ khi người dùng cho phép)
+
+Theo `git.md`: đúng nhánh task, định dạng `<type>(<scope>): <mô tả> (<TASK-ID>)`, mỗi commit một việc, không dòng ghi công AI. **Không push** khi chưa được yêu cầu.
+
+## Bước 7 — Báo cáo cho người dùng (tiếng Việt)
+
+1. Đã làm gì (theo nghiệp vụ), endpoint mới/đổi.
+2. Dùng lại gì; tạo mới gì và vì sao.
+3. Migration (nếu có) và kết quả lệnh kiểm tra.
+4. Ảnh hưởng tới app (API đổi gì, app cần làm gì).
+5. Điểm cần người dùng quyết hoặc lỗi phát hiện ngoài phạm vi.

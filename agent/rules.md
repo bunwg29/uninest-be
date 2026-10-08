@@ -1,120 +1,137 @@
-# UniNest Backend Rules & Enterprise Coding Standards
+# Quy chuẩn code — uninest-be
 
-## 1. QUY TẮC BẮT BUỘC (CRITICAL MANDATES FOR ALL DEVELOPERS & AI)
-
-### [MANDATE-1] NGUYÊN TẮC QUẢN LÝ & SỬ DỤNG MODULE (SCREAMING ARCHITECTURE)
-
-- **Dự án làm theo team với kiến trúc module hóa đặc trưng của NestJS**.
-- **Ưu tiên tuyệt đối các module đã define sẵn**: Mọi AI và thành viên trong nhóm phải kiểm tra và chỉ được triển khai code bên trong các module domain đã định nghĩa sẵn:
-  - **Core Packages**: `@core/database`, `@core/config`, `@core/storage`.
-  - **Common Packages**: `@common/filters`, `@common/interceptors`, `@common/pipes`, `@common/decorators`, `@common/constants`, `@common/dtos`.
-  - **Predefined Feature Modules**:
-    `@modules/auth`, `@modules/users`, `@modules/listings`, `@modules/search`,
-    `@modules/comparison`, `@modules/booking`, `@modules/chat`, `@modules/forum`,
-    `@modules/reviews`, `@modules/notifications`, `@modules/payment`,
-    `@modules/ai-chat`, `@modules/recommendations`, `@modules/health`.
-- **RÀNG BUỘC TẠO MODULE MỚI**: **TRỪ KHI** là tính năng mới hoàn toàn và **CHƯA CÓ** module define sẵn trong danh sách trên, thì mới được phép tạo module mới. Khi tạo mới:
-  - Phải đặt tên chuẩn `kebab-case`.
-  - Tuân thủ đầy đủ cấu trúc con (`dto/`, `entities/`, `controllers/`, `services/`, `*.module.ts`).
-  - Phải export module và đăng ký vào `app.module.ts`.
-
-### [MANDATE-2] 100% VALIDATION QUA DTO & CLASS-VALIDATOR
-
-- **CẤM TUYỆT ĐỐI** nhận request body, query params hoặc route params ở dạng `any` hoặc raw object.
-- 100% endpoint nhận dữ liệu phải khai báo DTO class với decorator validation đầy đủ (`@IsString()`, `@IsNumber()`, `@IsUUID()`, `@IsOptional()`, `@Min()`, `@Max()`,...).
-- Toàn bộ DTO phải được annotate Swagger decorator (`@ApiProperty()`, `@ApiPropertyOptional()`) để tài liệu hóa API tự động.
-
-### [MANDATE-3] HẰNG SỐ PHẢI ĐẶT TÊN IN HOA (UPPER_SNAKE_CASE)
-
-- Mọi biến đại diện cho hằng số (system constants, error codes, database table names, config keys, roles enum) **BẮT BUỘC PHẢI VIẾT IN HOA TOÀN BỘ**.
-- Ví dụ: `SYSTEM_CONSTANTS`, `HTTP_STATUS_CODES`, `USER_ROLES`, `LISTING_STATUS`, `R2_CONFIG`.
-
-### [MANDATE-4] TÁI SỬ DỤNG HẠ TẦNG CỐT LÕI (ZERO DUPLICATION)
-
-- Bắt buộc đọc và tái sử dụng các package nền tảng đã dựng sẵn:
-  - Database: Các entity được khai báo độc lập trong từng module theo nhu cầu nghiệp vụ, dùng các decorator chuẩn của TypeORM (`@PrimaryGeneratedColumn('uuid')`, `@CreateDateColumn()`, `@UpdateDateColumn()`, `@DeleteDateColumn()`).
-  - Storage: Gọi `R2StorageService` từ `@core/storage` để sinh Presigned URLs upload/download. Cấm lưu trữ binary file trực tiếp vào ổ cứng server.
-  - Exception Handling: Dùng `HttpExceptionFilter`, `AllExceptionsFilter` tự động bắt và đóng gói lỗi thành chuẩn API envelope.
-  - API Envelope: 100% response trả về từ server đều tự động tuân thủ cấu trúc chuẩn (thành công qua `TransformInterceptor`, lỗi qua Filters):
-    ```json
-    {
-      "status": true,
-      "data": { ... },
-      "error": null,
-      "messages": "Thao tác thành công"
-    }
-    ```
-    (Khi gặp lỗi: `"status": false`, `"data": null`, `"error": "Lỗi máy chủ nội bộ" | "Lỗi ngoại lệ"`, `"messages": string | string[]`). Controller chỉ cần return data bình thường, Interceptor sẽ tự động đóng gói.
-
-### [MANDATE-5] CẤM COMMENT BỪA BÃI (NO TRIVIAL COMMENTS)
-
-- **Tuyệt đối không viết comment giải thích các dòng code hiển nhiên** (ví dụ: `// import module`, `// inject service`, `// handle get request`, `// return data`, `// find in database`).
-- Code phải tự tường minh thông qua cách đặt tên hàm, class, biến rõ nghĩa (Self-documenting code).
-- **Chỉ người lập trình trực tiếp tự comment** khi thật sự cần thiết cho các logic nghiệp vụ phức tạp, câu truy vấn SQL không gian/vector phức tạp hay ngữ cảnh phi hiển nhiên.
-
-### [MANDATE-6] KHOẢNG CÁCH DÒNG GIỮA CÁC BLOCK LOGIC (PADDED BLOCKS)
-
-- **Tuyệt đối không viết code dính sát nhau**.
-- Phải luôn có 1 dòng trống phân cách giữa các khối logic rõ ràng:
-  - Giữa các nhóm dependency injection trong constructor.
-  - Giữa nhóm khai báo biến cục bộ và logic xử lý nghiệp vụ.
-  - Giữa các câu lệnh điều kiện, luồng xử lý (`if`, `switch`, `try-catch`, `for`).
-  - Trước câu lệnh `return` hoặc khối throw exception.
-- ESLint rule `padding-line-between-statements` và Prettier sẽ tự động hỗ trợ định dạng khoảng cách chuẩn mực này.
-
-### [MANDATE-7] AN TOÀN TRUY VẤN CƠ SỞ DỮ LIỆU & TYPEORM
-
-- Sử dụng TypeORM Repository hoặc QueryBuilder có parameterization (`:id`, `:name`). Cấm ghép chuỗi trực tiếp vào câu lệnh SQL để chống SQL Injection.
-- Các bảng cần lưu vết lịch sử (như Listings, Bookings, Users) bắt buộc dùng Soft-delete (`@DeleteDateColumn()`).
-- Truy vấn không gian PostGIS dùng `ST_DWithin`, `ST_Distance`, `ST_MakePoint` với SRID 4326 (WGS 84).
-
-### [MANDATE-8] QUY TẮC PHÂN NHÁNH GIT & TRÁCH NHIỆM MÃ NGUỒN (BRANCH RESPONSIBILITY)
-
-- **Phát triển theo cấu trúc phân nhánh tính năng (Feature Branching)**: Dự án chia làm các nhánh tính năng độc lập (ví dụ: `feat/sp1-base-backend-local`, `feat/sp1-api-auth-rbac`, ...).
-- **Trách nhiệm mã nguồn theo nhánh**: Khi thực hiện thay đổi, **BẮT BUỘC** xác định file thay đổi thuộc phạm vi nhánh nào:
-  - Checkout sang đúng nhánh đó để thực hiện code, kiểm tra và commit.
-  - Không gộp file của nhánh hạ tầng/base vào commit của nhánh tính năng downstream.
-  - Khi cần đồng bộ giữa các nhánh, thực hiện merge theo thứ tự kế thừa: nhánh base -> nhánh feature -> kiểm tra build/lint -> push lên `origin`.
-- **Format commit message chuẩn Conventional Commits**: `<type>(<scope>): <mô tả ngắn> (<TASK-ID>)` (ví dụ: `feat(auth): implement authentication endpoints (TSK-SP1-02)`).
-
-### [MANDATE-9] 100% TIẾNG VIỆT THỐNG NHẤT TOÀN HỆ THỐNG
-
-- **Quy chuẩn thông báo**: Toàn bộ exception message, validation message (`class-validator`) và interceptor response message gửi tới client **BẮT BUỘC PHẢI BẰNG TIẾNG VIỆT 100%**.
-- **Ngoại lệ - log nội bộ**: Log phía server (`Logger`, `console.*` trong seeder) **BẮT BUỘC PHẢI BẰNG TIẾNG ANH** để dễ tìm kiếm và dùng với công cụ giám sát. Mã lỗi máy đọc dùng tiếng Anh viết hoa. Mô tả Swagger giữ tiếng Việt.
-- Không viết lẫn lộn tiếng Anh trong các chuỗi thông báo lỗi trả về cho client/người dùng.
-- Thống nhất các thuật ngữ nghiệp vụ (ví dụ: "Số điện thoại hoặc mật khẩu không chính xác", "Không tìm thấy vai trò", "Quyền hạn đã tồn tại", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn").
+> Mỗi quy tắc có ví dụ ✅ nên / ❌ không. Code vi phạm quy tắc **bắt buộc** thì không được commit.
 
 ---
 
-## 2. Quy chuẩn Đặt tên Toàn diện (Naming Conventions)
+## 1. Công nghệ cố định
 
-### A. Tệp tin (Files) & Thư mục (Folders)
+NestJS 11 · TypeScript strict · TypeORM 1.x + `SnakeNamingStrategy` · PostgreSQL 14+ với PostGIS, unaccent, pg_trgm (pgvector từ Sprint 4) · class-validator + class-transformer · Swagger · Socket.IO (`@nestjs/websockets`) · `@nestjs/event-emitter` · `@nestjs/schedule` · bcryptjs · AWS SDK v3 cho Cloudflare R2. Redis + BullMQ **chỉ** cho Thông báo (Sprint 3).
 
-- **Controllers**: `<tên-nghiệp-vụ>.controller.ts` (ví dụ: `listings.controller.ts`, `auth.controller.ts`).
-- **Services**: `<tên-nghiệp-vụ>.service.ts` (ví dụ: `listings.service.ts`, `auth.service.ts`).
-- **Modules**: `<tên-nghiệp-vụ>.module.ts` (ví dụ: `listings.module.ts`, `database.module.ts`).
-- **Entities**: `<tên-nghiệp-vụ>.entity.ts` (ví dụ: `user.entity.ts`, `listing.entity.ts`).
-- **DTOs**: `<hành-động>-<nghiệp-vụ>.dto.ts` (ví dụ: `create-listing.dto.ts`, `update-profile.dto.ts`).
-- **Interceptors / Filters / Guards / Pipes / Constants / Decorators / DTOs trong `@common`**: Không gắn đuôi lặp lại tên package (`.constant`, `.decorator`, `.dto`, `.filter`, `.interceptor`, `.pipe`) vì thư mục cha đã thể hiện rõ (ví dụ: `transform.ts`, `http-exception.ts`, `validation.ts`, `api-response.ts`, `current-user.ts`, `system.ts`).
-- **Thư mục (Folders/Modules)**: `kebab-case` cho tên ghép hoặc chữ thường (ví dụ: `ai-chat`, `modules`, `core`, `common`).
+**Không tự cài thư viện mới, không đổi phiên bản** khi chưa được đồng ý.
 
-### B. Biến & Hàm (Variables & Methods)
+---
 
-- **Tên Class**: `PascalCase` kèm hậu tố chức năng (ví dụ: `ListingsController`, `AuthService`, `CreateListingDto`, `UserEntity`).
-- **Biến & Thuộc tính**: `camelCase` (ví dụ: `userId`, `listingPrice`, `totalCount`).
-- **Biến Boolean**: Bắt đầu bằng `is`, `has`, `should`, `can` (ví dụ: `isActive`, `hasPermission`, `isVerified`).
-- **Hàm xử lý Controller/Service**: Động từ mô tả hành động (ví dụ: `findById`, `createListing`, `updateStatus`, `searchNearby`).
-- **Hằng số (Constants) & Enums**: `UPPER_SNAKE_CASE` (ví dụ: `USER_ROLES`, `HTTP_STATUS_CODES`, `LISTING_STATUS_ENUM`).
+## 2. Cấu trúc module
 
-### C. Database & TypeORM
+```
+src/
+  common/      # constants, decorators, dtos, filters, guards, interceptors, pipes, utils
+  core/        # config, database (data-source, migrations, seeders), storage (R2)
+  modules/<tên>/
+    constants/   controllers/   dtos/   entities/   services/
+    <tên>.module.ts
+    index.ts     # barrel export
+```
 
-- **Tên Bảng (Tables)**: `snake_case` số nhiều (ví dụ: `users`, `listings`, `bookings`, `reviews`). Được quản lý tự động bởi `SnakeNamingStrategy`.
-- **Tên Cột (Columns)**: `snake_case` (ví dụ: `created_at`, `phone_number`, `user_id`, `room_type`).
-- **Khoá chính (Primary Key)**: Luôn là `id` kiểu UUID (`@PrimaryGeneratedColumn('uuid')`).
-- **Khoá ngoại (Foreign Keys)**: `<tên_thực_thể_đơn>_id` (ví dụ: `user_id`, `listing_id`).
+Module mới phải: tên `kebab-case`, đủ thư mục trên, đăng ký trong `app.module.ts`, export qua `modules/index.ts`. Chỉ tạo khi được giao.
 
-### D. Path Imports & Clean Architecture
+---
 
-- Luôn dùng path aliases: `@core`, `@core/*`, `@common`, `@common/*`, `@modules`, `@modules/*`.
-- Tuyệt đối không dùng relative path vượt quá 1 cấp (`../../`).
-- **Zero Unused Imports & Variables**: ESLint (`unused-imports/no-unused-imports: error`) và TypeScript (`noUnusedLocals: true`, `noUnusedParameters: true`). Chạy `npm run lint:fix` để tự động dọn sạch import thừa.
+## 3. Quy tắc bắt buộc
+
+### R1. Tái sử dụng trước, tạo mới sau
+Tra [`reuse-catalog.md`](./reuse-catalog.md) và `grep` code trước khi tạo guard, decorator, helper, DTO, hằng số. Gần giống → mở rộng, không viết bản thứ hai.
+
+### R2. Mọi input đi qua DTO
+Không nhận `body`/`query`/`param` kiểu `any` hay object trần. DTO có class-validator, message **tiếng Việt**, Swagger `@ApiProperty`/`@ApiPropertyOptional`. Con số validation **khớp `business-logic.md` và form bên app**.
+
+```ts
+// ❌
+@Post()
+create(@Body() body: any) {}
+
+// ✅
+export class CreateXxxDto {
+  @ApiProperty({ example: 'Phòng gần ĐH Bách khoa' })
+  @IsString({ message: 'Tiêu đề phải là chuỗi' })
+  @MaxLength(150, { message: 'Tiêu đề tối đa 150 ký tự' })
+  title!: string;
+}
+```
+
+### R3. Phân quyền ở mọi endpoint
+- Endpoint không công khai: `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(...)` + `@ApiBearerAuth()`.
+- Công khai: `@Public()` và chỉ trả dữ liệu được phép công khai.
+- **Kiểm tra quyền sở hữu trong service** (chủ tin, người tham gia hội thoại…), không chỉ dựa vào role.
+- Không bao giờ trả `password_hash`, token, mã OTP, dữ liệu nhạy cảm trong response — kể cả API admin.
+
+### R4. Response và lỗi
+- Controller **chỉ `return data`**; `TransformInterceptor` tự bọc envelope `{ status, data, error, messages }`.
+- Lỗi: `throw new BadRequestException('…')`, `NotFoundException`, `ForbiddenException`, `ConflictException`… với **message tiếng Việt**. Cần mã lỗi máy đọc → `throw new ConflictException({ message: '…', error: 'LISTING_HELD' })`.
+- Không tự `try/catch` để trả `{ status: false }`.
+
+### R5. Ngôn ngữ
+- Message trả về client, validation, Swagger description: **tiếng Việt**.
+- `Logger` / log nội bộ / log seeder: **tiếng Anh**. Mã lỗi máy đọc: tiếng Anh viết hoa.
+- Không log dữ liệu nhạy cảm (mật khẩu, token, OTP ở production).
+
+### R6. Database
+- Entity trong module của nó; PK `uuid` (`@PrimaryGeneratedColumn('uuid')`), `@CreateDateColumn`, `@UpdateDateColumn`; bảng cần lưu vết dùng `@DeleteDateColumn` (xoá mềm).
+- Tên bảng/cột `snake_case` (tự sinh bởi naming strategy). Khoá ngoại `<thực_thể>_id`, có ràng buộc FK ở DB.
+- **Đổi entity = phải có migration**: `npm run migration:generate -- src/core/database/migrations/<Tên>` → đọc lại file sinh ra → chạy `migration:run` và `migration:revert` thử. Không sửa migration đã merge, tạo migration mới.
+- Truy vấn: Repository hoặc QueryBuilder **có tham số** (`:id`). **Cấm ghép chuỗi vào SQL.** Từ khoá `LIKE` dùng `escapeLikePattern`.
+- PostGIS: `geography` SRID 4326, `ST_DWithin` / `ST_Distance`, có index GIST.
+- Thao tác nhiều bảng phải nhất quán → dùng transaction. Tranh chấp (giữ chỗ, thanh toán) → khoá dòng + ràng buộc unique ở DB.
+- Tránh N+1: lấy quan hệ bằng join/`In(...)` theo lô, không query trong vòng lặp.
+
+### R7. Trạng thái và nghiệp vụ
+- Trạng thái dùng **enum**, không chuỗi trần.
+- Chuyển trạng thái phải qua hàm kiểm tra hợp lệ (như `isBookingTransitionAllowed`) và ghi lịch sử nếu nghiệp vụ yêu cầu.
+- Con số nghiệp vụ (thời hạn, ngưỡng) là hằng số `UPPER_SNAKE_CASE` trong `constants/`, hoặc biến môi trường có giá trị mặc định nếu cần cấu hình.
+
+### R8. Tác vụ nền và realtime
+- Tác vụ định kỳ: `@Cron` của `@nestjs/schedule`, cập nhật có điều kiện (`WHERE status = ...`) để chạy lại an toàn. **Không Redis/BullMQ** ngoài pipeline Thông báo.
+- Giao tiếp giữa module: phát sự kiện bằng `EventEmitter2` với tên hằng số; module nhận dùng `@OnEvent`.
+- Realtime tới app: thêm sự kiện vào `ChatGateway` (`CHAT_SOCKET_EVENTS`), không tạo gateway mới.
+
+### R9. Cấu hình
+Đọc qua `ConfigService`. Biến mới khai báo trong `src/core/config/env.schema.ts` **và** `.env.example`. Không hard-code secret, URL, khoá.
+
+### R10. Không comment, không `any`, không bỏ qua lỗi
+- Không comment trong code (kể cả `// TODO`). Không code chết, code bị comment out.
+- Không `any`, `as any`, `@ts-ignore`, `eslint-disable`.
+- Không `catch {}` nuốt lỗi im lặng; lỗi bất ngờ để filter xử lý, hoặc log tiếng Anh rồi ném lỗi phù hợp.
+- Không `console.log` trong `src/modules` (dùng `Logger`).
+
+### R11. Không phá cái đang chạy
+- Không đổi đường dẫn, tên trường response, kiểu dữ liệu của API đang được app dùng. Cần đổi → giữ alias cũ (như `/auth/refresh-token`) và báo người dùng.
+- Không đổi nghiệp vụ khi không được giao. Sửa service dùng chung → chạy lại test liên quan.
+
+### R12. Test
+Nghiệp vụ cốt lõi (xác thực, đặt lịch, thanh toán, quyền truy cập) phải có unit test: luồng đúng, luồng sai, từ chối trái quyền. Tranh chấp đồng thời có test riêng.
+
+---
+
+## 4. Đặt tên
+
+| Loại | Quy tắc | Ví dụ |
+| --- | --- | --- |
+| Controller | `<tên>.controller.ts`, class `XxxController` | `listings.controller.ts` |
+| Service | `<tên>.service.ts`, class `XxxService` | `booking.service.ts` |
+| Module | `<tên>.module.ts` | `chat.module.ts` |
+| Entity | file theo tên thực thể, class số ít | `listing.ts` → `Listing` |
+| DTO | `<hành-động>-<tên>.dto.ts`, class `XxxDto` | `create-listing.dto.ts` |
+| File trong `@common` | không lặp hậu tố (`transform.ts`, không `transform.interceptor.ts`) | `current-user.ts` |
+| Hằng số / enum | `UPPER_SNAKE_CASE` / `PascalCase` enum | `BOOKING_DEFAULTS`, `BookingStatus` |
+| Boolean | `is`, `has`, `can`, `should` | `isRevoked` |
+| Method | động từ | `findById`, `confirmBooking`, `searchNearby` |
+
+Import qua alias `@common`, `@core`, `@modules/...`; tương đối tối đa 1 cấp trong cùng module.
+
+---
+
+## 5. Định dạng
+
+- Prettier + ESLint (`npm run lint:fix`, `npm run format`).
+- Dòng trống sau khối khai báo, trước `return`, trước/sau `if`/`for`/`switch`/`try`, giữa các nhóm inject trong constructor (`padding-line-between-statements` là **error**).
+- Service > ~400 dòng → tách service con theo nhiệm vụ (như `forum-posts`, `forum-comments`, `forum-reports`).
+
+---
+
+## 6. Hiệu năng (NFR)
+
+- API đọc thông thường ≤ 500ms P95; tìm kiếm ≤ 1,5s P95 với 5.000 tin.
+- Luôn phân trang danh sách. Chỉ `select` cột cần dùng ở danh sách lớn.
+- Thêm index cho cột lọc/sắp xếp thường dùng (qua migration).
+- Không gọi dịch vụ ngoài (R2, LLM, cổng thanh toán) trong vòng lặp; gom lô hoặc chạy song song có giới hạn.
