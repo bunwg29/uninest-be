@@ -130,3 +130,90 @@ describe('AuthService.verifyOtp', () => {
     expect(otpService.verifyOtp).not.toHaveBeenCalled();
   });
 });
+
+describe('AuthService đăng ký và đổi mật khẩu', () => {
+  const otpService = { sendOtp: jest.fn() };
+  const tokenService = { revokeAllUserTokens: jest.fn() };
+  const usersService = {
+    findByEmail: jest.fn(),
+    findByPhone: jest.fn(),
+    create: jest.fn(),
+    findByIdWithPassword: jest.fn(),
+    updatePassword: jest.fn(),
+  };
+  const service = new AuthService(
+    usersService as unknown as UsersService,
+    otpService as never,
+    tokenService as never,
+    {} as never,
+    {} as never,
+  );
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('đăng ký tạo tài khoản và gửi OTP tới số điện thoại', async () => {
+    usersService.findByPhone.mockResolvedValue(null);
+
+    await expect(
+      service.register({
+        fullName: 'Nguyễn Văn A',
+        phone: '0905123456',
+        password: 'matkhau123',
+        roleId: 0,
+      } as never),
+    ).resolves.toMatchObject({ identifier: '0905123456', requiresOtp: true });
+    expect(usersService.create).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: '0905123456', isVerified: false }),
+    );
+    expect(usersService.create.mock.calls[0][0].passwordHash).not.toBe(
+      'matkhau123',
+    );
+    expect(otpService.sendOtp).toHaveBeenCalledWith(
+      '0905123456',
+      OtpType.REGISTER,
+    );
+  });
+
+  it('từ chối đăng ký trùng số điện thoại', async () => {
+    usersService.findByPhone.mockResolvedValue({ id: 'existing' });
+
+    await expect(
+      service.register({
+        fullName: 'Nguyễn Văn A',
+        phone: '0905123456',
+        password: 'matkhau123',
+        roleId: 0,
+      } as never),
+    ).rejects.toThrow('Số điện thoại này đã được sử dụng');
+    expect(usersService.create).not.toHaveBeenCalled();
+  });
+
+  it('từ chối tự đăng ký vai trò quản trị viên', async () => {
+    await expect(
+      service.register({
+        fullName: 'Admin',
+        phone: '0905123456',
+        password: 'matkhau123',
+        roleId: 2,
+      } as never),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('đổi mật khẩu thu hồi toàn bộ phiên đăng nhập', async () => {
+    const bcrypt = await import('bcryptjs');
+
+    usersService.findByIdWithPassword.mockResolvedValue({
+      id: 'user-1',
+      passwordHash: await bcrypt.hash('matkhaucu1', 4),
+    });
+
+    await service.changePassword('user-1', {
+      currentPassword: 'matkhaucu1',
+      newPassword: 'matkhaumoi2',
+      confirmPassword: 'matkhaumoi2',
+    });
+
+    expect(usersService.updatePassword).toHaveBeenCalled();
+    expect(tokenService.revokeAllUserTokens).toHaveBeenCalledWith('user-1');
+  });
+});

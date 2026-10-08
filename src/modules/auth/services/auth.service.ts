@@ -347,7 +347,6 @@ export class AuthService {
   async changePassword(
     userId: string,
     dto: ChangePasswordDto,
-    deviceId?: string,
   ): Promise<{ message: string }> {
     if (dto.newPassword !== dto.confirmPassword) {
       throw new BadRequestException(
@@ -377,8 +376,11 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
 
     await this.usersService.updatePassword(userId, passwordHash);
-    await this.tokenService.revokeOtherUserTokens(userId, deviceId);
+    await this.tokenService.revokeAllUserTokens(userId);
 
-    return { message: 'Đổi mật khẩu thành công' };
+    return {
+      message:
+        'Đổi mật khẩu thành công. Vui lòng đăng nhập lại trên mọi thiết bị',
+    };
   }
 }

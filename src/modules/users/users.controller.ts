@@ -1,4 +1,6 @@
 import {
+  forwardRef,
+  Inject,
   BadRequestException,
   ConflictException,
   Controller,
@@ -15,6 +17,8 @@ import { UserRoleType } from '@common/constants';
 import { CurrentUser, Roles } from '@common/decorators';
 import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import { R2StorageService } from '@core/storage';
+import { ChangePasswordDto } from '../auth/dtos';
+import { AuthService } from '../auth/services/auth.service';
 import { OtpService } from '../auth/services/otp.service';
 import { OtpType } from '../auth/entities/otp-code';
 import { User } from './entities/user';
@@ -38,6 +42,8 @@ export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly otpService: OtpService,
+    @Inject(forwardRef(() => AuthService))
+    private readonly authService: AuthService,
     private readonly r2StorageService: R2StorageService,
   ) {}
 
@@ -84,6 +90,18 @@ export class UsersController {
       user,
       await this.usersService.getProfileStats(userId),
     );
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Đổi mật khẩu và thu hồi toàn bộ phiên đăng nhập',
+  })
+  async changePassword(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(userId, dto);
   }
 
   @Post('landlord-verification')

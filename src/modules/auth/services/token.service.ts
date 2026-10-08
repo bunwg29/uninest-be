@@ -215,25 +215,4 @@ export class TokenService {
       { isRevoked: true },
     );
   }
-
-  async revokeOtherUserTokens(
-    userId: string,
-    deviceId?: string,
-  ): Promise<void> {
-    const activeTokens = await this.refreshTokenRepository.find({
-      where: { userId, isRevoked: false },
-    });
-
-    const tokensToRevoke = activeTokens.filter(
-      (token) => !deviceId || token.deviceId !== deviceId,
-    );
-
-    for (const token of tokensToRevoke) {
-      token.isRevoked = true;
-    }
-
-    if (tokensToRevoke.length > 0) {
-      await this.refreshTokenRepository.save(tokensToRevoke);
-    }
-  }
 }
