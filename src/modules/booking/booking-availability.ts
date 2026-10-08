@@ -1,8 +1,6 @@
 import { DataSource, In } from 'typeorm';
 import { Booking, BookingStatus } from './entities';
 
-export type ListingAvailability = 'available' | 'holding' | 'rented' | 'paused';
-
 export interface ListingHoldInfo {
   expiresAt: Date;
   daysLeft: number;
