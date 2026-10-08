@@ -9,6 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OtpCode, OtpType } from '../entities/otp-code';
+import { Environment } from '@core/config/env.schema';
 
 const OTP_RULES = {
   TTL_MS: 5 * 60 * 1000,
@@ -64,8 +65,11 @@ export class OtpService {
       }),
     );
 
+    const codeForLog =
+      process.env.NODE_ENV === Environment.PRODUCTION ? '******' : code;
+
     this.logger.log(
-      `[OTP Service] OTP sent to [${cleanIdentifier}] (purpose: ${type}): ${code} (expires at: ${expiresAt.toLocaleTimeString()})`,
+      `[OTP Service] OTP sent to [${cleanIdentifier}] (purpose: ${type}): ${codeForLog} (expires at: ${expiresAt.toLocaleTimeString()})`,
     );
 
     return { expiresAt, code };
