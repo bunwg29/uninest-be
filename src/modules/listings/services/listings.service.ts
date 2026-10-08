@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
   DataSource,
@@ -16,11 +17,15 @@ import {
 import {
   ACTIVE_BOOKING_STATUSES,
   Booking,
+  BOOKING_ACTORS,
+  BOOKING_EVENTS,
   BookingEvent,
   BookingStatus,
+  type BookingStatusChangedPayload,
   findActiveHolds,
   type ListingHoldInfo,
 } from '@modules/booking';
+import { LISTING_EVENTS } from '../constants';
 import { UserRoleType } from '@common/constants';
 import { R2StorageService } from '@core/storage';
 import { Conversation } from '@modules/chat/entities';
@@ -65,6 +70,7 @@ export class ListingsService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly storageService: R2StorageService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async createListing(userId: string, dto: CreateListingDto): Promise<Listing> {
@@ -571,6 +577,10 @@ export class ListingsService {
     listing.status = status;
     const updatedListing = await this.listingRepository.save(listing);
 
+    this.eventEmitter.emit(LISTING_EVENTS.AVAILABILITY_CHANGED, {
+      listingId: id,
+    });
+
     return this.toLandlordListing(updatedListing);
   }
 
@@ -601,38 +611,58 @@ export class ListingsService {
       throw new ConflictException('Tin này chưa được đánh dấu là đã cho thuê');
     }
 
-    await this.dataSource.transaction(async (manager) => {
-      listing.status = rented ? ListingStatus.RENTED : ListingStatus.ACTIVE;
-      await manager.save(listing);
+    const expiredBookings = await this.dataSource.transaction(
+      async (manager) => {
+        listing.status = rented ? ListingStatus.RENTED : ListingStatus.ACTIVE;
+        await manager.save(listing);
 
-      if (!rented) return;
+        if (!rented) return [];
 
-      const openBookings = await manager.find(Booking, {
-        select: { id: true },
-        where: {
-          listingId: id,
-          status: In([BookingStatus.PENDING, BookingStatus.CONFIRMED]),
-        },
-      });
+        const openBookings = await manager.find(Booking, {
+          select: { id: true, userId: true, status: true },
+          where: {
+            listingId: id,
+            status: In([BookingStatus.PENDING, BookingStatus.CONFIRMED]),
+          },
+        });
 
-      if (openBookings.length === 0) return;
+        if (openBookings.length === 0) return [];
 
-      const now = new Date();
+        const now = new Date();
 
-      await manager.update(
-        Booking,
-        { id: In(openBookings.map((booking) => booking.id)) },
-        { status: BookingStatus.EXPIRED, expiredAt: now, expiresAt: null },
-      );
-      await manager.insert(
-        BookingEvent,
-        openBookings.map((booking) => ({
-          bookingId: booking.id,
-          eventType: BookingStatus.EXPIRED,
-          actor: 'system',
-          metadata: { reason: 'Phòng đã được cho thuê' },
-        })),
-      );
+        await manager.update(
+          Booking,
+          { id: In(openBookings.map((booking) => booking.id)) },
+          { status: BookingStatus.EXPIRED, expiredAt: now, expiresAt: null },
+        );
+        await manager.insert(
+          BookingEvent,
+          openBookings.map((booking) => ({
+            bookingId: booking.id,
+            eventType: BookingStatus.EXPIRED,
+            actor: 'system',
+            metadata: { reason: 'Phòng đã được cho thuê' },
+          })),
+        );
+
+        return openBookings;
+      },
+    );
+
+    expiredBookings.forEach((booking) =>
+      this.eventEmitter.emit(BOOKING_EVENTS.STATUS_CHANGED, {
+        bookingId: booking.id,
+        listingId: id,
+        studentId: booking.userId,
+        landlordId: userId,
+        from: booking.status,
+        to: BookingStatus.EXPIRED,
+        actor: BOOKING_ACTORS.SYSTEM,
+        reason: 'Phòng đã được cho thuê',
+      } satisfies BookingStatusChangedPayload),
+    );
+    this.eventEmitter.emit(LISTING_EVENTS.AVAILABILITY_CHANGED, {
+      listingId: id,
     });
 
     return this.toLandlordListing(listing);

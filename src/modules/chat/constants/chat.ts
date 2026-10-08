@@ -21,6 +21,8 @@ export const CHAT_SOCKET_EVENTS = {
   MESSAGE_RECALLED: 'message.recalled',
   MESSAGES_READ: 'conversation.read',
   CONVERSATION_DELETED: 'conversation.deleted',
+  BOOKING_UPDATED: 'booking.updated',
+  LISTING_AVAILABILITY_CHANGED: 'listing.availability_changed',
 } as const;
 
 export const CHAT_SOCKET_NAMESPACE = 'chat';

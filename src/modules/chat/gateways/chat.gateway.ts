@@ -15,6 +15,15 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import type { Server, Socket } from 'socket.io';
+import {
+  BOOKING_EVENTS,
+  type BookingStatusChangedPayload,
+} from '@modules/booking/constants';
+import { BookingStatus } from '@modules/booking/entities/booking-status';
+import {
+  LISTING_EVENTS,
+  type ListingAvailabilityChangedPayload,
+} from '@modules/listings/constants';
 import { UsersService } from '@modules/users/users.service';
 import {
   CHAT_EVENTS,
@@ -187,6 +196,37 @@ export class ChatGateway
       CHAT_SOCKET_EVENTS.MESSAGES_READ,
       payload,
     );
+  }
+
+  @OnEvent(BOOKING_EVENTS.CREATED)
+  @OnEvent(BOOKING_EVENTS.STATUS_CHANGED)
+  broadcastBookingUpdated(event: BookingStatusChangedPayload): void {
+    this.emitToParticipants(
+      [event.studentId, event.landlordId],
+      CHAT_SOCKET_EVENTS.BOOKING_UPDATED,
+      {
+        bookingId: event.bookingId,
+        listingId: event.listingId,
+        from: event.from,
+        to: event.to,
+        actor: event.actor,
+      },
+    );
+
+    const affectsAvailability =
+      event.from === BookingStatus.HOLDING ||
+      event.to === BookingStatus.HOLDING;
+
+    if (affectsAvailability) {
+      this.broadcastListingAvailability({ listingId: event.listingId });
+    }
+  }
+
+  @OnEvent(LISTING_EVENTS.AVAILABILITY_CHANGED)
+  broadcastListingAvailability(event: ListingAvailabilityChangedPayload): void {
+    this.server.emit(CHAT_SOCKET_EVENTS.LISTING_AVAILABILITY_CHANGED, {
+      listingId: event.listingId,
+    });
   }
 
   private emitToParticipants(
