@@ -25,6 +25,7 @@ import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import {
   CreateListingDto,
   LandlordListingsQueryDto,
+  ListingIdsQueryDto,
   ReportListingDto,
   UpdateListingStatusDto,
 } from '../dtos';
@@ -73,6 +74,23 @@ export class ListingsController {
     @Body() dto: CreateListingDto,
   ) {
     return this.listingsService.createListing(userId, dto);
+  }
+
+  @Get('batch')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRoleType.STUDENT, UserRoleType.LANDLORD, UserRoleType.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Lấy chi tiết nhiều tin đăng trong một lần (tối đa 20)',
+    description:
+      'Bỏ qua tin không tồn tại hoặc không còn hiển thị; giữ nguyên thứ tự mã truyền vào',
+  })
+  async getBatch(
+    @CurrentUser('userId') userId: string,
+    @CurrentUser('roleId') roleId: UserRoleType,
+    @Query() query: ListingIdsQueryDto,
+  ) {
+    return this.listingsService.getListingsByIds(userId, roleId, query.ids);
   }
 
   @Get('mine')

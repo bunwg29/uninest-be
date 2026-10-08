@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreateListingDto } from '../src/modules/listings/dtos/create-listing.dto';
+import { ListingIdsQueryDto } from '../src/modules/listings/dtos/listing-ids-query.dto';
 import { ChangePasswordDto } from '../src/modules/auth/dtos/change-password.dto';
 import { ResetPasswordDto } from '../src/modules/auth/dtos/reset-password.dto';
 
@@ -98,5 +99,27 @@ describe('Quy tắc mật khẩu mới', () => {
     });
 
     expect(errors.includes('newPassword')).toBe(!isValid);
+  });
+});
+
+describe('ListingIdsQueryDto', () => {
+  const id = '6f1c2b8e-4d3a-4f5b-9c1d-2e3f4a5b6c7d';
+
+  it('tách chuỗi mã phân tách bằng dấu phẩy', async () => {
+    const dto = plainToInstance(ListingIdsQueryDto, { ids: `${id}, ${id}` });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.ids).toEqual([id, id]);
+  });
+
+  it('từ chối mã sai định dạng và danh sách rỗng', async () => {
+    expect(await errorsOf(ListingIdsQueryDto, { ids: 'abc' })).toContain('ids');
+    expect(await errorsOf(ListingIdsQueryDto, { ids: '' })).toContain('ids');
+  });
+
+  it('từ chối quá 20 mã', async () => {
+    const ids = Array.from({ length: 21 }, () => id).join(',');
+
+    expect(await errorsOf(ListingIdsQueryDto, { ids })).toContain('ids');
   });
 });

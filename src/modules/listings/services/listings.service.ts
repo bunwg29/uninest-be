@@ -837,8 +837,64 @@ export class ListingsService {
     });
   }
 
+  async getListingsByIds(userId: string, roleId: UserRoleType, ids: string[]) {
+    const uniqueIds = [...new Set(ids)];
+    const query = this.createDetailBaseQuery().where(
+      'listing.id IN (:...ids)',
+      {
+        ids: uniqueIds,
+      },
+    );
+
+    if (roleId !== UserRoleType.ADMIN) {
+      query.andWhere(
+        '(listing.status = :activeStatus OR listing.ownerId = :userId)',
+        {
+          activeStatus: ListingStatus.ACTIVE,
+          userId,
+        },
+      );
+    }
+
+    const [listings, favorites, holds] = await Promise.all([
+      query.getMany(),
+      this.favoriteRepository.find({
+        where: { userId, listingId: In(uniqueIds) },
+        select: { listingId: true },
+      }),
+      findActiveHolds(this.dataSource, uniqueIds),
+    ]);
+    const favoriteIds = new Set(favorites.map((item) => item.listingId));
+    const listingsById = new Map(
+      listings.map((listing) => [listing.id, listing]),
+    );
+
+    return uniqueIds.flatMap((id) => {
+      const listing = listingsById.get(id);
+
+      return listing
+        ? [
+            this.toListingDetail(
+              listing,
+              favoriteIds.has(listing.id),
+              holds.get(listing.id),
+              listing.ownerId === userId || roleId === UserRoleType.ADMIN,
+            ),
+          ]
+        : [];
+    });
+  }
+
   private createDetailQuery(id: string, withDeleted = false) {
-    const query = this.listingRepository
+    const query = this.createDetailBaseQuery().where('listing.id = :id', {
+      id,
+    });
+
+    return withDeleted ? query.withDeleted() : query;
+  }
+
+  private createDetailBaseQuery() {
+    return this.listingRepository
       .createQueryBuilder('listing')
       .leftJoinAndSelect('listing.images', 'image')
       .leftJoinAndSelect('listing.listingAmenities', 'listingAmenity')
@@ -853,12 +909,9 @@ export class ListingsService {
         'owner.bio',
         'owner.isVerified',
       ])
-      .where('listing.id = :id', { id })
       .orderBy('image.sortOrder', 'ASC')
       .addOrderBy('amenity.group', 'ASC')
       .addOrderBy('amenity.id', 'ASC');
-
-    return withDeleted ? query.withDeleted() : query;
   }
 
   private async findMyActiveBooking(userId: string, listingId: string) {
