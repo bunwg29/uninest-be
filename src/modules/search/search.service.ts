@@ -16,7 +16,7 @@ export interface NormalizedSearchQuery {
   roomTypes: SearchRoomType[];
   amenities: number[];
   ownerId?: string;
-  universityCode?: string;
+  universityCodes: string[];
   latitude?: number;
   longitude?: number;
   radiusKm?: number;
@@ -76,7 +76,7 @@ export const normalizeSearchQuery = (
     roomTypes: query.roomTypes ?? [],
     amenities: query.amenities ?? [],
     ownerId: query.ownerId,
-    universityCode: query.universityCode,
+    universityCodes: query.universityCodes ?? [],
     latitude: query.latitude,
     longitude: query.longitude,
     radiusKm: hasLatitude

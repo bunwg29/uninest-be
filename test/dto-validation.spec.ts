@@ -3,6 +3,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CreateListingDto } from '../src/modules/listings/dtos/create-listing.dto';
 import { ListingIdsQueryDto } from '../src/modules/listings/dtos/listing-ids-query.dto';
+import { SearchListingsQueryDto } from '../src/modules/search/dto/search-listings-query.dto';
 import { ChangePasswordDto } from '../src/modules/auth/dtos/change-password.dto';
 import { ResetPasswordDto } from '../src/modules/auth/dtos/reset-password.dto';
 
@@ -121,5 +122,24 @@ describe('ListingIdsQueryDto', () => {
     const ids = Array.from({ length: 21 }, () => id).join(',');
 
     expect(await errorsOf(ListingIdsQueryDto, { ids })).toContain('ids');
+  });
+});
+
+describe('Lọc tìm kiếm theo trường', () => {
+  it('nhận nhiều mã trường, chuẩn hoá chữ hoa và bỏ trùng', async () => {
+    const dto = plainToInstance(SearchListingsQueryDto, {
+      universityCodes: 'ddk, VKU,ddk',
+    });
+
+    expect(await validate(dto)).toHaveLength(0);
+    expect(dto.universityCodes).toEqual(['DDK', 'VKU']);
+  });
+
+  it('từ chối lọc quá 5 trường', async () => {
+    expect(
+      await errorsOf(SearchListingsQueryDto, {
+        universityCodes: 'A1,A2,A3,A4,A5,A6',
+      }),
+    ).toContain('universityCodes');
   });
 });

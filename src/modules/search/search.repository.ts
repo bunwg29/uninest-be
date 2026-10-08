@@ -208,10 +208,10 @@ export class ListingsSearchRepository {
       })
       .andWhere('listing.deletedAt IS NULL');
 
-    if (query.universityCode) {
+    if (query.universityCodes.length > 0) {
       listingsQuery.andWhere(
-        'EXISTS (SELECT 1 FROM listing_universities lu WHERE lu.listing_id = listing.id AND lu.university_code = :universityCode)',
-        { universityCode: query.universityCode },
+        'EXISTS (SELECT 1 FROM listing_universities lu WHERE lu.listing_id = listing.id AND lu.university_code IN (:...universityCodes))',
+        { universityCodes: query.universityCodes },
       );
     }
 

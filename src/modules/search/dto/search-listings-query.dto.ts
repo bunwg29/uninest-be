@@ -167,16 +167,21 @@ export class SearchListingsQueryDto {
   radius?: number;
 
   @ApiPropertyOptional({
-    description: 'Chỉ lấy tin đăng gần một trường đại học (mã trường)',
-    example: 'DDK',
+    description:
+      'Chỉ lấy tin đăng gần ít nhất một trong các trường (mã trường, phân tách bằng dấu phẩy)',
+    example: 'DDK,VKU',
   })
   @IsOptional()
   @Transform(({ value }: { value: unknown }) =>
-    typeof value === 'string' ? value.trim().toUpperCase() : value,
+    normalizeCsvValues(value)?.map((code) => code.toUpperCase()),
   )
-  @IsString({ message: 'Mã trường không hợp lệ' })
-  @MaxLength(20, { message: 'Mã trường không hợp lệ' })
-  universityCode?: string;
+  @IsArray({ message: 'Danh sách trường không hợp lệ' })
+  @ArrayMaxSize(SEARCH_DEFAULTS.MAX_UNIVERSITY_FILTERS, {
+    message: `Chỉ lọc tối đa ${SEARCH_DEFAULTS.MAX_UNIVERSITY_FILTERS} trường`,
+  })
+  @IsString({ each: true, message: 'Mã trường không hợp lệ' })
+  @MaxLength(20, { each: true, message: 'Mã trường không hợp lệ' })
+  universityCodes?: string[];
 
   @ApiPropertyOptional({
     description: 'Chỉ lấy các tin đăng của một chủ trọ',
