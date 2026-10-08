@@ -19,6 +19,12 @@ export class LandlordPublicProfileDto {
   @ApiProperty({ nullable: true, type: String })
   bio!: string | null;
 
+  @ApiProperty({
+    type: [Object],
+    description: 'Các trường đại học gần trọ mà chủ trọ đã chọn',
+  })
+  universities!: { code: string; name: string }[];
+
   @ApiProperty({ description: 'Số tin đang hiển thị' })
   activeListingCount!: number;
 

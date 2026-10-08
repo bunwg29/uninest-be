@@ -7,8 +7,18 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { ACTIVE_BOOKING_STATUSES, Booking } from '@modules/booking';
 import { Favorite, ListingStatus } from '@modules/listings/entities';
+import { UserRoleType } from '@common/constants';
 import { LocationsService } from '../locations/locations.service';
+import {
+  UniversitiesService,
+  type UniversitySummary,
+} from '../universities/universities.service';
 import { User, RolePermission } from './entities';
+
+const UNIVERSITY_LIMITS: Partial<Record<UserRoleType, number>> = {
+  [UserRoleType.STUDENT]: 1,
+  [UserRoleType.LANDLORD]: 3,
+};
 
 type AddressUpdate = Partial<
   Pick<User, 'provinceCode' | 'wardCode' | 'streetAddress' | 'fullAddress'>
@@ -24,6 +34,7 @@ export class UsersService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly locationsService: LocationsService,
+    private readonly universitiesService: UniversitiesService,
   ) {}
 
   async getProfileStats(userId: string) {
@@ -50,12 +61,20 @@ export class UsersService {
     userId: string,
     dto: {
       identityNumber: string;
+      universityCodes?: string[];
       provinceCode?: string;
       wardCode?: string;
       streetAddress?: string;
     },
   ): Promise<User> {
     const address = await this.resolveAddress(dto);
+
+    if (dto.universityCodes) {
+      await this.updateUniversities(
+        { id: userId, roleId: UserRoleType.LANDLORD },
+        dto.universityCodes,
+      );
+    }
 
     await this.userRepository.update(userId, {
       identityNumber: dto.identityNumber,
@@ -103,6 +122,33 @@ export class UsersService {
         streetAddress,
       ),
     };
+  }
+
+  getUniversities(userId: string): Promise<UniversitySummary[]> {
+    return this.universitiesService.getUserUniversities(userId);
+  }
+
+  async updateUniversities(
+    user: Pick<User, 'id' | 'roleId'>,
+    codes: string[],
+  ): Promise<UniversitySummary[]> {
+    const maxCount = UNIVERSITY_LIMITS[user.roleId] ?? 0;
+
+    if (maxCount === 0 && codes.length > 0) {
+      throw new BadRequestException('Tài khoản này không chọn trường đại học');
+    }
+
+    const universities = await this.universitiesService.replaceUserUniversities(
+      user.id,
+      codes,
+      maxCount,
+    );
+
+    await this.userRepository.update(user.id, {
+      school: universities[0]?.name ?? null,
+    });
+
+    return universities;
   }
 
   async findById(id: string): Promise<User | null> {

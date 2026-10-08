@@ -8,6 +8,7 @@ import { seedAmenities } from './amenities.seeder';
 import { seedRooms } from './rooms.seeder';
 import { seedChatDemo } from './chat-demo.seeder';
 import { seedDaNang } from './danang.seeder';
+import { seedUniversities } from './universities.seeder';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env'), quiet: true });
 
@@ -30,6 +31,7 @@ async function seedRoomsWithDependencies(
   await seedRbac(dataSource);
   await seedAmenities(dataSource);
   await seedLocations(dataSource);
+  await seedUniversities(dataSource);
   await seedRooms(dataSource);
 }
 
@@ -54,6 +56,12 @@ const SEEDERS: Record<
     description:
       'Nạp 34 tỉnh/thành phố và 3.321 phường/xã từ dữ liệu đơn vị hành chính Việt Nam',
     fn: seedLocations,
+  },
+  universities: {
+    name: 'Seeder trường đại học',
+    description:
+      'Nạp 256 trường đại học, học viện trên cả nước (theo mã tuyển sinh)',
+    fn: seedUniversities,
   },
   chat: {
     name: 'Seeder dữ liệu thử chat',

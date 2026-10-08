@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsEmail,
   IsInt,
@@ -25,11 +26,17 @@ export class UpdateProfileDto {
   @MaxLength(50, { message: 'Họ và tên tối đa 50 ký tự' })
   name?: string;
 
-  @ApiPropertyOptional({ example: 'ĐH Bách khoa - ĐH Đà Nẵng' })
+  @ApiPropertyOptional({
+    example: ['DDK'],
+    type: [String],
+    description: 'Mã trường đại học: sinh viên tối đa 1, chủ trọ tối đa 3',
+  })
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  school?: string;
+  @IsArray({ message: 'Danh sách trường phải là mảng' })
+  @ArrayMaxSize(3, { message: 'Chỉ chọn được tối đa 3 trường đại học' })
+  @IsString({ each: true, message: 'Mã trường không hợp lệ' })
+  @MaxLength(20, { each: true, message: 'Mã trường không hợp lệ' })
+  universityCodes?: string[];
 
   @ApiPropertyOptional({ example: 'Sinh viên năm 3 Bách khoa' })
   @IsOptional()
@@ -129,6 +136,10 @@ export class ProfileResponseDto {
   @ApiProperty() phoneVerified!: boolean;
   @ApiPropertyOptional() email!: string | null;
   @ApiPropertyOptional() school!: string | null;
+  @ApiProperty({ type: [Object] }) universities!: {
+    code: string;
+    name: string;
+  }[];
   @ApiPropertyOptional() bio!: string | null;
   @ApiPropertyOptional() provinceCode!: string | null;
   @ApiPropertyOptional() provinceName!: string | null;
@@ -149,6 +160,18 @@ export class ProfileResponseDto {
 }
 
 export class LandlordVerificationDto {
+  @ApiPropertyOptional({
+    example: ['DDK'],
+    type: [String],
+    description: 'Mã trường đại học: sinh viên tối đa 1, chủ trọ tối đa 3',
+  })
+  @IsOptional()
+  @IsArray({ message: 'Danh sách trường phải là mảng' })
+  @ArrayMaxSize(3, { message: 'Chỉ chọn được tối đa 3 trường đại học' })
+  @IsString({ each: true, message: 'Mã trường không hợp lệ' })
+  @MaxLength(20, { each: true, message: 'Mã trường không hợp lệ' })
+  universityCodes?: string[];
+
   @ApiProperty({ example: '048200012345', description: 'Số CCCD/CMND' })
   @Matches(/^(\d{9}|\d{12})$/, {
     message: 'Số CCCD/CMND phải gồm 9 hoặc 12 chữ số',

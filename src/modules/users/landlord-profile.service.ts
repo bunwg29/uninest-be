@@ -6,6 +6,7 @@ import { R2StorageService } from '@core/storage';
 import { Booking } from '@modules/booking/entities';
 import { Conversation } from '@modules/chat/entities';
 import { Listing, ListingStatus } from '@modules/listings/entities';
+import { UniversitiesService } from '../universities/universities.service';
 import { User } from './entities/user';
 import { LandlordPublicProfileDto } from './dtos';
 
@@ -15,6 +16,7 @@ export class LandlordProfileService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly storageService: R2StorageService,
+    private readonly universitiesService: UniversitiesService,
   ) {}
 
   async getPublicProfile(
@@ -29,12 +31,13 @@ export class LandlordProfileService {
       throw new NotFoundException('Không tìm thấy chủ trọ');
     }
 
-    const [activeListingCount, canSeePhone] = await Promise.all([
+    const [activeListingCount, canSeePhone, universities] = await Promise.all([
       this.dataSource.getRepository(Listing).countBy({
         ownerId: landlordId,
         status: ListingStatus.ACTIVE,
       }),
       this.canSeePhone(viewerId, landlordId),
+      this.universitiesService.getUserUniversities(landlordId),
     ]);
 
     return {
@@ -46,6 +49,7 @@ export class LandlordProfileService {
       isVerified: landlord.landlordVerifiedAt !== null,
       joinedAt: landlord.createdAt,
       bio: landlord.bio,
+      universities,
       activeListingCount,
       phone: canSeePhone ? landlord.phone : null,
       averageRating: null,

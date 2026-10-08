@@ -58,16 +58,14 @@ export class UsersController {
       throw new BadRequestException('Không tìm thấy hồ sơ cá nhân');
     }
 
-    return this.mapProfile(
-      user,
-      await this.usersService.getProfileStats(userId),
-    );
+    return this.buildProfile(user);
   }
 
   @Patch()
   @ApiOperation({ summary: 'Cập nhật hồ sơ cá nhân' })
   async updateProfile(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('roleId') roleId: UserRoleType,
     @Body() dto: UpdateProfileDto,
   ): Promise<ProfileResponseDto> {
     const address = await this.usersService.resolveAddress(dto);
@@ -75,10 +73,16 @@ export class UsersController {
     await this.usersService.update(userId, {
       ...address,
       fullName: dto.name?.trim(),
-      school: dto.school?.trim(),
       bio: dto.bio?.trim(),
       interestedAreas: dto.interestedAreas,
     });
+
+    if (dto.universityCodes) {
+      await this.usersService.updateUniversities(
+        { id: userId, roleId },
+        dto.universityCodes,
+      );
+    }
 
     const user = await this.usersService.findProfileById(userId);
 
@@ -86,10 +90,7 @@ export class UsersController {
       throw new BadRequestException('Không tìm thấy hồ sơ cá nhân');
     }
 
-    return this.mapProfile(
-      user,
-      await this.usersService.getProfileStats(userId),
-    );
+    return this.buildProfile(user);
   }
 
   @Post('change-password')
@@ -119,10 +120,7 @@ export class UsersController {
       dto,
     );
 
-    return this.mapProfile(
-      user,
-      await this.usersService.getProfileStats(userId),
-    );
+    return this.buildProfile(user);
   }
 
   @Post('avatar/presign')
@@ -297,9 +295,19 @@ export class UsersController {
     return { email: newEmail };
   }
 
+  private async buildProfile(user: User): Promise<ProfileResponseDto> {
+    const [stats, universities] = await Promise.all([
+      this.usersService.getProfileStats(user.id),
+      this.usersService.getUniversities(user.id),
+    ]);
+
+    return this.mapProfile(user, stats, universities);
+  }
+
   private mapProfile(
     user: User,
     stats: ProfileResponseDto['stats'],
+    universities: ProfileResponseDto['universities'],
   ): ProfileResponseDto {
     return {
       id: user.id,
@@ -312,6 +320,7 @@ export class UsersController {
         user.phoneVerified || (user.isVerified && Boolean(user.phone)),
       email: user.email,
       school: user.school,
+      universities,
       bio: user.bio,
       provinceCode: user.provinceCode,
       provinceName: user.province?.fullName ?? null,

@@ -8,12 +8,14 @@ import { LandlordProfileController } from './landlord-profile.controller';
 import { LandlordProfileService } from './landlord-profile.service';
 import { AuthModule } from '../auth/auth.module';
 import { LocationsModule } from '../locations/locations.module';
+import { UniversitiesModule } from '../universities/universities.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Role, Permission, RolePermission]),
     forwardRef(() => AuthModule),
     LocationsModule,
+    UniversitiesModule,
   ],
   controllers: [UsersController, LandlordProfileController],
   providers: [UsersService, RolesService, LandlordProfileService],
