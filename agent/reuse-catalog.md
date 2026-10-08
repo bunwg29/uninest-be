@@ -19,8 +19,8 @@
 | Decorator, guard, filter, interceptor, pipe, DTO, tiện ích dùng ≥ 2 module | `src/common/<loại>` |
 | Hạ tầng (DB, config, storage) | `src/core/<loại>` |
 | Migration | `src/core/database/migrations` |
-| Seed | `src/core/database/seeders` |
-| Test | `test/*.spec.ts` (unit), `test/*.e2e-spec.ts` (e2e), hoặc cạnh file như `search-query.spec.ts` |
+| Danh mục cố định (vai trò, tiện ích, địa giới, trường) | `src/core/database/seeders/catalog.seeder.ts` + `seeders/data/*.json` |
+| Dữ liệu mẫu (tài khoản, tin, chat) | `src/core/database/seeders/demo.seeder.ts` |
 
 Module hiện có: `auth`, `users`, `listings`, `search`, `booking`, `chat`, `forum`, `universities`, `locations`, `health`, và khung rỗng chờ làm: `reviews`, `notifications`, `payment`, `ai-chat`, `recommendations`. **Viết tiếp vào khung đã có**, không tạo module trùng nghĩa. Module mới (vd `admin`, `price-comparison`, `premium`) chỉ tạo khi được giao, theo cấu trúc ở `rules.md`.
 
@@ -69,7 +69,7 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 | `ChatGateway` + `CHAT_SOCKET_EVENTS` | `modules/chat/gateways` | Đẩy realtime tới app (phòng `user:<id>`). **Không tạo gateway Socket.IO thứ hai** — thêm sự kiện vào đây |
 | `@Cron(...)` (`@nestjs/schedule`) | vd `booking-expiration.service.ts` | Mọi tác vụ định kỳ (hết hạn, tổng hợp giá, embedding, đối soát, Premium). **Không dùng Redis/BullMQ** (trừ Thông báo) |
 | `findActiveHolds()` | `modules/booking/booking-availability.ts` | Lấy thông tin giữ chỗ của nhiều tin |
-| `isBookingTransitionAllowed()`, `isCancellationReasonRequired()`, `canHoldAfterViewing()` | `modules/booking/services/booking-policy.ts` | Mọi kiểm tra chuyển trạng thái booking |
+| `doTimeRangesOverlap()`, `isCancellationReasonRequired()`, `canHoldAfterViewing()` | `modules/booking/services/booking-policy.ts` | Kiểm tra trùng giờ, bắt buộc lý do huỷ, điều kiện giữ chỗ |
 | `BOOKING_DEFAULTS`, `ACTIVE_BOOKING_STATUSES` | `modules/booking/constants` | Thời hạn phản hồi, giữ chỗ, huỷ miễn lý do |
 | `ListingStatus`, `BookingStatus`, enum forum | `entities/*-status.ts`, `forum-enums.ts` | Trạng thái — **không viết chuỗi `'active'` trần** |
 | `SEARCH_DEFAULTS`, `SEARCH_SORT_VALUES`, `SEARCH_ROOM_TYPE_VALUES` | `modules/search/search.constants.ts` | Loại phòng, sắp xếp, giới hạn tìm kiếm |
@@ -92,7 +92,6 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 | Truy vấn PostGIS + query builder có tham số | `modules/search/search.repository.ts` |
 | Gateway Socket.IO xác thực JWT | `modules/chat/gateways/chat.gateway.ts` |
 | Kiểm duyệt nội dung bằng interceptor | `modules/forum/interceptors/content-moderation.ts` |
-| Unit test service | `test/booking-policy.spec.ts`, `test/forum-moderation.spec.ts` |
 
 ---
 

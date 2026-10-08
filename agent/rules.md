@@ -77,7 +77,7 @@ export class CreateXxxDto {
 
 ### R7. Trạng thái và nghiệp vụ
 - Trạng thái dùng **enum**, không chuỗi trần.
-- Chuyển trạng thái phải qua hàm kiểm tra hợp lệ (như `isBookingTransitionAllowed`) và ghi lịch sử nếu nghiệp vụ yêu cầu.
+- Chuyển trạng thái bằng cập nhật có điều kiện (`WHERE status = <trạng thái hợp lệ trước đó>`), đúng sơ đồ trạng thái trong `business-logic.md`, và ghi lịch sử nếu nghiệp vụ yêu cầu.
 - Con số nghiệp vụ (thời hạn, ngưỡng) là hằng số `UPPER_SNAKE_CASE` trong `constants/`, hoặc biến môi trường có giá trị mặc định nếu cần cấu hình.
 
 ### R8. Tác vụ nền và realtime
@@ -96,10 +96,8 @@ export class CreateXxxDto {
 
 ### R11. Không phá cái đang chạy
 - Không đổi đường dẫn, tên trường response, kiểu dữ liệu của API đang được app dùng. Cần đổi → giữ alias cũ (như `/auth/refresh-token`) và báo người dùng.
-- Không đổi nghiệp vụ khi không được giao. Sửa service dùng chung → chạy lại test liên quan.
+- Không đổi nghiệp vụ khi không được giao. Sửa service dùng chung → gọi thử lại các endpoint đang dùng nó.
 
-### R12. Test
-Nghiệp vụ cốt lõi (xác thực, đặt lịch, thanh toán, quyền truy cập) phải có unit test: luồng đúng, luồng sai, từ chối trái quyền. Tranh chấp đồng thời có test riêng.
 
 ---
 

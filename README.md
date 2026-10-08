@@ -7,7 +7,7 @@ NestJS (TypeScript) + PostgreSQL (PostGIS, pgvector, unaccent, pg_trgm) + Socket
 1. Sao chép `.env.example` thành `.env`, cập nhật PostgreSQL, JWT, R2.
 2. Tạo database PostgreSQL (tên theo `DB_DATABASE`, ví dụ `uninest`).
 3. `npm install`
-4. Nạp dữ liệu nền: `npm run seed -- rooms` (phân quyền, tiện ích, địa giới, trường đại học, tài khoản mẫu, 55 phòng). Chạy `npm run seed` không tham số để xem danh sách seeder.
+4. Nạp dữ liệu: `npm run seed` (xem mục Seeder).
 5. `npm run start:dev`
 
 API mặc định tại `http://localhost:3000/api/v1` (đổi bằng `PORT`), Swagger tại `/api/docs`. Tài khoản mẫu dùng mật khẩu `UniNest@123`.
@@ -41,13 +41,16 @@ Sau khi đổi entity, chạy `migration:generate` để tạo migration mới t
 
 | Lệnh | Nội dung |
 |---|---|
-| `npm run seed -- rbac` | Vai trò và quyền |
-| `npm run seed -- amenities` | Danh mục tiện ích |
-| `npm run seed -- locations` | 34 tỉnh/thành, 3.321 phường/xã |
-| `npm run seed -- universities` | 256 trường đại học, học viện (`seeders/data/universities.json`) |
-| `npm run seed -- rooms` | Toàn bộ dữ liệu nền và 55 phòng |
-| `npm run seed -- danang [--bulk[=N]]` | Tin đăng quanh các trường ở Đà Nẵng, chế độ bulk mặc định 5.000 tin |
-| `npm run seed -- chat` | Dữ liệu thử nhắn tin |
+| `npm run seed` | Danh mục + dữ liệu mẫu Đà Nẵng (tài khoản, 64 tin đăng có gắn trường, 1 hội thoại chat) |
+| `npm run seed -- catalog` | Chỉ danh mục: vai trò & quyền, tiện ích, 34 tỉnh/thành + 3.321 phường/xã, 256 trường đại học |
+| `npm run seed -- --bulk[=N]` | Như `npm run seed` và sinh thêm N tin (mặc định 5.000) để thử hiệu năng |
+
+- `catalog.seeder.ts`: dữ liệu danh mục, đọc từ `seeders/data/*.json`.
+- `demo.seeder.ts`: tài khoản mẫu, tin đăng quanh ĐH Bách khoa, Sư phạm, Kinh tế, VKU.
+- Chạy lại nhiều lần không tạo trùng. Không chạy được khi `NODE_ENV=production`.
+- Seeder tự đồng bộ schema (`DB_SYNCHRONIZE=true`) hoặc chạy migration (`false`) trước khi nạp.
+
+Tài khoản mẫu (mật khẩu `UniNest@123`): sinh viên `0900000001`, `0900000211`, `0900000212`; chủ trọ đã xác minh `0900000201`→`0900000204`; chủ trọ chờ xác minh `0900000205`; admin `0900000299`.
 
 ## Quy tắc đặt lịch
 
@@ -71,9 +74,6 @@ Sau khi đổi entity, chạy `migration:generate` để tạo migration mới t
 ## Kiểm tra chất lượng
 
 ```bash
-npm run test
-npm run test:cov
-npm run test:e2e
 npm run typecheck
 npm run lint
 npm run format:check

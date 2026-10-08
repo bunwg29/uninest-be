@@ -444,9 +444,10 @@ Mọi màn có tải dữ liệu phải có đủ **3 trạng thái: đang tải
 
 ## 7. Dữ liệu mẫu
 
-- `npm run seed` (backend) nạp ≥ 50 tin quanh 4 trường ở Đà Nẵng, đủ các trạng thái, mỗi phường chính ≥ 5 tin, danh mục trường đại học, tỉnh/phường. Chạy lại không tạo trùng. Có chế độ bulk ≥ 5.000 tin cho kiểm thử hiệu năng.
+- `npm run seed` (backend) nạp danh mục (vai trò, tiện ích, tỉnh/phường, trường đại học) và dữ liệu mẫu: 64 tin quanh ĐH Bách khoa, Sư phạm, Kinh tế, VKU ở Đà Nẵng, đủ các trạng thái, mỗi phường chính ≥ 5 tin, có gắn trường, kèm 1 hội thoại chat mẫu. Chạy lại không tạo trùng.
+- `npm run seed -- catalog`: chỉ danh mục. `npm run seed -- --bulk[=N]`: thêm N tin (mặc định 5.000) cho kiểm thử hiệu năng.
 - Mật khẩu mặc định của mọi tài khoản seed: `UniNest@123`.
   - Sinh viên: `0900000001`, `0900000211`, `0900000212`.
-  - Chủ trọ đã xác minh: `0900000101`→`0900000105`, `0900000201`→`0900000204`. Chủ trọ **chờ xác minh**: `0900000205`.
+  - Chủ trọ đã xác minh: `0900000201`→`0900000204`. Chủ trọ **chờ xác minh**: `0900000205`.
   - Admin: `0900000299`.
-- **Chỉ chạy seed ở môi trường dev/test.**
+- **Chỉ chạy seed ở môi trường dev** (bị chặn khi `NODE_ENV=production`).

@@ -25,9 +25,9 @@
 
 ## Bước 3 — Viết code
 
-Thứ tự gợi ý: entity → migration → DTO → service (nghiệp vụ + kiểm tra quyền) → controller (guard, role, Swagger) → sự kiện/cron/socket nếu cần → test.
+Thứ tự gợi ý: entity → migration → DTO → service (nghiệp vụ + kiểm tra quyền) → controller (guard, role, Swagger) → sự kiện/cron/socket nếu cần.
 
-- Tuân thủ toàn bộ `rules.md` (R1–R12).
+- Tuân thủ toàn bộ `rules.md` (R1–R11).
 - Làm **đúng phạm vi được giao**. Thấy lỗi khác → ghi lại để báo, không tự sửa lan man.
 - Thêm thứ dùng chung → cập nhật `reuse-catalog.md`.
 - Thêm/đổi endpoint, trạng thái, con số đã được duyệt → cập nhật `business-logic.md` và **copy nguyên file sang `../uninest-app/agent/`**.
@@ -40,7 +40,6 @@ npm run lint:fix
 npm run format
 npm run typecheck
 npm run lint
-npm test
 ```
 Đổi entity → thêm:
 ```bash
@@ -63,7 +62,6 @@ Gọi thử endpoint (Swagger `/api/docs` hoặc curl): đúng envelope, đúng 
 - [ ] Không trả dữ liệu nhạy cảm
 - [ ] Log tiếng Anh, message client tiếng Việt
 - [ ] Không comment, không `any`, không `console.log`, không code chết
-- [ ] Có test cho nghiệp vụ cốt lõi
 
 ## Bước 6 — Commit (chỉ khi người dùng cho phép)
 

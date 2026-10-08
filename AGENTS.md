@@ -38,7 +38,6 @@ npm run lint:fix
 npm run format
 npm run typecheck
 npm run lint
-npm test
 ```
 
 ## Chạy dự án
@@ -47,7 +46,7 @@ npm test
 npm install
 cp .env.example .env        # điền DB, JWT, R2
 npm run start:dev           # http://localhost:<PORT>/api/v1, Swagger ở /api/docs
-npm run seed                # dữ liệu mẫu (chỉ dev/test)
+npm run seed                # danh mục + dữ liệu mẫu Đà Nẵng (chỉ dev)
 ```
 
 - `DB_SYNCHRONIZE=true`: TypeORM tự đồng bộ schema (chỉ dev nhanh). `false`: migration tự chạy khi khởi động; chạy tay bằng `npm run migration:run`.

@@ -63,7 +63,6 @@ git checkout -b feat/spN-<task>
 | `fix` | Sửa lỗi |
 | `refactor` | Đổi cấu trúc code, **không** đổi hành vi |
 | `perf` | Tối ưu hiệu năng |
-| `test` | Thêm/sửa test |
 | `docs` | Tài liệu, README, thư mục `agent/` |
 | `style` | Chỉ format, không đổi logic |
 | `chore` | Cấu hình, script, phụ thuộc |
@@ -118,12 +117,12 @@ feat(booking): thêm giữ chỗ (TSK-S2-05)  ← dòng đầu phải tiếng An
 
 ## 4. Tuyệt đối không
 
-- Không commit `.env`, khoá bí mật, token, file build (`dist/`, `.expo/`), `node_modules`, file tạm, ảnh chụp màn hình test.
+- Không commit `.env`, khoá bí mật, token, file build (`dist/`, `.expo/`), `node_modules`, file tạm, ảnh chụp màn hình.
 - Không thêm dòng ghi công AI vào commit hoặc PR (`Co-Authored-By: <AI>`, `Generated with ...`, `🤖`).
 - Không commit thẳng vào `main` hoặc `sprint-0N` — luôn qua nhánh task + Pull Request.
 - Không `git push --force` lên nhánh dùng chung. Không `--amend`/rebase commit đã push.
 - Không `--no-verify` để bỏ qua hook.
-- Không commit khi lint/typecheck/test còn lỗi.
+- Không commit khi lint/typecheck còn lỗi.
 - Không xoá hoặc đổi tên nhánh của người khác.
 
 ---
@@ -135,5 +134,5 @@ feat(booking): thêm giữ chỗ (TSK-S2-05)  ← dòng đầu phải tiếng An
 - Checklist trước khi xin review:
   - [ ] Đúng nghiệp vụ trong `agent/business-logic.md`
   - [ ] Không tạo trùng thứ đã có trong `agent/reuse-catalog.md`
-  - [ ] Lint, format, typecheck, test: 0 lỗi
+  - [ ] Lint, format, typecheck: 0 lỗi
   - [ ] Không còn `console.log`, comment, code chết, file thừa
