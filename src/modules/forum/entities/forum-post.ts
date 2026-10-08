@@ -13,8 +13,13 @@ import { User } from '@modules/users/entities';
 import {
   ForumCategory,
   ForumPostStatus,
+  RoommateBedtime,
+  RoommateCooking,
   RoommateGender,
+  RoommatePets,
+  RoommateSmoking,
   RoommateStatus,
+  RoommateTidiness,
 } from './forum-enums';
 
 export type RoommateCriteria = {
@@ -24,6 +29,11 @@ export type RoommateCriteria = {
   moveInDate: string | null;
   minStayMonths: number | null;
   lifestyle: string | null;
+  smoking?: RoommateSmoking | null;
+  tidiness?: RoommateTidiness | null;
+  bedtime?: RoommateBedtime | null;
+  pets?: RoommatePets | null;
+  cooking?: RoommateCooking | null;
   area: string | null;
   provinceCode?: string | null;
   wardCode?: string | null;

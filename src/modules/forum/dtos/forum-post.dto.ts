@@ -23,8 +23,13 @@ import { FORUM_CONSTANTS } from '../constants';
 import {
   ForumCategory,
   ForumPostStatus,
+  RoommateBedtime,
+  RoommateCooking,
   RoommateGender,
+  RoommatePets,
+  RoommateSmoking,
   RoommateStatus,
+  RoommateTidiness,
 } from '../entities';
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -78,6 +83,34 @@ export class RoommateCriteriaDto {
   @IsString({ message: 'Tiêu chí ở ghép phải là chuỗi' })
   @MaxLength(500, { message: 'Tiêu chí ở ghép không được vượt quá 500 ký tự' })
   lifestyle?: string;
+
+  @ApiPropertyOptional({ enum: RoommateSmoking, description: 'Hút thuốc' })
+  @IsOptional()
+  @IsEnum(RoommateSmoking, { message: 'Tiêu chí hút thuốc không hợp lệ' })
+  smoking?: RoommateSmoking;
+
+  @ApiPropertyOptional({
+    enum: RoommateTidiness,
+    description: 'Mức độ gọn gàng',
+  })
+  @IsOptional()
+  @IsEnum(RoommateTidiness, { message: 'Tiêu chí gọn gàng không hợp lệ' })
+  tidiness?: RoommateTidiness;
+
+  @ApiPropertyOptional({ enum: RoommateBedtime, description: 'Giờ đi ngủ' })
+  @IsOptional()
+  @IsEnum(RoommateBedtime, { message: 'Tiêu chí giờ ngủ không hợp lệ' })
+  bedtime?: RoommateBedtime;
+
+  @ApiPropertyOptional({ enum: RoommatePets, description: 'Nuôi thú cưng' })
+  @IsOptional()
+  @IsEnum(RoommatePets, { message: 'Tiêu chí thú cưng không hợp lệ' })
+  pets?: RoommatePets;
+
+  @ApiPropertyOptional({ enum: RoommateCooking, description: 'Nấu ăn' })
+  @IsOptional()
+  @IsEnum(RoommateCooking, { message: 'Tiêu chí nấu ăn không hợp lệ' })
+  cooking?: RoommateCooking;
 
   @ApiPropertyOptional({
     example: 'Kiệt 154 Nguyễn Lương Bằng, P. Hoà Khánh Bắc, Q. Liên Chiểu',
