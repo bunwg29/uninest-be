@@ -87,6 +87,27 @@ export class RoommateCriteriaDto {
   @IsString({ message: 'Khu vực phải là chuỗi' })
   @MaxLength(255, { message: 'Khu vực không được vượt quá 255 ký tự' })
   area?: string;
+
+  @ApiPropertyOptional({ example: '48', description: 'Mã tỉnh/thành phố' })
+  @IsOptional()
+  @IsString({ message: 'Mã tỉnh/thành phố phải là chuỗi' })
+  @MaxLength(20)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '20194', description: 'Mã phường/xã' })
+  @IsOptional()
+  @IsString({ message: 'Mã phường/xã phải là chuỗi' })
+  @MaxLength(20)
+  wardCode?: string;
+
+  @ApiPropertyOptional({ example: 'Kiệt 154 Nguyễn Lương Bằng' })
+  @IsOptional()
+  @Transform(trimString)
+  @IsString({ message: 'Số nhà, tên đường phải là chuỗi' })
+  @MaxLength(255, {
+    message: 'Số nhà, tên đường không được vượt quá 255 ký tự',
+  })
+  streetAddress?: string;
 }
 
 export class CreateForumPostDto {
@@ -210,6 +231,24 @@ export class ForumPostsQueryDto extends PaginationQueryDto {
   @IsString({ message: 'Khu vực phải là chuỗi' })
   @MaxLength(100, { message: 'Khu vực không được vượt quá 100 ký tự' })
   area?: string;
+
+  @ApiPropertyOptional({
+    example: '48',
+    description: 'Lọc theo mã tỉnh/thành phố',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({
+    example: '20194',
+    description: 'Lọc theo mã phường/xã',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  wardCode?: string;
 
   @ApiPropertyOptional({ enum: RoommateStatus })
   @IsOptional()

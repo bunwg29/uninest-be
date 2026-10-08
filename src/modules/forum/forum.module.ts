@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { LocationsModule } from '@modules/locations/locations.module';
 import { AdminForumController } from './controllers/admin-forum.controller';
 import { ForumController } from './controllers/forum.controller';
 import {
@@ -7,6 +8,7 @@ import {
   ForumComment,
   ForumLike,
   ForumPost,
+  ForumPostView,
   ForumReport,
 } from './entities';
 import { ForumContentModerationInterceptor } from './interceptors/content-moderation';
@@ -20,11 +22,13 @@ import { ForumReportsService } from './services/forum-reports.service';
   imports: [
     TypeOrmModule.forFeature([
       ForumPost,
+      ForumPostView,
       ForumComment,
       ForumLike,
       ForumReport,
       ForumBannedKeyword,
     ]),
+    LocationsModule,
   ],
   controllers: [ForumController, AdminForumController],
   providers: [

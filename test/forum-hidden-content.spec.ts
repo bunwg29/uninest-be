@@ -75,6 +75,7 @@ describe('Nội dung diễn đàn đã ẩn', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await expect(service.unlikePost(viewer, 'post-1')).resolves.toEqual({
@@ -92,6 +93,7 @@ describe('Nội dung diễn đàn đã ẩn', () => {
       postRepository,
       {} as never,
       {} as DataSource,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

@@ -180,6 +180,16 @@ export class ForumController {
     return this.commentsService.getComments(viewer, id, query);
   }
 
+  @Get('comments/:id/replies')
+  @ApiOperation({ summary: 'Lấy các phản hồi của một bình luận' })
+  async getReplies(
+    @CurrentUser() viewer: ForumViewer,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.commentsService.getReplies(viewer, id, query);
+  }
+
   @Post('posts/:id/comments')
   @UseInterceptors(ForumContentModerationInterceptor)
   @ApiOperation({ summary: 'Bình luận hoặc trả lời bình luận' })

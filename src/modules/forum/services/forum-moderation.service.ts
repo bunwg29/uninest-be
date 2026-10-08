@@ -118,7 +118,8 @@ export class ForumModerationService implements OnModuleInit {
       content: pickString(record.content),
       'roommate.costNote': pickString(roommate.costNote),
       'roommate.lifestyle': pickString(roommate.lifestyle),
-      'roommate.area': pickString(roommate.area),
+      'roommate.area':
+        pickString(roommate.streetAddress) ?? pickString(roommate.area),
     };
   }
 

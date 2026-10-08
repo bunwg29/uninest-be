@@ -6,9 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, MoreThan, Repository } from 'typeorm';
 import { createPaginatedResult } from '@common/dtos';
 import { R2StorageService } from '@core/storage';
+import { LocationsService } from '@modules/locations/locations.service';
 import {
   CreateForumPostDto,
   ForumPostsQueryDto,
@@ -21,6 +22,7 @@ import {
   ForumLike,
   ForumPost,
   ForumPostStatus,
+  ForumPostView,
   RoommateCriteria,
   RoommateGender,
   RoommateStatus,
@@ -30,6 +32,8 @@ import { ForumPresenterService, ForumViewer } from './forum-presenter.service';
 
 export const escapeLikePattern = (value: string) =>
   value.replace(/[\\%_]/g, '\\$&');
+
+const FORUM_VIEW_THROTTLE_MS = 30 * 60 * 1000;
 
 @Injectable()
 export class ForumPostsService {
@@ -45,6 +49,7 @@ export class ForumPostsService {
     private readonly moderationService: ForumModerationService,
     private readonly presenter: ForumPresenterService,
     private readonly storageService: R2StorageService,
+    private readonly locationsService: LocationsService,
   ) {}
 
   async getFeed(viewer: ForumViewer, query: ForumPostsQueryDto) {
@@ -90,6 +95,18 @@ export class ForumPostsService {
         `(post.roommate ->> 'area' ILIKE :area OR post.title ILIKE :area OR post.content ILIKE :area)`,
         { area: `%${escapeLikePattern(query.area)}%` },
       );
+    }
+
+    if (query.provinceCode) {
+      postsQuery.andWhere(`post.roommate ->> 'provinceCode' = :provinceCode`, {
+        provinceCode: query.provinceCode,
+      });
+    }
+
+    if (query.wardCode) {
+      postsQuery.andWhere(`post.roommate ->> 'wardCode' = :wardCode`, {
+        wardCode: query.wardCode,
+      });
     }
 
     if (query.roommateStatus) {
@@ -154,8 +171,9 @@ export class ForumPostsService {
       post.status === ForumPostStatus.PUBLISHED &&
       post.authorId !== viewer.userId
     ) {
-      await this.postRepository.increment({ id: post.id }, 'viewCount', 1);
-      post.viewCount += 1;
+      const isCounted = await this.recordView(post.id, viewer.userId);
+
+      if (isCounted) post.viewCount += 1;
     }
 
     const [presentedPost] = await this.presentPosts([post], viewer);
@@ -163,9 +181,30 @@ export class ForumPostsService {
     return presentedPost;
   }
 
+  private recordView(postId: string, viewerId: string): Promise<boolean> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `forum-post-view:${viewerId}:${postId}`,
+      ]);
+
+      const hasRecentView = await manager.existsBy(ForumPostView, {
+        postId,
+        viewerId,
+        createdAt: MoreThan(new Date(Date.now() - FORUM_VIEW_THROTTLE_MS)),
+      });
+
+      if (hasRecentView) return false;
+
+      await manager.increment(ForumPost, { id: postId }, 'viewCount', 1);
+      await manager.insert(ForumPostView, { postId, viewerId });
+
+      return true;
+    });
+  }
+
   async createPost(viewer: ForumViewer, dto: CreateForumPostDto) {
     const isDraft = dto.isDraft === true;
-    const roommate = this.resolveRoommate(dto.category, dto.roommate);
+    const roommate = await this.resolveRoommate(dto.category, dto.roommate);
     const moderationFlags = isDraft
       ? []
       : await this.moderationService.assertContentAllowed(
@@ -221,8 +260,8 @@ export class ForumPostsService {
     const category = dto.category ?? post.category;
     const roommate =
       dto.roommate !== undefined
-        ? this.resolveRoommate(category, dto.roommate)
-        : this.resolveRoommate(category, post.roommate ?? undefined);
+        ? await this.resolveRoommate(category, dto.roommate)
+        : await this.resolveRoommate(category, post.roommate ?? undefined);
     const shouldPublish =
       post.status === ForumPostStatus.DRAFT && dto.isDraft === false;
     const nextStatus = shouldPublish ? ForumPostStatus.PUBLISHED : post.status;
@@ -377,10 +416,10 @@ export class ForumPostsService {
     return post;
   }
 
-  private resolveRoommate(
+  private async resolveRoommate(
     category: ForumCategory,
     roommate: RoommateCriteriaDto | RoommateCriteria | undefined,
-  ): RoommateCriteria | null {
+  ): Promise<RoommateCriteria | null> {
     if (category !== ForumCategory.ROOMMATE) {
       return null;
     }
@@ -391,6 +430,8 @@ export class ForumPostsService {
       );
     }
 
+    const location = await this.resolveRoommateLocation(roommate);
+
     return {
       gender: roommate.gender,
       costPerPerson: roommate.costPerPerson,
@@ -398,7 +439,45 @@ export class ForumPostsService {
       moveInDate: roommate.moveInDate ?? null,
       minStayMonths: roommate.minStayMonths ?? null,
       lifestyle: roommate.lifestyle ?? null,
-      area: roommate.area ?? null,
+      area: location?.area ?? roommate.area ?? null,
+      provinceCode: location?.provinceCode ?? null,
+      wardCode: location?.wardCode ?? null,
+      streetAddress: location?.streetAddress ?? null,
+    };
+  }
+
+  private async resolveRoommateLocation(
+    roommate: RoommateCriteriaDto | RoommateCriteria,
+  ) {
+    const { provinceCode, wardCode } = roommate;
+
+    if (!provinceCode && !wardCode) return null;
+
+    if (!provinceCode || !wardCode) {
+      throw new BadRequestException(
+        'Vui lòng chọn đầy đủ tỉnh/thành phố và phường/xã cho khu vực',
+      );
+    }
+
+    const ward = await this.locationsService.getWardByCode(wardCode);
+
+    if (ward.provinceCode !== provinceCode) {
+      throw new BadRequestException(
+        'Phường/xã không thuộc tỉnh/thành phố đã chọn',
+      );
+    }
+
+    const streetAddress = roommate.streetAddress?.trim() || null;
+
+    return {
+      provinceCode,
+      wardCode,
+      streetAddress,
+      area: await this.locationsService.formatFullAddress(
+        provinceCode,
+        wardCode,
+        streetAddress,
+      ),
     };
   }
 

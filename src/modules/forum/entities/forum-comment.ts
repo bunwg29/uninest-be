@@ -15,6 +15,7 @@ import { ForumPost } from './forum-post';
 
 @Entity('forum_comments')
 @Index('idx_forum_comments_post_created', ['postId', 'createdAt'])
+@Index('idx_forum_comments_parent_created', ['parentId', 'createdAt'])
 export class ForumComment {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

@@ -11,6 +11,11 @@ import { Listing } from './listing';
 
 @Entity('listing_views')
 @Index('idx_listing_views_listing_created', ['listingId', 'createdAt'])
+@Index('idx_listing_views_listing_viewer_created', [
+  'listingId',
+  'viewerId',
+  'createdAt',
+])
 export class ListingView {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

@@ -25,6 +25,9 @@ export type RoommateCriteria = {
   minStayMonths: number | null;
   lifestyle: string | null;
   area: string | null;
+  provinceCode?: string | null;
+  wardCode?: string | null;
+  streetAddress?: string | null;
 };
 
 @Entity('forum_posts')
