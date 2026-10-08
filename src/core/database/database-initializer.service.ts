@@ -1,6 +1,9 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { KEYWORD_SEARCH_SQL } from './keyword-search.sql';
+import {
+  KEYWORD_TRIGRAM_INDEXES_SQL,
+  UNACCENT_FUNCTION_SQL,
+} from './keyword-search.sql';
 
 @Injectable()
 export class DatabaseInitializerService implements OnModuleInit {
@@ -122,12 +125,26 @@ export class DatabaseInitializerService implements OnModuleInit {
 
   private async initializeKeywordSearchIndexes() {
     try {
-      await this.dataSource.query(KEYWORD_SEARCH_SQL);
+      await this.dataSource.query(UNACCENT_FUNCTION_SQL);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      this.logger.error(
+        `Failed to create the unaccent search function: ${message}`,
+      );
+
+      return;
+    }
+
+    try {
+      await this.dataSource.query(KEYWORD_TRIGRAM_INDEXES_SQL);
       this.logger.log('Keyword search trigram indexes are ready.');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
-      this.logger.warn(`Failed to prepare keyword search indexes: ${message}`);
+      this.logger.warn(
+        `Trigram indexes are unavailable, keyword search will scan sequentially: ${message}`,
+      );
     }
   }
 
