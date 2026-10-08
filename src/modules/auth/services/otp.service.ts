@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OtpCode, OtpType } from '../entities/otp-code';
@@ -24,6 +25,8 @@ export class OtpService {
   constructor(
     @InjectRepository(OtpCode)
     private readonly otpRepository: Repository<OtpCode>,
+
+    private readonly configService: ConfigService,
   ) {}
 
   async sendOtp(
@@ -65,8 +68,10 @@ export class OtpService {
       }),
     );
 
-    const codeForLog =
-      process.env.NODE_ENV === Environment.PRODUCTION ? '******' : code;
+    const isProduction =
+      this.configService.get<Environment>('NODE_ENV') ===
+      Environment.PRODUCTION;
+    const codeForLog = isProduction ? '******' : code;
 
     this.logger.log(
       `[OTP Service] OTP sent to [${cleanIdentifier}] (purpose: ${type}): ${codeForLog} (expires at: ${expiresAt.toLocaleTimeString()})`,
