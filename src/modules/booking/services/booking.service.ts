@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository, SelectQueryBuilder } from 'typeorm';
+import { R2StorageService } from '@core/storage';
 import { Listing, ListingStatus } from '@modules/listings/entities';
 import {
   BookingListQueryDto,
@@ -61,6 +62,7 @@ export class BookingService {
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly storageService: R2StorageService,
   ) {}
 
   async getSlots(query: BookingSlotsQueryDto) {
@@ -736,14 +738,14 @@ export class BookingService {
               id: booking.user.id,
               fullName: booking.user.fullName,
               phone: booking.phone,
-              avatarUrl: booking.user.avatarUrl ?? null,
+              avatarUrl: this.toPublicUrl(booking.user.avatarUrl),
             }
           : null,
       landlord: booking.listing?.owner
         ? {
             id: booking.listing.owner.id,
             fullName: booking.listing.owner.fullName,
-            avatarUrl: booking.listing.owner.avatarUrl ?? null,
+            avatarUrl: this.toPublicUrl(booking.listing.owner.avatarUrl),
           }
         : null,
       listing: booking.listing
@@ -756,7 +758,7 @@ export class BookingService {
               ? Number(booking.listing.deposit)
               : null,
             address: booking.listing.fullAddress,
-            imageUrl: coverImage?.url ?? null,
+            imageUrl: this.toPublicUrl(coverImage?.url),
           }
         : null,
       events: events.map((event) => ({
@@ -767,5 +769,9 @@ export class BookingService {
         createdAt: event.createdAt,
       })),
     };
+  }
+
+  private toPublicUrl(reference: string | null | undefined): string | null {
+    return reference ? this.storageService.getPublicUrl(reference) : null;
   }
 }
