@@ -63,7 +63,7 @@ export class UsersService {
       landlordVerifiedAt: new Date(),
     });
 
-    const user = await this.findById(userId);
+    const user = await this.findProfileById(userId);
 
     if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
 
@@ -108,6 +108,13 @@ export class UsersService {
   async findById(id: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { id },
+      relations: { role: true },
+    });
+  }
+
+  async findProfileById(id: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { id },
       relations: { role: true, province: true, ward: true },
     });
   }
@@ -145,8 +152,8 @@ export class UsersService {
       .leftJoinAndSelect('user.role', 'role');
 
     if (isEmail) {
-      query.where('LOWER(user.email) = LOWER(:identifier)', {
-        identifier: trimmed,
+      query.where('user.email = :identifier', {
+        identifier: trimmed.toLowerCase(),
       });
     } else {
       query.where('user.phone = :identifier', { identifier: trimmed });

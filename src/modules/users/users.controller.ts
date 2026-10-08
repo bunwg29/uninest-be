@@ -46,7 +46,7 @@ export class UsersController {
   async getProfile(
     @CurrentUser('userId') userId: string,
   ): Promise<ProfileResponseDto> {
-    const user = await this.usersService.findById(userId);
+    const user = await this.usersService.findProfileById(userId);
 
     if (!user) {
       throw new BadRequestException('Không tìm thấy hồ sơ cá nhân');
@@ -65,13 +65,20 @@ export class UsersController {
     @Body() dto: UpdateProfileDto,
   ): Promise<ProfileResponseDto> {
     const address = await this.usersService.resolveAddress(dto);
-    const user = await this.usersService.update(userId, {
+
+    await this.usersService.update(userId, {
       ...address,
       fullName: dto.name?.trim(),
       school: dto.school?.trim(),
       bio: dto.bio?.trim(),
       interestedAreas: dto.interestedAreas,
     });
+
+    const user = await this.usersService.findProfileById(userId);
+
+    if (!user) {
+      throw new BadRequestException('Không tìm thấy hồ sơ cá nhân');
+    }
 
     return this.mapProfile(
       user,
