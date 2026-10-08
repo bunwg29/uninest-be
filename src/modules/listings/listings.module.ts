@@ -28,7 +28,7 @@ import { ListingsService } from './services/listings.service';
       Ward,
     ]),
   ],
-  controllers: [LandlordListingsController, ListingsController],
+  controllers: [ListingsController, LandlordListingsController],
   providers: [ListingsService],
   exports: [ListingsService],
 })
