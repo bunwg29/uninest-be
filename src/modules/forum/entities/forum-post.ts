@@ -27,6 +27,8 @@ export type RoommateCriteria = {
   area: string | null;
   provinceCode?: string | null;
   wardCode?: string | null;
+  provinceName?: string | null;
+  wardName?: string | null;
   streetAddress?: string | null;
 };
 

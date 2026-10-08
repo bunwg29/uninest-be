@@ -442,6 +442,8 @@ export class ForumPostsService {
       area: location?.area ?? roommate.area ?? null,
       provinceCode: location?.provinceCode ?? null,
       wardCode: location?.wardCode ?? null,
+      provinceName: location?.provinceName ?? null,
+      wardName: location?.wardName ?? null,
       streetAddress: location?.streetAddress ?? null,
     };
   }
@@ -472,6 +474,8 @@ export class ForumPostsService {
     return {
       provinceCode,
       wardCode,
+      provinceName: ward.province?.fullName ?? null,
+      wardName: ward.fullName,
       streetAddress,
       area: await this.locationsService.formatFullAddress(
         provinceCode,
