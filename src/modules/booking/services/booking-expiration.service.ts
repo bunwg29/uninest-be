@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, Repository } from 'typeorm';
@@ -21,13 +22,18 @@ export class BookingExpirationService {
     @InjectRepository(BookingEvent)
     private readonly eventRepository: Repository<BookingEvent>,
     private readonly eventEmitter: EventEmitter2,
+    private readonly configService: ConfigService,
   ) {}
 
   @Cron('*/5 * * * *')
   async handleExpiredBookings(): Promise<number> {
     const now = new Date();
+    const holdingDays = this.configService.get<number>(
+      'HOLDING_DAYS',
+      BOOKING_DEFAULTS.HOLDING_DAYS,
+    );
     const confirmedDeadline = new Date(
-      now.getTime() - BOOKING_DEFAULTS.HOLDING_DAYS * 24 * 3_600_000,
+      now.getTime() - holdingDays * 24 * 3_600_000,
     );
     const expiredBookings = await this.bookingRepository.find({
       select: {

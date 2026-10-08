@@ -407,8 +407,7 @@ export class BookingService {
 
       booking.status = BookingStatus.HOLDING;
       booking.expiresAt = new Date(Date.now() + holdingDays * DAY_IN_MS);
-      booking.depositAmount =
-        listing.deposit ?? String(BOOKING_DEFAULTS.DEFAULT_DEPOSIT_AMOUNT);
+      booking.depositAmount = listing.deposit;
 
       await queryRunner.manager.save(booking);
       await queryRunner.manager.save(

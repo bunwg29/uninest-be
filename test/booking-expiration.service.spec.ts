@@ -1,5 +1,7 @@
+import type { ConfigService } from '@nestjs/config';
 import type { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Repository } from 'typeorm';
+jest.mock('@nestjs/config', () => ({ ConfigService: class {} }));
 jest.mock('@nestjs/schedule', () => ({ Cron: () => () => undefined }));
 jest.mock('@nestjs/typeorm', () => ({
   InjectRepository: () => () => undefined,
@@ -30,6 +32,9 @@ describe('BookingExpirationService', () => {
     bookingRepository,
     eventRepository,
     eventEmitter,
+    {
+      get: (_key: string, fallback: number) => fallback,
+    } as unknown as ConfigService,
   );
 
   beforeEach(() => jest.clearAllMocks());
