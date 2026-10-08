@@ -1,8 +1,10 @@
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -15,6 +17,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SEARCH_ROOM_TYPE_RESPONSE_VALUES } from '@modules/search/search.constants';
+
+const LISTING_ROOM_TYPES = Object.keys(SEARCH_ROOM_TYPE_RESPONSE_VALUES);
 
 export class CreateListingImageDto {
   @ApiProperty({
@@ -120,7 +125,7 @@ export class CreateListingDto {
   })
   @IsNotEmpty({ message: 'Loại hình phòng/trọ không được để trống' })
   @IsString({ message: 'Loại hình phòng/trọ phải là chuỗi' })
-  @MaxLength(50, { message: 'Loại hình phòng/trọ tối đa 50 ký tự' })
+  @IsIn(LISTING_ROOM_TYPES, { message: 'Loại hình phòng/trọ không hợp lệ' })
   roomType!: string;
 
   @ApiProperty({
@@ -228,16 +233,17 @@ export class CreateListingDto {
   @Max(180, { message: 'Kinh độ phải nằm trong khoảng -180 đến 180' })
   longitude!: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     type: [CreateListingImageDto],
-    description: 'Danh sách object key của ảnh phòng đã tải lên, tối đa 10 ảnh',
+    description:
+      'Danh sách object key của ảnh phòng đã tải lên, từ 1 đến 10 ảnh',
   })
-  @IsOptional()
   @IsArray({ message: 'Danh sách ảnh phải là mảng' })
+  @ArrayMinSize(1, { message: 'Cần ít nhất 1 ảnh phòng' })
   @ArrayMaxSize(10, { message: 'Chỉ được chọn tối đa 10 ảnh' })
   @ValidateNested({ each: true })
   @Type(() => CreateListingImageDto)
-  images?: CreateListingImageDto[];
+  images!: CreateListingImageDto[];
 
   @ApiPropertyOptional({
     example: [1, 2, 3],
