@@ -28,10 +28,13 @@ import {
   ListingImage,
   ListingReport,
   ListingStatus,
+  ListingView,
 } from '../entities';
 import {
   CreateListingDto,
+  LANDLORD_STATS_PERIOD_DAYS,
   LandlordListingsQueryDto,
+  type LandlordStatsPeriod,
   ReportListingDto,
 } from '../dtos';
 
@@ -218,6 +221,9 @@ export class ListingsService {
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
+    const engagement = await this.loadEngagementCounts(
+      listings.map((listing) => listing.id),
+    );
     const counterRows = await this.listingRepository
       .createQueryBuilder('listing')
       .select('listing.status', 'status')
@@ -247,7 +253,9 @@ export class ListingsService {
       .getCount();
 
     return {
-      items: listings.map((listing) => this.toLandlordListing(listing)),
+      items: listings.map((listing) =>
+        this.toLandlordListing(listing, engagement.get(listing.id)),
+      ),
       pagination: {
         page,
         limit,
@@ -336,6 +344,10 @@ export class ListingsService {
     const canSeeStats =
       listing.ownerId === userId || roleId === UserRoleType.ADMIN;
 
+    if (canSeeStats) {
+      return { viewCount: listing.viewCount, incremented: false };
+    }
+
     const throttleKey = `${userId}:${id}`;
     const currentTime = Date.now();
 
@@ -343,10 +355,7 @@ export class ListingsService {
     const throttleExpiration = this.viewThrottleExpirations.get(throttleKey);
 
     if (throttleExpiration && throttleExpiration > currentTime) {
-      return {
-        viewCount: canSeeStats ? listing.viewCount : null,
-        incremented: false,
-      };
+      return { viewCount: null, incremented: false };
     }
 
     const nextExpiration = currentTime + VIEW_THROTTLE_MILLISECONDS;
@@ -354,7 +363,10 @@ export class ListingsService {
     this.viewThrottleExpirations.set(throttleKey, nextExpiration);
 
     try {
-      await this.listingRepository.increment({ id }, 'viewCount', 1);
+      await this.dataSource.transaction(async (manager) => {
+        await manager.increment(Listing, { id }, 'viewCount', 1);
+        await manager.insert(ListingView, { listingId: id, viewerId: userId });
+      });
     } catch (error) {
       if (this.viewThrottleExpirations.get(throttleKey) === nextExpiration) {
         this.viewThrottleExpirations.delete(throttleKey);
@@ -363,12 +375,97 @@ export class ListingsService {
       throw error;
     }
 
-    const currentListing = await this.listingRepository.findOneByOrFail({ id });
+    return { viewCount: null, incremented: true };
+  }
+
+  async getLandlordStats(userId: string, period: LandlordStatsPeriod) {
+    const since =
+      period === 'all'
+        ? null
+        : new Date(
+            Date.now() -
+              LANDLORD_STATS_PERIOD_DAYS[period] * 24 * 60 * 60 * 1000,
+          );
+
+    const [views, conversations, bookings, pendingBookings] = await Promise.all(
+      [
+        this.countLandlordViews(userId, since),
+        this.countLandlordConversations(userId, since),
+        this.countLandlordBookings(userId, since),
+        this.countLandlordBookings(userId, null, BookingStatus.PENDING),
+      ],
+    );
 
     return {
-      viewCount: canSeeStats ? currentListing.viewCount : null,
-      incremented: true,
+      period,
+      since: since?.toISOString() ?? null,
+      views,
+      contacts: conversations + bookings,
+      conversations,
+      bookings,
+      pendingBookings,
     };
+  }
+
+  private async countLandlordViews(
+    userId: string,
+    since: Date | null,
+  ): Promise<number> {
+    if (!since) {
+      const total = await this.listingRepository
+        .createQueryBuilder('listing')
+        .select('COALESCE(SUM(listing.viewCount), 0)', 'total')
+        .where('listing.ownerId = :userId', { userId })
+        .getRawOne<{ total: string }>();
+
+      return Number(total?.total ?? 0);
+    }
+
+    return this.dataSource
+      .getRepository(ListingView)
+      .createQueryBuilder('listingView')
+      .innerJoin(Listing, 'listing', 'listing.id = listingView.listingId')
+      .where('listing.ownerId = :userId', { userId })
+      .andWhere('listingView.createdAt >= :since', { since })
+      .getCount();
+  }
+
+  private countLandlordConversations(
+    userId: string,
+    since: Date | null,
+  ): Promise<number> {
+    const query = this.dataSource
+      .getRepository(Conversation)
+      .createQueryBuilder('conversation')
+      .where('conversation.landlordId = :userId', { userId });
+
+    if (since) {
+      query.andWhere('conversation.createdAt >= :since', { since });
+    }
+
+    return query.getCount();
+  }
+
+  private countLandlordBookings(
+    userId: string,
+    since: Date | null,
+    status?: BookingStatus,
+  ): Promise<number> {
+    const query = this.dataSource
+      .getRepository(Booking)
+      .createQueryBuilder('booking')
+      .innerJoin(Listing, 'listing', 'listing.id = booking.listingId')
+      .where('listing.ownerId = :userId', { userId });
+
+    if (since) {
+      query.andWhere('booking.createdAt >= :since', { since });
+    }
+
+    if (status) {
+      query.andWhere('booking.status = :status', { status });
+    }
+
+    return query.getCount();
   }
 
   async addFavorite(userId: string, id: string) {
@@ -925,7 +1022,67 @@ export class ListingsService {
     );
   }
 
-  private toLandlordListing(listing: Listing) {
+  private async loadEngagementCounts(
+    listingIds: string[],
+  ): Promise<Map<string, { saveCount: number; contactCount: number }>> {
+    const counts = new Map<
+      string,
+      { saveCount: number; contactCount: number }
+    >();
+
+    if (listingIds.length === 0) return counts;
+
+    const [saves, conversations, bookings] = await Promise.all([
+      this.favoriteRepository
+        .createQueryBuilder('favorite')
+        .select('favorite.listingId', 'listingId')
+        .addSelect('COUNT(*)', 'total')
+        .where('favorite.listingId IN (:...listingIds)', { listingIds })
+        .groupBy('favorite.listingId')
+        .getRawMany<{ listingId: string; total: string }>(),
+      this.dataSource
+        .getRepository(Conversation)
+        .createQueryBuilder('conversation')
+        .select('conversation.listingId', 'listingId')
+        .addSelect('COUNT(*)', 'total')
+        .where('conversation.listingId IN (:...listingIds)', { listingIds })
+        .groupBy('conversation.listingId')
+        .getRawMany<{ listingId: string; total: string }>(),
+      this.dataSource
+        .getRepository(Booking)
+        .createQueryBuilder('booking')
+        .select('booking.listingId', 'listingId')
+        .addSelect('COUNT(*)', 'total')
+        .where('booking.listingId IN (:...listingIds)', { listingIds })
+        .groupBy('booking.listingId')
+        .getRawMany<{ listingId: string; total: string }>(),
+    ]);
+
+    const entryFor = (listingId: string) => {
+      const entry = counts.get(listingId) ?? { saveCount: 0, contactCount: 0 };
+
+      counts.set(listingId, entry);
+
+      return entry;
+    };
+
+    saves.forEach((row) => {
+      entryFor(row.listingId).saveCount = Number(row.total);
+    });
+    conversations.forEach((row) => {
+      entryFor(row.listingId).contactCount += Number(row.total);
+    });
+    bookings.forEach((row) => {
+      entryFor(row.listingId).contactCount += Number(row.total);
+    });
+
+    return counts;
+  }
+
+  private toLandlordListing(
+    listing: Listing,
+    engagement?: { saveCount: number; contactCount: number },
+  ) {
     const images = [...(listing.images ?? [])].sort(
       (a, b) => a.sortOrder - b.sortOrder,
     );
@@ -954,8 +1111,8 @@ export class ListingsService {
       status: listing.deletedAt ? 'deleted' : listing.status,
       isFeatured: false,
       viewCount: listing.viewCount,
-      contactCount: 0,
-      saveCount: 0,
+      contactCount: engagement?.contactCount ?? 0,
+      saveCount: engagement?.saveCount ?? 0,
       holdingStatus: false,
       roomType: listing.roomType,
       maxOccupants: listing.maxOccupants,

@@ -19,6 +19,7 @@ import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import {
   CreateListingDto,
   LandlordListingsQueryDto,
+  LandlordStatsQueryDto,
   UpdateListingRentalDto,
   UpdateListingVisibilityDto,
 } from '../dtos';
@@ -40,6 +41,18 @@ export class LandlordListingsController {
     @Query() query: LandlordListingsQueryDto,
   ) {
     return this.listingsService.getLandlordListings(userId, query);
+  }
+
+  @Get('stats')
+  @ApiOperation({
+    summary:
+      'Thống kê lượt xem, liên hệ và yêu cầu xem phòng theo khoảng thời gian',
+  })
+  async getStats(
+    @CurrentUser('userId') userId: string,
+    @Query() query: LandlordStatsQueryDto,
+  ) {
+    return this.listingsService.getLandlordStats(userId, query.period);
   }
 
   @Get(':id')
