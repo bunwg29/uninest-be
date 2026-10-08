@@ -246,6 +246,19 @@ export class CreateListingDto {
   images!: CreateListingImageDto[];
 
   @ApiPropertyOptional({
+    example: 'listings/videos/1715800000000-uuid.mp4',
+    description:
+      'Object key của video giới thiệu phòng đã tải lên, tối đa 1 video',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString({ message: 'Object key video phải là chuỗi' })
+  @Matches(/^listings\/videos\/[A-Za-z0-9_-]+\.(mp4|mov)$/, {
+    message: 'Object key video không hợp lệ',
+  })
+  videoKey?: string | null;
+
+  @ApiPropertyOptional({
     example: [1, 2, 3],
     description: 'Danh sách mã định danh tiện ích dạng số',
     type: [Number],

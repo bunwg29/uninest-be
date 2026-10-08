@@ -57,3 +57,34 @@ export class CreatePresignedUploadUrlDto {
   })
   folder?: string;
 }
+
+export class CreatePresignedVideoUploadDto {
+  @ApiProperty({ description: 'Tên tệp gốc', example: 'room-tour.mp4' })
+  @IsString()
+  @IsNotEmpty()
+  fileName!: string;
+
+  @ApiProperty({
+    description: 'Loại tệp video, chỉ nhận mp4 hoặc mov',
+    example: 'video/mp4',
+    enum: STORAGE_LIMITS.ALLOWED_VIDEO_TYPES,
+  })
+  @IsString()
+  @IsIn([...STORAGE_LIMITS.ALLOWED_VIDEO_TYPES], {
+    message: 'Chỉ hỗ trợ video định dạng mp4 hoặc mov',
+  })
+  contentType!: string;
+
+  @ApiPropertyOptional({
+    description: 'Dung lượng video theo byte, tối đa 100MB',
+    example: 10485760,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(STORAGE_LIMITS.MAX_VIDEO_BYTES, {
+    message: 'Video có dung lượng tối đa 100MB',
+  })
+  fileSize?: number;
+}

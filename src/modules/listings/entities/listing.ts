@@ -75,6 +75,9 @@ export class Listing {
   })
   deposit!: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'video_key' })
+  videoKey!: string | null;
+
   @Column({ type: 'varchar', length: 255, name: 'street_address' })
   streetAddress!: string;
 

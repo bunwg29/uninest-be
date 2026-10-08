@@ -46,6 +46,24 @@ describe('CreateListingDto', () => {
     ).toContain('images');
   });
 
+  it('chấp nhận video hợp lệ và từ chối key video sai định dạng', async () => {
+    expect(
+      await errorsOf(CreateListingDto, {
+        ...validListing,
+        videoKey: 'listings/videos/1715800000000-abc.mp4',
+      }),
+    ).toEqual([]);
+    expect(
+      await errorsOf(CreateListingDto, {
+        ...validListing,
+        videoKey: 'listings/1715800000000-abc.mp4',
+      }),
+    ).toContain('videoKey');
+    expect(
+      await errorsOf(CreateListingDto, { ...validListing, videoKey: null }),
+    ).toEqual([]);
+  });
+
   it('từ chối loại phòng ngoài danh sách', async () => {
     expect(
       await errorsOf(CreateListingDto, { ...validListing, roomType: 'khac' }),

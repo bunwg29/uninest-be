@@ -88,6 +88,19 @@ export class R2StorageService {
     });
   }
 
+  async generatePresignedUploadUrlForVideo(
+    contentType: string,
+  ): Promise<PresignedUploadUrlResponse> {
+    const extension = contentType === 'video/quicktime' ? 'mov' : 'mp4';
+    const key = `listings/videos/${Date.now()}-${randomUUID()}.${extension}`;
+
+    return this.getPresignedUploadUrl({
+      key,
+      contentType,
+      expiresInSeconds: STORAGE_LIMITS.PRESIGN_EXPIRES_SECONDS,
+    });
+  }
+
   async getPresignedUploadUrl(
     options: PresignedUploadUrlOptions,
   ): Promise<PresignedUploadUrlResponse> {
@@ -259,6 +272,33 @@ export class R2StorageService {
 
     throw new BadRequestException(
       'Ảnh phải là jpg hoặc png và có dung lượng tối đa 100MB',
+    );
+  }
+
+  async assertValidVideoObject(key: string): Promise<void> {
+    if (!this.isConfigured || !this.s3Client) return;
+
+    try {
+      const head = await this.s3Client.send(
+        new HeadObjectCommand({ Bucket: this.bucketName, Key: key }),
+      );
+      const contentType = head.ContentType?.toLowerCase() ?? '';
+      const contentLength = head.ContentLength ?? 0;
+      const isAllowedType = (
+        STORAGE_LIMITS.ALLOWED_VIDEO_TYPES as readonly string[]
+      ).includes(contentType);
+
+      if (isAllowedType && contentLength <= STORAGE_LIMITS.MAX_VIDEO_BYTES) {
+        return;
+      }
+
+      await this.deleteFile(key);
+    } catch {
+      throw new BadRequestException('Không tìm thấy video đã tải lên');
+    }
+
+    throw new BadRequestException(
+      'Video phải là mp4 hoặc mov và có dung lượng tối đa 100MB',
     );
   }
 

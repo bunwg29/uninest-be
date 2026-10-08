@@ -91,6 +91,7 @@ export class ListingsService {
     }
 
     await this.assertImagesValid(dto.images?.map((image) => image.key));
+    await this.assertVideoValid(dto.videoKey);
 
     const amenityIds = [...new Set(dto.amenityIds ?? [])];
     const amenities = amenityIds.length
@@ -130,6 +131,7 @@ export class ListingsService {
           coordinates: [dto.longitude, dto.latitude],
         },
         status: ListingStatus.PENDING,
+        videoKey: dto.videoKey ?? null,
         viewingSchedule: dto.viewingSchedule
           ? { ...dto.viewingSchedule }
           : null,
@@ -662,6 +664,14 @@ export class ListingsService {
     }
 
     await this.assertImagesValid(dto.images?.map((image) => image.key));
+    const existingVideoKey = (
+      await this.listingRepository.findOne({
+        where: { id, ownerId: userId },
+        select: { id: true, videoKey: true },
+      })
+    )?.videoKey;
+
+    await this.assertVideoValid(dto.videoKey, existingVideoKey);
 
     const amenityIds = [...new Set(dto.amenityIds ?? [])];
     const amenities = amenityIds.length
@@ -685,7 +695,7 @@ export class ListingsService {
     }
 
     const nextImageKeys = new Set(dto.images?.map((image) => image.key) ?? []);
-    const { updatedListing, removedImageKeys } =
+    const { updatedListing, removedImageKeys, removedVideoKey } =
       await this.dataSource.transaction(async (manager) => {
         const listing = await manager.findOne(Listing, {
           where: { id, ownerId: userId },
@@ -700,6 +710,11 @@ export class ListingsService {
           .map((image) => this.storageService.getObjectKey(image.url))
           .filter((key): key is string => key !== null)
           .filter((key) => !nextImageKeys.has(key));
+
+        const removedVideoKey =
+          listing.videoKey && listing.videoKey !== (dto.videoKey ?? null)
+            ? listing.videoKey
+            : null;
 
         const isKeyFieldChanged =
           Number(listing.price) !== dto.price ||
@@ -732,6 +747,7 @@ export class ListingsService {
             coordinates: [dto.longitude, dto.latitude],
           },
           status: nextStatus,
+          videoKey: dto.videoKey ?? null,
           viewingSchedule: dto.viewingSchedule
             ? { ...dto.viewingSchedule }
             : null,
@@ -775,10 +791,13 @@ export class ListingsService {
           throw new NotFoundException('Không tìm thấy tin đăng vừa cập nhật');
         }
 
-        return { updatedListing, removedImageKeys };
+        return { updatedListing, removedImageKeys, removedVideoKey };
       });
 
-    await this.deleteImagesFromStorage(removedImageKeys);
+    await this.deleteImagesFromStorage([
+      ...removedImageKeys,
+      ...(removedVideoKey ? [removedVideoKey] : []),
+    ]);
 
     return updatedListing;
   }
@@ -954,6 +973,9 @@ export class ListingsService {
         isCover: image.isCover,
         sortOrder: image.sortOrder,
       })),
+      videoUrl: listing.videoKey
+        ? this.storageService.getPublicUrl(listing.videoKey)
+        : null,
       amenities,
       landlord: {
         id: listing.owner.id,
@@ -1071,6 +1093,10 @@ export class ListingsService {
         this.storageService.getPublicUrl(image.url),
       ),
       imageKeys,
+      videoKey: listing.videoKey ?? undefined,
+      videoUrl: listing.videoKey
+        ? this.storageService.getPublicUrl(listing.videoKey)
+        : undefined,
       status: listing.deletedAt ? 'deleted' : listing.status,
       isFeatured: false,
       viewCount: listing.viewCount,
@@ -1111,6 +1137,15 @@ export class ListingsService {
     await Promise.all(
       newKeys.map((key) => this.storageService.assertValidImageObject(key)),
     );
+  }
+
+  private async assertVideoValid(
+    key: string | null | undefined,
+    currentKey?: string | null,
+  ): Promise<void> {
+    if (!key || key === currentKey) return;
+
+    await this.storageService.assertValidVideoObject(key);
   }
 
   private async assertLandlordVerified(userId: string): Promise<void> {
