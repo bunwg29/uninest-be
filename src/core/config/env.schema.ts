@@ -51,6 +51,10 @@ export class EnvironmentVariables {
   @IsOptional()
   DB_LOGGING?: boolean | string;
 
+  @IsOptional()
+  @IsNumber()
+  DB_POOL_SIZE: number = 20;
+
   @IsString()
   @IsOptional()
   R2_ACCOUNT_ID?: string;

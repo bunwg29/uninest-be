@@ -27,6 +27,9 @@ import { DatabaseInitializerService } from './database-initializer.service';
           autoLoadEntities: true,
           synchronize: isSync,
           logging: isLogging,
+          extra: {
+            max: Number(configService.get<number>('DB_POOL_SIZE', 20)),
+          },
           namingStrategy: new SnakeNamingStrategy(),
         };
       },
