@@ -1,3 +1,8 @@
+export const LISTING_SEARCH_INDEXES_SQL = `
+  CREATE INDEX IF NOT EXISTS "idx_listings_location_geography"
+    ON "listings" USING GIST ((location::geography));
+`;
+
 export const UNACCENT_FUNCTION_SQL = `
   CREATE OR REPLACE FUNCTION uninest_unaccent(value text)
     RETURNS text

@@ -5,13 +5,11 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryColumn,
-  Unique,
 } from 'typeorm';
 import { User } from '@modules/users/entities';
 import { Listing } from './listing';
 
 @Entity('favorites')
-@Unique('uq_favorites_user_listing', ['userId', 'listingId'])
 export class Favorite {
   @PrimaryColumn({ type: 'uuid', name: 'user_id' })
   userId!: string;

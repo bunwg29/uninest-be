@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   KEYWORD_TRIGRAM_INDEXES_SQL,
+  LISTING_SEARCH_INDEXES_SQL,
   UNACCENT_FUNCTION_SQL,
 } from './keyword-search.sql';
 
@@ -12,6 +13,8 @@ export class DatabaseInitializerService implements OnModuleInit {
   constructor(private readonly dataSource: DataSource) {}
 
   async onModuleInit() {
+    if (!this.dataSource.options.synchronize) return;
+
     await this.initializeExtensions();
     await this.initializeKeywordSearchIndexes();
     await this.migrateListingsSearchSchema();
@@ -22,16 +25,7 @@ export class DatabaseInitializerService implements OnModuleInit {
 
   private async migrateListingsSearchSchema() {
     try {
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS idx_listings_location_geography
-        ON listings USING GIST ((location::geography))
-      `);
-
-      await this.dataSource.query(`
-        CREATE INDEX IF NOT EXISTS idx_listings_active_created_at
-        ON listings (created_at DESC, id)
-        WHERE status = 'active' AND deleted_at IS NULL
-      `);
+      await this.dataSource.query(LISTING_SEARCH_INDEXES_SQL);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 

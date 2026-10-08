@@ -14,9 +14,28 @@ API mặc định tại `http://localhost:3000/api/v1` (đổi bằng `PORT`), S
 
 ## Schema cơ sở dữ liệu
 
-- Khi `DB_SYNCHRONIZE=true`, TypeORM tạo bảng theo entity.
-- `DatabaseInitializerService` chạy lúc khởi động: bật extension, tạo hàm `uninest_unaccent` và các index tìm kiếm (GIST cho vị trí, GIN trigram cho từ khoá).
-- Thư mục `src/core/database/migrations` chứa migration tương ứng cho môi trường không dùng synchronize; hiện chưa có script chạy migration tự động.
+Hai chế độ, chọn bằng `DB_SYNCHRONIZE`:
+
+- `true` (mặc định khi phát triển): TypeORM đồng bộ bảng theo entity; `DatabaseInitializerService` bật extension và tạo hàm, index tìm kiếm lúc khởi động.
+- `false`: schema do migration quản lý. Ứng dụng tự chạy migration còn thiếu khi khởi động.
+
+| Lệnh | Tác dụng |
+|---|---|
+| `npm run migration:run` | Chạy các migration chưa chạy |
+| `npm run migration:revert` | Hoàn tác migration gần nhất |
+| `npm run migration:show` | Xem trạng thái migration |
+| `npm run migration:generate -- src/core/database/migrations/<Tên>` | Sinh migration từ thay đổi entity |
+| `npm run migration:create -- src/core/database/migrations/<Tên>` | Tạo migration trống |
+| `npm run migration:run:prod` | Chạy migration từ bản build (`dist`) |
+
+Migration hiện có:
+
+1. `EnableExtensions`: `uuid-ossp`, `postgis`, `unaccent`, `pg_trgm`; `vector` nếu máy chủ có sẵn.
+2. `InitialSchema`: toàn bộ bảng, enum, index, khoá ngoại theo entity. Tự bỏ qua nếu database đã có bảng (database từng chạy synchronize), nên có thể chuyển một database cũ sang dùng migration.
+3. `SearchIndexes`: index GIST cho toạ độ, hàm `uninest_unaccent` và index trigram cho tìm theo từ khoá.
+4. `DropRedundantFavoriteUnique`: gỡ ràng buộc trùng với khoá chính trên các database cũ.
+
+Sau khi đổi entity, chạy `migration:generate` để tạo migration mới thay vì sửa các migration đã có.
 
 ## Seeder
 

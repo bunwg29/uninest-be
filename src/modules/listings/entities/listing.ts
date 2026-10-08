@@ -24,6 +24,9 @@ type ListingPoint = {
 };
 
 @Entity('listings')
+@Index('idx_listings_active_created_at', ['createdAt', 'id'], {
+  where: "status = 'active' AND deleted_at IS NULL",
+})
 export class Listing {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
