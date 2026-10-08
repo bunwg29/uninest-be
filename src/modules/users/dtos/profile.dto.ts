@@ -25,12 +25,6 @@ export class UpdateProfileDto {
   @MaxLength(50, { message: 'Họ và tên tối đa 50 ký tự' })
   name?: string;
 
-  @ApiPropertyOptional({ example: 'xuanhoai@gmail.com' })
-  @IsOptional()
-  @IsEmail({}, { message: 'Email không đúng định dạng' })
-  @MaxLength(150)
-  email?: string;
-
   @ApiPropertyOptional({ example: 'ĐH Bách khoa - ĐH Đà Nẵng' })
   @IsOptional()
   @IsString()
@@ -87,6 +81,14 @@ export class RequestPhoneOtpDto {
     message: 'Số điện thoại không hợp lệ',
   })
   newPhone!: string;
+}
+
+export class RequestEmailOtpDto {
+  @ApiProperty({ example: 'xuanhoai@gmail.com' })
+  @IsNotEmpty({ message: 'Email mới không được để trống' })
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
+  @MaxLength(150)
+  newEmail!: string;
 }
 
 export class VerifyPhoneOtpDto {

@@ -24,6 +24,7 @@ import {
   PresignAvatarDto,
   LandlordVerificationDto,
   ProfileResponseDto,
+  RequestEmailOtpDto,
   RequestPhoneOtpDto,
   UpdateProfileDto,
   VerifyPhoneOtpDto,
@@ -63,17 +64,8 @@ export class UsersController {
     @CurrentUser('userId') userId: string,
     @Body() dto: UpdateProfileDto,
   ): Promise<ProfileResponseDto> {
-    if (dto.email) {
-      const existingUser = await this.usersService.findByEmail(dto.email);
-
-      if (existingUser && existingUser.id !== userId) {
-        throw new ConflictException('Email này đã được sử dụng');
-      }
-    }
-
     const user = await this.usersService.update(userId, {
       fullName: dto.name?.trim(),
-      email: dto.email?.trim().toLowerCase(),
       school: dto.school?.trim(),
       bio: dto.bio?.trim(),
       interestedAreas: dto.interestedAreas,
@@ -218,6 +210,64 @@ export class UsersController {
     });
 
     return { phone: newPhone, phoneVerified: true };
+  }
+
+  @Post('email/request-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Gửi OTP đổi email' })
+  async requestEmailOtp(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: RequestEmailOtpDto,
+  ) {
+    const newEmail = dto.newEmail.trim().toLowerCase();
+    const existingUser = await this.usersService.findByEmail(newEmail);
+
+    if (existingUser && existingUser.id !== userId) {
+      throw new ConflictException('Email này đã được sử dụng');
+    }
+
+    const requestId = `${userId}:${newEmail}`;
+    const result = await this.otpService.sendOtp(
+      requestId,
+      OtpType.EMAIL_CHANGE,
+    );
+
+    return {
+      requestId,
+      expiresIn: Math.floor((result.expiresAt.getTime() - Date.now()) / 1000),
+    };
+  }
+
+  @Post('email/verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Xác nhận OTP đổi email' })
+  async verifyEmailOtp(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: VerifyPhoneOtpDto,
+  ) {
+    const requestPrefix = `${userId}:`;
+
+    if (!dto.requestId.startsWith(requestPrefix)) {
+      throw new BadRequestException('Mã yêu cầu không hợp lệ');
+    }
+
+    const newEmail = dto.requestId.slice(requestPrefix.length).toLowerCase();
+
+    await this.otpService.verifyOtp(
+      dto.requestId,
+      dto.otp,
+      OtpType.EMAIL_CHANGE,
+    );
+
+    const existingUser = await this.usersService.findByEmail(newEmail);
+
+    if (existingUser && existingUser.id !== userId) {
+      throw new ConflictException('Email này đã được sử dụng');
+    }
+
+    await this.usersService.update(userId, { email: newEmail });
+
+    return { email: newEmail };
   }
 
   private mapProfile(
