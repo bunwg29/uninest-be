@@ -818,39 +818,6 @@ export class ListingsService {
     });
   }
 
-  async getDetailsForComparison(userId: string, ids: string[]) {
-    if (ids.length === 0) {
-      return [];
-    }
-
-    const [listings, favorites, holds] = await Promise.all([
-      Promise.all(ids.map((id) => this.createDetailQuery(id, true).getOne())),
-      this.favoriteRepository.find({
-        where: { userId, listingId: In(ids) },
-        select: { listingId: true },
-      }),
-      findActiveHolds(this.dataSource, ids),
-    ]);
-    const favoriteIds = new Set(favorites.map((item) => item.listingId));
-
-    return listings.flatMap((listing) =>
-      listing
-        ? [
-            {
-              status: listing.status,
-              isDeleted: listing.deletedAt !== null,
-              detail: this.toListingDetail(
-                listing,
-                favoriteIds.has(listing.id),
-                holds.get(listing.id),
-                false,
-              ),
-            },
-          ]
-        : [],
-    );
-  }
-
   private createDetailQuery(id: string, withDeleted = false) {
     const query = this.listingRepository
       .createQueryBuilder('listing')
