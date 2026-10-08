@@ -29,6 +29,7 @@ import {
 import { UniversitiesService } from '@modules/universities/universities.service';
 import { LISTING_EVENTS } from '../constants';
 import { UserRoleType } from '@common/constants';
+import { escapeLikePattern } from '@common/utils';
 import { R2StorageService } from '@core/storage';
 import { Conversation } from '@modules/chat/entities';
 import { Province, Ward } from '@modules/locations/entities';
@@ -209,10 +210,8 @@ export class ListingsService {
     const { keyword, limit, page, sortBy, status } = query;
     const listingsQuery = this.listingRepository
       .createQueryBuilder('listing')
-      .leftJoinAndSelect('listing.images', 'image')
       .leftJoinAndSelect('listing.province', 'province')
       .leftJoinAndSelect('listing.ward', 'ward')
-      .leftJoinAndSelect('listing.listingAmenities', 'listingAmenity')
       .where('listing.ownerId = :userId', { userId });
 
     if (status === 'all' || status === 'deleted') {
@@ -228,7 +227,7 @@ export class ListingsService {
     if (keyword) {
       listingsQuery.andWhere(
         '(listing.title ILIKE :keyword OR listing.fullAddress ILIKE :keyword)',
-        { keyword: `%${keyword}%` },
+        { keyword: `%${escapeLikePattern(keyword)}%` },
       );
     }
 
@@ -246,38 +245,13 @@ export class ListingsService {
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
-    const engagement = await this.loadEngagementCounts(
-      listings.map((listing) => listing.id),
-    );
-    const counterRows = await this.listingRepository
-      .createQueryBuilder('listing')
-      .select('listing.status', 'status')
-      .addSelect('COUNT(listing.id)', 'count')
-      .where('listing.ownerId = :userId', { userId })
-      .groupBy('listing.status')
-      .getRawMany<{ status: ListingStatus; count: string }>();
-    const counters: Record<ListingStatus | 'deleted', number> = {
-      [ListingStatus.PENDING]: 0,
-      [ListingStatus.ACTIVE]: 0,
-      [ListingStatus.REJECTED]: 0,
-      [ListingStatus.HIDDEN]: 0,
-      [ListingStatus.RENTED]: 0,
-      [ListingStatus.PAUSED]: 0,
-      deleted: 0,
-    };
-
-    counterRows.forEach((row) => {
-      counters[row.status] = Number(row.count);
-    });
-
-    counters.deleted = await this.listingRepository
-      .createQueryBuilder('listing')
-      .withDeleted()
-      .where('listing.ownerId = :userId', { userId })
-      .andWhere('listing.deletedAt IS NOT NULL')
-      .getCount();
-
-    await this.attachUniversities(listings);
+    const listingIds = listings.map((listing) => listing.id);
+    const [engagement, counters] = await Promise.all([
+      this.loadEngagementCounts(listingIds),
+      this.countLandlordListingsByStatus(userId),
+      this.attachImagesAndAmenities(listings),
+      this.attachUniversities(listings),
+    ]);
 
     return {
       items: listings.map((listing) =>
@@ -325,17 +299,18 @@ export class ListingsService {
   }
 
   async getListingDetail(userId: string, roleId: UserRoleType, id: string) {
-    const [listing, isFavorite] = await Promise.all([
-      this.createDetailQuery(id).getOne(),
-      this.favoriteRepository.existsBy({ userId, listingId: id }),
-    ]);
+    const [listing, isFavorite, myBooking, holds, universities] =
+      await Promise.all([
+        this.createDetailQuery(id).getOne(),
+        this.favoriteRepository.existsBy({ userId, listingId: id }),
+        roleId === UserRoleType.STUDENT
+          ? this.findMyActiveBooking(userId, id)
+          : Promise.resolve(null),
+        findActiveHolds(this.dataSource, [id]),
+        this.loadListingUniversities([id]),
+      ]);
 
-    const myBooking =
-      roleId === UserRoleType.STUDENT && listing
-        ? await this.findMyActiveBooking(userId, listing.id)
-        : null;
-
-    if (listing) await this.attachUniversities([listing]);
+    if (listing) listing.listingUniversities = universities.get(id) ?? [];
 
     if (
       listing &&
@@ -354,7 +329,6 @@ export class ListingsService {
 
     this.assertCanAccessListing(listing, userId, roleId);
 
-    const holds = await findActiveHolds(this.dataSource, [listing.id]);
     const canSeeStats =
       listing.ownerId === userId || roleId === UserRoleType.ADMIN;
 
@@ -965,15 +939,78 @@ export class ListingsService {
     );
   }
 
-  private async attachUniversities(listings: Listing[]): Promise<void> {
+  private async countLandlordListingsByStatus(
+    userId: string,
+  ): Promise<Record<ListingStatus | 'deleted', number>> {
+    const rows = await this.listingRepository
+      .createQueryBuilder('listing')
+      .withDeleted()
+      .select(
+        `CASE WHEN listing.deletedAt IS NOT NULL THEN 'deleted' ELSE listing.status::text END`,
+        'status',
+      )
+      .addSelect('COUNT(listing.id)', 'count')
+      .where('listing.ownerId = :userId', { userId })
+      .groupBy('1')
+      .getRawMany<{ status: ListingStatus | 'deleted'; count: string }>();
+    const counters: Record<ListingStatus | 'deleted', number> = {
+      [ListingStatus.PENDING]: 0,
+      [ListingStatus.ACTIVE]: 0,
+      [ListingStatus.REJECTED]: 0,
+      [ListingStatus.HIDDEN]: 0,
+      [ListingStatus.RENTED]: 0,
+      [ListingStatus.PAUSED]: 0,
+      deleted: 0,
+    };
+
+    rows.forEach((row) => {
+      counters[row.status] = Number(row.count);
+    });
+
+    return counters;
+  }
+
+  private async attachImagesAndAmenities(listings: Listing[]): Promise<void> {
     if (listings.length === 0) return;
 
+    const listingIds = listings.map((listing) => listing.id);
+    const [images, amenities] = await Promise.all([
+      this.dataSource.getRepository(ListingImage).find({
+        where: { listingId: In(listingIds) },
+        order: { sortOrder: 'ASC' },
+      }),
+      this.dataSource.getRepository(ListingAmenity).find({
+        where: { listingId: In(listingIds) },
+        select: { listingId: true, amenityId: true },
+      }),
+    ]);
+    const groupBy = <T extends { listingId: string }>(rows: T[]) =>
+      rows.reduce((groups, row) => {
+        groups.set(row.listingId, [...(groups.get(row.listingId) ?? []), row]);
+
+        return groups;
+      }, new Map<string, T[]>());
+    const imagesByListing = groupBy(images);
+    const amenitiesByListing = groupBy(amenities);
+
+    listings.forEach((listing) => {
+      listing.images = imagesByListing.get(listing.id) ?? [];
+      listing.listingAmenities = amenitiesByListing.get(listing.id) ?? [];
+    });
+  }
+
+  private async loadListingUniversities(
+    listingIds: string[],
+  ): Promise<Map<string, ListingUniversity[]>> {
+    const byListing = new Map<string, ListingUniversity[]>();
+
+    if (listingIds.length === 0) return byListing;
+
     const rows = await this.dataSource.getRepository(ListingUniversity).find({
-      where: { listingId: In(listings.map((listing) => listing.id)) },
+      where: { listingId: In(listingIds) },
       relations: { university: true },
       order: { position: 'ASC' },
     });
-    const byListing = new Map<string, ListingUniversity[]>();
 
     rows.forEach((row) => {
       byListing.set(row.listingId, [
@@ -981,6 +1018,15 @@ export class ListingsService {
         row,
       ]);
     });
+
+    return byListing;
+  }
+
+  private async attachUniversities(listings: Listing[]): Promise<void> {
+    const byListing = await this.loadListingUniversities(
+      listings.map((listing) => listing.id),
+    );
+
     listings.forEach((listing) => {
       listing.listingUniversities = byListing.get(listing.id) ?? [];
     });
