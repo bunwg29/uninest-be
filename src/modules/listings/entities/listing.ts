@@ -15,6 +15,7 @@ import type { Province, Ward } from '@modules/locations/entities';
 import { ListingStatus } from './listing-status';
 import { ListingImage } from './listing-image';
 import { ListingAmenity } from './listing-amenity';
+import { ListingUniversity } from './listing-university';
 import { Favorite } from './favorite';
 
 type ListingPoint = {
@@ -142,6 +143,12 @@ export class Listing {
     cascade: true,
   })
   listingAmenities!: ListingAmenity[];
+
+  @OneToMany(
+    () => ListingUniversity,
+    (listingUniversity) => listingUniversity.listing,
+  )
+  listingUniversities!: ListingUniversity[];
 
   @OneToMany(() => Favorite, (favorite) => favorite.listing)
   favorites!: Favorite[];

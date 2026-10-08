@@ -9,6 +9,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
   DataSource,
+  EntityManager,
   In,
   MoreThan,
   QueryFailedError,
@@ -25,6 +26,7 @@ import {
   findActiveHolds,
   type ListingHoldInfo,
 } from '@modules/booking';
+import { UniversitiesService } from '@modules/universities/universities.service';
 import { LISTING_EVENTS } from '../constants';
 import { UserRoleType } from '@common/constants';
 import { R2StorageService } from '@core/storage';
@@ -36,6 +38,7 @@ import {
   Favorite,
   Listing,
   ListingAmenity,
+  ListingUniversity,
   ListingImage,
   ListingReport,
   ListingStatus,
@@ -71,6 +74,7 @@ export class ListingsService {
     private readonly dataSource: DataSource,
     private readonly storageService: R2StorageService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly universitiesService: UniversitiesService,
   ) {}
 
   async createListing(userId: string, dto: CreateListingDto): Promise<Listing> {
@@ -98,6 +102,9 @@ export class ListingsService {
 
     await this.assertImagesValid(dto.images?.map((image) => image.key));
     await this.assertVideoValid(dto.videoKey);
+    const universities = await this.universitiesService.assertCodesExist(
+      dto.universityCodes ?? [],
+    );
 
     const amenityIds = [...new Set(dto.amenityIds ?? [])];
     const amenities = amenityIds.length
@@ -175,6 +182,12 @@ export class ListingsService {
 
         await manager.save(ListingAmenity, listingAmenities);
       }
+
+      await this.saveListingUniversities(
+        manager,
+        savedListing.id,
+        universities.map((university) => university.code),
+      );
 
       const createdListing = await manager.findOne(Listing, {
         where: { id: savedListing.id },
@@ -264,6 +277,8 @@ export class ListingsService {
       .andWhere('listing.deletedAt IS NOT NULL')
       .getCount();
 
+    await this.attachUniversities(listings);
+
     return {
       items: listings.map((listing) =>
         this.toLandlordListing(listing, engagement.get(listing.id)),
@@ -299,6 +314,8 @@ export class ListingsService {
       this.dataSource.getRepository(Booking).countBy({ listingId: id }),
     ]);
 
+    await this.attachUniversities([listing]);
+
     return {
       ...this.toLandlordListing(listing),
       saveCount,
@@ -317,6 +334,8 @@ export class ListingsService {
       roleId === UserRoleType.STUDENT && listing
         ? await this.findMyActiveBooking(userId, listing.id)
         : null;
+
+    if (listing) await this.attachUniversities([listing]);
 
     if (
       listing &&
@@ -702,6 +721,9 @@ export class ListingsService {
     )?.videoKey;
 
     await this.assertVideoValid(dto.videoKey, existingVideoKey);
+    const universities = await this.universitiesService.assertCodesExist(
+      dto.universityCodes ?? [],
+    );
 
     const amenityIds = [...new Set(dto.amenityIds ?? [])];
     const amenities = amenityIds.length
@@ -812,6 +834,12 @@ export class ListingsService {
           await manager.save(ListingAmenity, listingAmenities);
         }
 
+        await this.saveListingUniversities(
+          manager,
+          id,
+          universities.map((university) => university.code),
+        );
+
         const updatedListing = await manager.findOne(Listing, {
           where: { id },
           relations: { images: true, listingAmenities: true },
@@ -895,6 +923,9 @@ export class ListingsService {
       findActiveHolds(this.dataSource, uniqueIds),
     ]);
     const favoriteIds = new Set(favorites.map((item) => item.listingId));
+
+    await this.attachUniversities(listings);
+
     const listingsById = new Map(
       listings.map((listing) => [listing.id, listing]),
     );
@@ -913,6 +944,55 @@ export class ListingsService {
           ]
         : [];
     });
+  }
+
+  private async saveListingUniversities(
+    manager: EntityManager,
+    listingId: string,
+    codes: string[],
+  ): Promise<void> {
+    await manager.delete(ListingUniversity, { listingId });
+
+    if (codes.length === 0) return;
+
+    await manager.insert(
+      ListingUniversity,
+      codes.map((universityCode, position) => ({
+        listingId,
+        universityCode,
+        position,
+      })),
+    );
+  }
+
+  private async attachUniversities(listings: Listing[]): Promise<void> {
+    if (listings.length === 0) return;
+
+    const rows = await this.dataSource.getRepository(ListingUniversity).find({
+      where: { listingId: In(listings.map((listing) => listing.id)) },
+      relations: { university: true },
+      order: { position: 'ASC' },
+    });
+    const byListing = new Map<string, ListingUniversity[]>();
+
+    rows.forEach((row) => {
+      byListing.set(row.listingId, [
+        ...(byListing.get(row.listingId) ?? []),
+        row,
+      ]);
+    });
+    listings.forEach((listing) => {
+      listing.listingUniversities = byListing.get(listing.id) ?? [];
+    });
+  }
+
+  private toUniversities(listing: Listing) {
+    return (listing.listingUniversities ?? [])
+      .filter((item) => item.university)
+      .map((item) => ({
+        code: item.university.code,
+        name: item.university.name,
+      }));
   }
 
   private createDetailQuery(id: string, withDeleted = false) {
@@ -1060,6 +1140,7 @@ export class ListingsService {
         ? this.storageService.getPublicUrl(listing.videoKey)
         : null,
       amenities,
+      universities: this.toUniversities(listing),
       landlord: {
         id: listing.owner.id,
         fullName: listing.owner.fullName,
@@ -1202,6 +1283,7 @@ export class ListingsService {
       latitude: listing.location.coordinates[1],
       longitude: listing.location.coordinates[0],
       amenityIds: listing.listingAmenities?.map((item) => item.amenityId) ?? [],
+      universities: this.toUniversities(listing),
       viewingSchedule: listing.viewingSchedule ?? undefined,
     };
   }

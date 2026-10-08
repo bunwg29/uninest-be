@@ -167,6 +167,18 @@ export class SearchListingsQueryDto {
   radius?: number;
 
   @ApiPropertyOptional({
+    description: 'Chỉ lấy tin đăng gần một trường đại học (mã trường)',
+    example: 'DDK',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
+  @IsString({ message: 'Mã trường không hợp lệ' })
+  @MaxLength(20, { message: 'Mã trường không hợp lệ' })
+  universityCode?: string;
+
+  @ApiPropertyOptional({
     description: 'Chỉ lấy các tin đăng của một chủ trọ',
     format: 'uuid',
   })

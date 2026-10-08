@@ -29,11 +29,12 @@ export class UpdateProfileDto {
   @ApiPropertyOptional({
     example: ['DDK'],
     type: [String],
-    description: 'Mã trường đại học: sinh viên tối đa 1, chủ trọ tối đa 3',
+    description:
+      'Mã trường đại học đang học (chỉ dành cho sinh viên, tối đa 1)',
   })
   @IsOptional()
   @IsArray({ message: 'Danh sách trường phải là mảng' })
-  @ArrayMaxSize(3, { message: 'Chỉ chọn được tối đa 3 trường đại học' })
+  @ArrayMaxSize(1, { message: 'Sinh viên chỉ chọn được 1 trường đại học' })
   @IsString({ each: true, message: 'Mã trường không hợp lệ' })
   @MaxLength(20, { each: true, message: 'Mã trường không hợp lệ' })
   universityCodes?: string[];
@@ -160,18 +161,6 @@ export class ProfileResponseDto {
 }
 
 export class LandlordVerificationDto {
-  @ApiPropertyOptional({
-    example: ['DDK'],
-    type: [String],
-    description: 'Mã trường đại học: sinh viên tối đa 1, chủ trọ tối đa 3',
-  })
-  @IsOptional()
-  @IsArray({ message: 'Danh sách trường phải là mảng' })
-  @ArrayMaxSize(3, { message: 'Chỉ chọn được tối đa 3 trường đại học' })
-  @IsString({ each: true, message: 'Mã trường không hợp lệ' })
-  @MaxLength(20, { each: true, message: 'Mã trường không hợp lệ' })
-  universityCodes?: string[];
-
   @ApiProperty({ example: '048200012345', description: 'Số CCCD/CMND' })
   @Matches(/^(\d{9}|\d{12})$/, {
     message: 'Số CCCD/CMND phải gồm 9 hoặc 12 chữ số',

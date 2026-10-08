@@ -3,6 +3,7 @@ export * from './amenity-group';
 export * from './favorite';
 export * from './listing';
 export * from './listing-amenity';
+export * from './listing-university';
 export * from './listing-image';
 export * from './listing-status';
 export * from './listing-report';

@@ -115,10 +115,22 @@ export class AuthService {
       fullAddress = dto.streetAddress.trim();
     }
 
+    const universityCodes = dto.universityCodes ?? [];
+
+    if (universityCodes.length > 0) {
+      if (dto.roleId !== UserRoleType.STUDENT) {
+        throw new BadRequestException(
+          'Chủ trọ chọn trường đại học gần phòng khi đăng tin',
+        );
+      }
+
+      await this.usersService.assertUniversitiesExist(universityCodes);
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const identifier = dto.phone || dto.email!;
 
-    await this.usersService.create({
+    const createdUser = await this.usersService.create({
       email: dto.email || null,
       phone: dto.phone || null,
       fullName: dto.fullName.trim(),
@@ -131,6 +143,10 @@ export class AuthService {
       streetAddress: dto.streetAddress?.trim() || null,
       fullAddress,
     });
+
+    if (universityCodes.length > 0) {
+      await this.usersService.updateUniversities(createdUser, universityCodes);
+    }
 
     await this.otpService.sendOtp(identifier, OtpType.REGISTER);
 

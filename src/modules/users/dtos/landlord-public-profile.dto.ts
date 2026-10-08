@@ -21,7 +21,7 @@ export class LandlordPublicProfileDto {
 
   @ApiProperty({
     type: [Object],
-    description: 'Các trường đại học gần trọ mà chủ trọ đã chọn',
+    description: 'Các trường đại học gần các tin đang hiển thị của chủ trọ',
   })
   universities!: { code: string; name: string }[];
 

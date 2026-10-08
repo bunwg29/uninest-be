@@ -259,6 +259,18 @@ export class CreateListingDto {
   videoKey?: string | null;
 
   @ApiPropertyOptional({
+    example: ['DDK', 'VKU'],
+    type: [String],
+    description: 'Mã các trường đại học gần phòng, tối đa 3 trường',
+  })
+  @IsOptional()
+  @IsArray({ message: 'Danh sách trường phải là mảng' })
+  @ArrayMaxSize(3, { message: 'Chỉ chọn được tối đa 3 trường đại học' })
+  @IsString({ each: true, message: 'Mã trường không hợp lệ' })
+  @MaxLength(20, { each: true, message: 'Mã trường không hợp lệ' })
+  universityCodes?: string[];
+
+  @ApiPropertyOptional({
     example: [1, 2, 3],
     description: 'Danh sách mã định danh tiện ích dạng số',
     type: [Number],

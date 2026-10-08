@@ -8,6 +8,8 @@ import {
   IsOptional,
   IsIn,
   Matches,
+  ArrayMaxSize,
+  IsArray,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRoleType } from '@common/constants';
@@ -117,4 +119,16 @@ export class RegisterDto {
   @IsString()
   @MaxLength(255)
   streetAddress?: string;
+
+  @ApiPropertyOptional({
+    example: ['DDK'],
+    type: [String],
+    description: 'Mã trường đại học đang học (sinh viên, tối đa 1)',
+  })
+  @IsOptional()
+  @IsArray({ message: 'Danh sách trường phải là mảng' })
+  @ArrayMaxSize(1, { message: 'Sinh viên chỉ chọn được 1 trường đại học' })
+  @IsString({ each: true, message: 'Mã trường không hợp lệ' })
+  @MaxLength(20, { each: true, message: 'Mã trường không hợp lệ' })
+  universityCodes?: string[];
 }

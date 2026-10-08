@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { UniversitiesModule } from '@modules/universities/universities.module';
 import { Province, Ward } from '@modules/locations/entities';
 import {
   Amenity,
   Favorite,
   Listing,
   ListingAmenity,
+  ListingUniversity,
   ListingImage,
   ListingReport,
   ListingView,
@@ -22,11 +24,13 @@ import { ListingsService } from './services/listings.service';
       Amenity,
       Favorite,
       ListingAmenity,
+      ListingUniversity,
       ListingReport,
       ListingView,
       Province,
       Ward,
     ]),
+    UniversitiesModule,
   ],
   controllers: [ListingsController, LandlordListingsController],
   providers: [ListingsService],

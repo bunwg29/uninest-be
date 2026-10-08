@@ -41,6 +41,30 @@ export class UniversitiesService {
     return builder.getMany();
   }
 
+  async assertCodesExist(codes: string[]): Promise<University[]> {
+    const uniqueCodes = this.normalizeCodes(codes);
+
+    if (uniqueCodes.length === 0) return [];
+
+    const universities = await this.universityRepository.findBy({
+      code: In(uniqueCodes),
+    });
+
+    if (universities.length !== uniqueCodes.length) {
+      throw new BadRequestException(
+        'Một hoặc nhiều trường đại học không tồn tại',
+      );
+    }
+
+    const byCode = new Map(universities.map((item) => [item.code, item]));
+
+    return uniqueCodes.map((code) => byCode.get(code) as University);
+  }
+
+  normalizeCodes(codes: string[]): string[] {
+    return [...new Set(codes.map((code) => code.trim().toUpperCase()))];
+  }
+
   async getUserUniversities(userId: string): Promise<UniversitySummary[]> {
     const rows = await this.userUniversityRepository.find({
       where: { userId },

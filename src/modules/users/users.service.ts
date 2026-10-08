@@ -15,10 +15,7 @@ import {
 } from '../universities/universities.service';
 import { User, RolePermission } from './entities';
 
-const UNIVERSITY_LIMITS: Partial<Record<UserRoleType, number>> = {
-  [UserRoleType.STUDENT]: 1,
-  [UserRoleType.LANDLORD]: 3,
-};
+const STUDENT_UNIVERSITY_LIMIT = 1;
 
 type AddressUpdate = Partial<
   Pick<User, 'provinceCode' | 'wardCode' | 'streetAddress' | 'fullAddress'>
@@ -61,20 +58,12 @@ export class UsersService {
     userId: string,
     dto: {
       identityNumber: string;
-      universityCodes?: string[];
       provinceCode?: string;
       wardCode?: string;
       streetAddress?: string;
     },
   ): Promise<User> {
     const address = await this.resolveAddress(dto);
-
-    if (dto.universityCodes) {
-      await this.updateUniversities(
-        { id: userId, roleId: UserRoleType.LANDLORD },
-        dto.universityCodes,
-      );
-    }
 
     await this.userRepository.update(userId, {
       identityNumber: dto.identityNumber,
@@ -124,6 +113,10 @@ export class UsersService {
     };
   }
 
+  async assertUniversitiesExist(codes: string[]): Promise<void> {
+    await this.universitiesService.assertCodesExist(codes);
+  }
+
   getUniversities(userId: string): Promise<UniversitySummary[]> {
     return this.universitiesService.getUserUniversities(userId);
   }
@@ -132,16 +125,16 @@ export class UsersService {
     user: Pick<User, 'id' | 'roleId'>,
     codes: string[],
   ): Promise<UniversitySummary[]> {
-    const maxCount = UNIVERSITY_LIMITS[user.roleId] ?? 0;
-
-    if (maxCount === 0 && codes.length > 0) {
-      throw new BadRequestException('Tài khoản này không chọn trường đại học');
+    if (user.roleId !== UserRoleType.STUDENT && codes.length > 0) {
+      throw new BadRequestException(
+        'Chủ trọ chọn trường đại học gần phòng khi đăng tin',
+      );
     }
 
     const universities = await this.universitiesService.replaceUserUniversities(
       user.id,
       codes,
-      maxCount,
+      STUDENT_UNIVERSITY_LIMIT,
     );
 
     await this.userRepository.update(user.id, {
