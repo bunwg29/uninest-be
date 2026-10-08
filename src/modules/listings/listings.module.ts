@@ -8,6 +8,7 @@ import {
   ListingAmenity,
   ListingImage,
   ListingReport,
+  ListingView,
 } from './entities';
 import { ListingsController } from './controllers/listings.controller';
 import { LandlordListingsController } from './controllers/landlord-listings.controller';
@@ -22,6 +23,7 @@ import { ListingsService } from './services/listings.service';
       Favorite,
       ListingAmenity,
       ListingReport,
+      ListingView,
       Province,
       Ward,
     ]),
