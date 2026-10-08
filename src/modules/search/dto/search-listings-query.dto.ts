@@ -180,6 +180,9 @@ export class SearchListingsQueryDto {
     description: 'Cách sắp xếp kết quả',
   })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'distance' ? 'nearest' : value,
+  )
   @IsIn(SEARCH_SORT_VALUES, { message: 'Cách sắp xếp không hợp lệ' })
   sortBy: SearchSort = 'relevance';
 

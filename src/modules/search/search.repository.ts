@@ -55,7 +55,7 @@ export class ListingsSearchRepository {
     if (rows.length === 0) {
       return {
         items: [],
-        hasResults: total > 0,
+        has_results: total > 0,
         suggestion: total === 0 ? this.createSuggestion(query) : undefined,
         pagination: {
           page: query.page,
@@ -70,7 +70,7 @@ export class ListingsSearchRepository {
 
     return {
       items,
-      hasResults: true,
+      has_results: true,
       pagination: {
         page: query.page,
         limit: query.limit,
@@ -108,7 +108,7 @@ export class ListingsSearchRepository {
 
     return {
       items,
-      hasResults: items.length > 0,
+      has_results: items.length > 0,
       pagination: {
         page,
         limit,
@@ -312,7 +312,7 @@ export class ListingsSearchRepository {
       case 'area_desc':
         listingsQuery.orderBy('listing.area', 'DESC');
         break;
-      case 'distance':
+      case 'nearest':
         listingsQuery.orderBy(SEARCH_DISTANCE_SQL, 'ASC');
         break;
       case 'newest':

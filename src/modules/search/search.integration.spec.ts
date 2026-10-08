@@ -216,7 +216,7 @@ void describe('SearchService voi PostgreSQL va PostGIS', () => {
         latitude: Number(fixture.latitude),
         longitude: Number(fixture.longitude),
         radius: 0.1,
-        sortBy: 'distance',
+        sortBy: 'nearest',
         limit: 50,
       }),
     );
@@ -240,7 +240,7 @@ void describe('SearchService voi PostgreSQL va PostGIS', () => {
         latitude: Number(fixture.latitude),
         longitude: Number(fixture.longitude),
         radius: 50,
-        sortBy: 'distance',
+        sortBy: 'nearest',
         limit: 50,
       }),
     );

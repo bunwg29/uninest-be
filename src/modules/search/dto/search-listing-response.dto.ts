@@ -97,7 +97,7 @@ export class SearchListingsResponseDto {
   items!: SearchListingItemDto[];
 
   @ApiProperty()
-  hasResults!: boolean;
+  has_results!: boolean;
 
   @ApiPropertyOptional({ type: SearchSuggestionDto })
   suggestion?: SearchSuggestionDto;

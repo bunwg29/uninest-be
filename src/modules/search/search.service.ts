@@ -59,7 +59,7 @@ export const normalizeSearchQuery = (
     });
   }
 
-  if (query.sortBy === 'distance' && !hasLatitude) {
+  if (query.sortBy === 'nearest' && !hasLatitude) {
     throw new BadRequestException({
       error: 'INVALID_COORDINATES',
       message: 'Cần cung cấp vị trí để sắp xếp theo khoảng cách.',

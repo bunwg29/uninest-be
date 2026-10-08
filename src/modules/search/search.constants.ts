@@ -5,7 +5,7 @@ export const SEARCH_SORT_VALUES = [
   'price_desc',
   'area_asc',
   'area_desc',
-  'distance',
+  'nearest',
 ] as const;
 
 export type SearchSort = (typeof SEARCH_SORT_VALUES)[number];

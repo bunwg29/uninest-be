@@ -115,7 +115,7 @@ void describe('normalizeSearchQuery', () => {
   void it('tu choi sap xep khoang cach khi khong co toa do', () => {
     const query = new SearchListingsQueryDto();
 
-    query.sortBy = 'distance';
+    query.sortBy = 'nearest';
 
     assert.equal(
       getErrorCode(() => normalizeSearchQuery(query)),
