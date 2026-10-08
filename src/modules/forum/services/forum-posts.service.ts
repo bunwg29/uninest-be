@@ -8,6 +8,7 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, MoreThan, Repository } from 'typeorm';
 import { createPaginatedResult } from '@common/dtos';
+import { escapeLikePattern } from '@common/utils';
 import { R2StorageService } from '@core/storage';
 import { LocationsService } from '@modules/locations/locations.service';
 import {
@@ -29,9 +30,6 @@ import {
 } from '../entities';
 import { ForumModerationService } from './forum-moderation.service';
 import { ForumPresenterService, ForumViewer } from './forum-presenter.service';
-
-export const escapeLikePattern = (value: string) =>
-  value.replace(/[\\%_]/g, '\\$&');
 
 const FORUM_VIEW_THROTTLE_MS = 30 * 60 * 1000;
 

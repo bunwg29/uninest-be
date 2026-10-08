@@ -20,13 +20,12 @@ import {
   SEARCH_ROOM_TYPE_RESPONSE_VALUES,
 } from './search.constants';
 import type { NormalizedSearchQuery } from './search.service';
+import { escapeLikePattern } from '@common/utils';
 
 interface SearchListingRow {
   id: string;
   distanceMeters?: number | string | null;
 }
-
-const escapeLikePattern = (value: string) => value.replace(/[\\%_]/g, '\\$&');
 
 const SEARCH_DISTANCE_SQL = `ST_Distance(${SEARCH_LISTING_GEOGRAPHY_SQL}, ${SEARCH_REFERENCE_POINT_SQL})`;
 

@@ -30,6 +30,7 @@ import {
 import { CHAT_EVENTS, CHAT_LIMITS } from '../constants';
 import { Conversation, Message, MessageType } from '../entities';
 import { ChatMapperService } from './chat-mapper.service';
+import { escapeLikePattern } from '@common/utils';
 
 const UNIQUE_VIOLATION_CODE = '23505';
 
@@ -227,7 +228,7 @@ export class ChatService {
       queryBuilder.andWhere(
         `(CASE WHEN conversation.student_id = :userId THEN landlord.full_name ELSE student.full_name END ILIKE :pattern
           OR listing.title ILIKE :pattern)`,
-        { pattern: `%${this.escapeLikePattern(query.keyword)}%` },
+        { pattern: `%${escapeLikePattern(query.keyword)}%` },
       );
     }
 
@@ -740,10 +741,6 @@ export class ChatService {
     return conversation.studentId === userId
       ? conversation.studentDeletedAt
       : conversation.landlordDeletedAt;
-  }
-
-  private escapeLikePattern(keyword: string): string {
-    return keyword.replace(/[\\%_]/g, (character) => `\\${character}`);
   }
 
   private buildUnreadExistsClause(conversationAlias: string): string {
