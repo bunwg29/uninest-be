@@ -6,7 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, QueryFailedError, Repository } from 'typeorm';
+import {
+  DataSource,
+  In,
+  MoreThan,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 import {
   ACTIVE_BOOKING_STATUSES,
   Booking,
@@ -45,8 +51,6 @@ const POSTGRES_UNIQUE_VIOLATION = '23505';
 
 @Injectable()
 export class ListingsService {
-  private readonly viewThrottleExpirations = new Map<string, number>();
-
   constructor(
     @InjectRepository(Amenity)
     private readonly amenityRepository: Repository<Amenity>,
@@ -348,34 +352,26 @@ export class ListingsService {
       return { viewCount: listing.viewCount, incremented: false };
     }
 
-    const throttleKey = `${userId}:${id}`;
-    const currentTime = Date.now();
+    const incremented = await this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `listing-view:${userId}:${id}`,
+      ]);
 
-    this.pruneViewThrottle(currentTime);
-    const throttleExpiration = this.viewThrottleExpirations.get(throttleKey);
-
-    if (throttleExpiration && throttleExpiration > currentTime) {
-      return { viewCount: null, incremented: false };
-    }
-
-    const nextExpiration = currentTime + VIEW_THROTTLE_MILLISECONDS;
-
-    this.viewThrottleExpirations.set(throttleKey, nextExpiration);
-
-    try {
-      await this.dataSource.transaction(async (manager) => {
-        await manager.increment(Listing, { id }, 'viewCount', 1);
-        await manager.insert(ListingView, { listingId: id, viewerId: userId });
+      const recentView = await manager.existsBy(ListingView, {
+        listingId: id,
+        viewerId: userId,
+        createdAt: MoreThan(new Date(Date.now() - VIEW_THROTTLE_MILLISECONDS)),
       });
-    } catch (error) {
-      if (this.viewThrottleExpirations.get(throttleKey) === nextExpiration) {
-        this.viewThrottleExpirations.delete(throttleKey);
-      }
 
-      throw error;
-    }
+      if (recentView) return false;
 
-    return { viewCount: null, incremented: true };
+      await manager.increment(Listing, { id }, 'viewCount', 1);
+      await manager.insert(ListingView, { listingId: id, viewerId: userId });
+
+      return true;
+    });
+
+    return { viewCount: null, incremented };
   }
 
   async getLandlordStats(userId: string, period: LandlordStatsPeriod) {
@@ -1163,13 +1159,5 @@ export class ListingsService {
           'Tài khoản đang ở trạng thái "Chờ xác minh". Vui lòng hoàn thiện thông tin xác minh trước khi đăng tin',
       });
     }
-  }
-
-  private pruneViewThrottle(currentTime: number): void {
-    if (this.viewThrottleExpirations.size < 5000) return;
-
-    this.viewThrottleExpirations.forEach((expiration, key) => {
-      if (expiration <= currentTime) this.viewThrottleExpirations.delete(key);
-    });
   }
 }
