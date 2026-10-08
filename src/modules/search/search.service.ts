@@ -15,6 +15,7 @@ export interface NormalizedSearchQuery {
   maxArea?: number;
   roomTypes: SearchRoomType[];
   amenities: number[];
+  ownerId?: string;
   latitude?: number;
   longitude?: number;
   radiusKm?: number;
@@ -73,6 +74,7 @@ export const normalizeSearchQuery = (
     maxArea: query.maxArea,
     roomTypes: query.roomTypes ?? [],
     amenities: query.amenities ?? [],
+    ownerId: query.ownerId,
     latitude: query.latitude,
     longitude: query.longitude,
     radiusKm: hasLatitude

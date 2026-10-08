@@ -12,6 +12,7 @@ import {
   Max,
   MaxLength,
   Min,
+  IsUUID,
 } from 'class-validator';
 import {
   SEARCH_DEFAULTS,
@@ -164,6 +165,14 @@ export class SearchListingsQueryDto {
     message: `Bán kính tìm kiếm không được vượt quá ${SEARCH_DEFAULTS.MAX_RADIUS_KM} km`,
   })
   radius?: number;
+
+  @ApiPropertyOptional({
+    description: 'Chỉ lấy các tin đăng của một chủ trọ',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'Mã chủ trọ không hợp lệ' })
+  ownerId?: string;
 
   @ApiPropertyOptional({
     enum: SEARCH_SORT_VALUES,

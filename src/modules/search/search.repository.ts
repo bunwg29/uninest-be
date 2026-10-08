@@ -209,6 +209,12 @@ export class ListingsSearchRepository {
       })
       .andWhere('listing.deletedAt IS NULL');
 
+    if (query.ownerId) {
+      listingsQuery.andWhere('listing.ownerId = :ownerId', {
+        ownerId: query.ownerId,
+      });
+    }
+
     if (query.keyword) {
       listingsQuery.andWhere(
         '(unaccent(listing.title) ILIKE unaccent(:keyword) OR unaccent(listing.fullAddress) ILIKE unaccent(:keyword))',
