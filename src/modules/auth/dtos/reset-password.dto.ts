@@ -29,13 +29,14 @@ export class ResetPasswordDto {
 
   @ApiProperty({
     example: 'NewSecret@123',
-    description: 'Mật khẩu mới (tối thiểu 8 ký tự, có chữ số và chữ in hoa)',
+    description: 'Mật khẩu mới (tối thiểu 8 ký tự, gồm chữ cái và chữ số)',
   })
   @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
   @IsString()
   @MinLength(8, { message: 'Mật khẩu mới phải từ 8 ký tự trở lên' })
-  @Matches(/[0-9]/, { message: 'Mật khẩu mới phải có ít nhất một chữ số' })
-  @Matches(/[A-Z]/, { message: 'Mật khẩu mới phải có ít nhất một chữ in hoa' })
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d)/, {
+    message: 'Mật khẩu mới phải chứa cả chữ cái và chữ số',
+  })
   @MaxLength(32)
   newPassword!: string;
 }

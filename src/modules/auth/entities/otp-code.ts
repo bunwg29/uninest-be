@@ -11,6 +11,7 @@ export enum OtpType {
   LOGIN = 'LOGIN',
   FORGOT_PASSWORD = 'FORGOT_PASSWORD',
   PHONE_CHANGE = 'PHONE_CHANGE',
+  EMAIL_CHANGE = 'EMAIL_CHANGE',
 }
 
 @Entity('otp_codes')

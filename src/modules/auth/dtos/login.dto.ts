@@ -1,10 +1,4 @@
-import {
-  IsString,
-  IsNotEmpty,
-  MinLength,
-  MaxLength,
-  IsOptional,
-} from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, IsOptional } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class LoginDto {
@@ -23,7 +17,6 @@ export class LoginDto {
   })
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @IsString()
-  @MinLength(6, { message: 'Mật khẩu tối thiểu 6 ký tự' })
   @MaxLength(32)
   password!: string;
 
