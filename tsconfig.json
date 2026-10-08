@@ -70,5 +70,5 @@
     "strictBindCallApply": true,
     "noFallthroughCasesInSwitch": true
   },
-  "exclude": ["dist", "node_modules", "test", "coverage", "vitest.config.mts"]
+  "exclude": ["dist", "node_modules"]
 }
