@@ -64,7 +64,9 @@ export class UsersController {
     @CurrentUser('userId') userId: string,
     @Body() dto: UpdateProfileDto,
   ): Promise<ProfileResponseDto> {
+    const address = await this.usersService.resolveAddress(dto);
     const user = await this.usersService.update(userId, {
+      ...address,
       fullName: dto.name?.trim(),
       school: dto.school?.trim(),
       bio: dto.bio?.trim(),
@@ -286,6 +288,12 @@ export class UsersController {
       email: user.email,
       school: user.school,
       bio: user.bio,
+      provinceCode: user.provinceCode,
+      provinceName: user.province?.fullName ?? null,
+      wardCode: user.wardCode,
+      wardName: user.ward?.fullName ?? null,
+      streetAddress: user.streetAddress,
+      fullAddress: user.fullAddress,
       interestedAreas: user.interestedAreas || [],
       role: user.role?.code || 'student',
       stats,

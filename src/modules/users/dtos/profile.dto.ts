@@ -37,6 +37,24 @@ export class UpdateProfileDto {
   @MaxLength(300, { message: 'Giới thiệu tối đa 300 ký tự' })
   bio?: string;
 
+  @ApiPropertyOptional({ example: '48', description: 'Mã tỉnh/thành phố' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '20194', description: 'Mã phường/xã' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  wardCode?: string;
+
+  @ApiPropertyOptional({ example: '54 Nguyễn Lương Bằng' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  streetAddress?: string;
+
   @ApiPropertyOptional({ example: ['Hòa Khánh', 'Khuê Mỹ'], type: [String] })
   @IsOptional()
   @IsArray()
@@ -112,6 +130,12 @@ export class ProfileResponseDto {
   @ApiPropertyOptional() email!: string | null;
   @ApiPropertyOptional() school!: string | null;
   @ApiPropertyOptional() bio!: string | null;
+  @ApiPropertyOptional() provinceCode!: string | null;
+  @ApiPropertyOptional() provinceName!: string | null;
+  @ApiPropertyOptional() wardCode!: string | null;
+  @ApiPropertyOptional() wardName!: string | null;
+  @ApiPropertyOptional() streetAddress!: string | null;
+  @ApiPropertyOptional() fullAddress!: string | null;
   @ApiProperty({ type: [String] }) interestedAreas!: string[];
   @ApiProperty() role!: string;
   @ApiPropertyOptional({ enum: ['pending_verification', 'verified'] })
