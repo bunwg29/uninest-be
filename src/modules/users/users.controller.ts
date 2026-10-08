@@ -33,7 +33,7 @@ import {
 @ApiTags('Profile')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('profile')
+@Controller(['profile', 'users/me'])
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,

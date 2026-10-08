@@ -74,7 +74,7 @@ export class AuthController {
   }
 
   @Public()
-  @Post('otp/send')
+  @Post(['otp/send', 'send-otp'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Gửi hoặc gửi lại mã xác thực OTP',
@@ -91,7 +91,7 @@ export class AuthController {
   }
 
   @Public()
-  @Post('otp/verify')
+  @Post(['otp/verify', 'verify-otp'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Xác thực mã OTP',

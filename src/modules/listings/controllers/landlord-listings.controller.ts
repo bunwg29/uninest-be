@@ -30,7 +30,7 @@ import { ListingsService } from '../services/listings.service';
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRoleType.LANDLORD)
-@Controller('landlord/listings')
+@Controller(['landlord/listings', 'listings/mine'])
 export class LandlordListingsController {
   constructor(private readonly listingsService: ListingsService) {}
 
