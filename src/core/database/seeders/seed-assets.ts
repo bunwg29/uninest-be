@@ -13,64 +13,68 @@ dotenv.config({
   quiet: true,
 });
 
-const PEXELS_SEARCH_URL = 'https://api.pexels.com/v1/search';
-const PEXELS_PAGE_SIZE = 80;
-const PEXELS_MAX_PAGES_PER_QUERY = 5;
+const PIXABAY_SEARCH_URL = 'https://pixabay.com/api/';
+const PIXABAY_PAGE_SIZE = 200;
+const PIXABAY_MAX_PAGES_PER_QUERY = 2;
 const UPLOAD_BATCH_SIZE = 5;
 const REQUEST_TIMEOUT_MS = 30_000;
 
-interface PexelsPhoto {
+interface PixabayPhoto {
   id: number;
-  src: { large: string };
+  largeImageURL: string;
 }
 
-interface PexelsSearchResponse {
-  photos: PexelsPhoto[];
+interface PixabaySearchResponse {
+  hits: PixabayPhoto[];
 }
 
-const fetchPexelsPage = async (
+const fetchPixabayPage = async (
   apiKey: string,
   query: string,
   page: number,
-): Promise<PexelsPhoto[]> => {
-  const url = `${PEXELS_SEARCH_URL}?${new URLSearchParams({
-    query,
-    per_page: String(PEXELS_PAGE_SIZE),
+): Promise<PixabayPhoto[]> => {
+  const url = `${PIXABAY_SEARCH_URL}?${new URLSearchParams({
+    key: apiKey,
+    q: query,
+    image_type: 'photo',
+    orientation: 'horizontal',
+    safesearch: 'true',
+    per_page: String(PIXABAY_PAGE_SIZE),
     page: String(page),
-    orientation: 'landscape',
   })}`;
   const response = await fetch(url, {
-    headers: { Authorization: apiKey },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
 
   if (!response.ok) {
-    throw new Error(`Pexels search failed: HTTP ${response.status}`);
+    throw new Error(`Pixabay search failed: HTTP ${response.status}`);
   }
 
-  return ((await response.json()) as PexelsSearchResponse).photos;
+  return ((await response.json()) as PixabaySearchResponse).hits;
 };
 
 const collectPhotoUrls = async (apiKey: string): Promise<string[]> => {
   const urls = new Map<number, string>();
 
   for (const query of DEMO_ASSET_SEARCH_QUERIES) {
-    for (let page = 1; page <= PEXELS_MAX_PAGES_PER_QUERY; page += 1) {
+    for (let page = 1; page <= PIXABAY_MAX_PAGES_PER_QUERY; page += 1) {
       if (urls.size >= DEMO_ASSET_COUNT) return [...urls.values()];
 
-      const photos = await fetchPexelsPage(apiKey, query, page);
+      const photos = await fetchPixabayPage(apiKey, query, page);
 
       if (photos.length === 0) break;
 
       photos.forEach((photo) => {
-        if (urls.size < DEMO_ASSET_COUNT) urls.set(photo.id, photo.src.large);
+        if (urls.size < DEMO_ASSET_COUNT) {
+          urls.set(photo.id, photo.largeImageURL);
+        }
       });
     }
   }
 
   if (urls.size < DEMO_ASSET_COUNT) {
     throw new Error(
-      `Pexels returned only ${urls.size} unique photos, ${DEMO_ASSET_COUNT} required`,
+      `Pixabay returned only ${urls.size} unique photos, ${DEMO_ASSET_COUNT} required`,
     );
   }
 
@@ -110,10 +114,10 @@ async function run(): Promise<void> {
     return;
   }
 
-  const apiKey = config.get<string>('PEXELS_API_KEY');
+  const apiKey = config.get<string>('PIXABAY_API_KEY');
 
   if (!apiKey) {
-    throw new Error('PEXELS_API_KEY must be configured to upload demo assets');
+    throw new Error('PIXABAY_API_KEY must be configured to upload demo assets');
   }
 
   if (!config.get<string>('R2_PUBLIC_URL')) {
