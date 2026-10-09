@@ -16,7 +16,9 @@ dotenv.config({
 const PIXABAY_SEARCH_URL = 'https://pixabay.com/api/';
 const PIXABAY_PAGE_SIZE = 200;
 const PIXABAY_MAX_PAGES_PER_QUERY = 2;
-const UPLOAD_BATCH_SIZE = 5;
+const UPLOAD_BATCH_SIZE = 2;
+const DOWNLOAD_MAX_ATTEMPTS = 6;
+const DOWNLOAD_BASE_DELAY_MS = 2_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 
 interface PixabayPhoto {
@@ -65,7 +67,10 @@ const collectPhotoUrls = async (apiKey: string): Promise<string[]> => {
       if (photos.length === 0) break;
 
       photos.forEach((photo) => {
-        if (urls.size < DEMO_ASSET_COUNT) {
+        if (
+          urls.size < DEMO_ASSET_COUNT &&
+          /\.jpe?g$/i.test(new URL(photo.largeImageURL).pathname)
+        ) {
           urls.set(photo.id, photo.largeImageURL);
         }
       });
@@ -81,20 +86,42 @@ const collectPhotoUrls = async (apiKey: string): Promise<string[]> => {
   return [...urls.values()];
 };
 
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+
 const downloadImage = async (sourceUrl: string): Promise<Buffer> => {
-  const response = await fetch(sourceUrl, {
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
+  for (let attempt = 1; attempt <= DOWNLOAD_MAX_ATTEMPTS; attempt += 1) {
+    const response = await fetch(sourceUrl, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Demo image download failed: HTTP ${response.status}`);
+    if (response.status === 429 || response.status >= 500) {
+      if (attempt === DOWNLOAD_MAX_ATTEMPTS) {
+        throw new Error(`Demo image download failed: HTTP ${response.status}`);
+      }
+
+      const retryAfter = Number(response.headers.get('retry-after'));
+
+      await wait(
+        retryAfter > 0
+          ? retryAfter * 1000
+          : DOWNLOAD_BASE_DELAY_MS * 2 ** (attempt - 1),
+      );
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Demo image download failed: HTTP ${response.status}`);
+    }
+
+    if (!response.headers.get('content-type')?.startsWith('image/jpeg')) {
+      throw new Error('Demo image source did not return a JPEG');
+    }
+
+    return Buffer.from(await response.arrayBuffer());
   }
 
-  if (!response.headers.get('content-type')?.startsWith('image/jpeg')) {
-    throw new Error('Demo image source did not return a JPEG');
-  }
-
-  return Buffer.from(await response.arrayBuffer());
+  throw new Error('Demo image download failed');
 };
 
 async function run(): Promise<void> {
