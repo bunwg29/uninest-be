@@ -13,6 +13,7 @@ import {
 import { User } from '@modules/users/entities';
 import type { Province, Ward } from '@modules/locations/entities';
 import { ListingStatus } from './listing-status';
+import { RoomType } from './room-type';
 import { ListingImage } from './listing-image';
 import { ListingAmenity } from './listing-amenity';
 import { ListingUniversity } from './listing-university';
@@ -41,8 +42,8 @@ export class Listing {
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
-  @Column({ type: 'varchar', length: 50, name: 'room_type' })
-  roomType!: string;
+  @Column({ type: 'enum', enum: RoomType, name: 'room_type' })
+  roomType!: RoomType;
 
   @Column({ type: 'numeric', precision: 12, scale: 0 })
   price!: string;

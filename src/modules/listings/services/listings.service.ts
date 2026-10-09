@@ -633,7 +633,7 @@ export class ListingsService {
           openBookings.map((booking) => ({
             bookingId: booking.id,
             eventType: BookingStatus.EXPIRED,
-            actor: 'system',
+            actor: BOOKING_ACTORS.SYSTEM,
             metadata: { reason: 'Phòng đã được cho thuê' },
           })),
         );

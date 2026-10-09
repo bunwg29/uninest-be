@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsEmpty,
+  IsEnum,
   IsIn,
   IsInt,
   IsNumber,
@@ -14,12 +15,9 @@ import {
   Min,
   IsUUID,
 } from 'class-validator';
-import {
-  SEARCH_DEFAULTS,
-  SEARCH_ROOM_TYPE_VALUES,
-  SEARCH_SORT_VALUES,
-} from '../search.constants';
-import type { SearchRoomType, SearchSort } from '../search.constants';
+import { RoomType } from '@modules/listings/entities';
+import { SEARCH_DEFAULTS, SEARCH_SORT_VALUES } from '../search.constants';
+import type { SearchSort } from '../search.constants';
 
 const normalizeCsvValues = (value: unknown): string[] | undefined => {
   if (value === undefined || value === null || value === '') return undefined;
@@ -95,7 +93,7 @@ export class SearchListingsQueryDto {
   maxArea?: number;
 
   @ApiPropertyOptional({
-    enum: SEARCH_ROOM_TYPE_VALUES,
+    enum: RoomType,
     isArray: true,
     description: 'Danh sách loại phòng, phân tách bằng dấu phẩy',
     example: 'phong_tro,studio',
@@ -103,14 +101,14 @@ export class SearchListingsQueryDto {
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => normalizeCsvValues(value))
   @IsArray({ message: 'Danh sách loại phòng không hợp lệ' })
-  @ArrayMaxSize(SEARCH_ROOM_TYPE_VALUES.length, {
+  @ArrayMaxSize(Object.values(RoomType).length, {
     message: 'Danh sách loại phòng vượt quá giới hạn',
   })
-  @IsIn(SEARCH_ROOM_TYPE_VALUES, {
+  @IsEnum(RoomType, {
     each: true,
     message: 'Loại phòng không hợp lệ',
   })
-  roomTypes?: SearchRoomType[];
+  roomTypes?: RoomType[];
 
   @ApiPropertyOptional({
     type: String,

@@ -26,7 +26,7 @@ export class OtpCode {
   @Column({ type: 'varchar', length: 64, name: 'code_hash' })
   codeHash!: string;
 
-  @Column({ type: 'varchar', length: 20, default: OtpType.REGISTER })
+  @Column({ type: 'enum', enum: OtpType, default: OtpType.REGISTER })
   type!: OtpType;
 
   @Column({ type: 'timestamptz', name: 'expires_at' })

@@ -9,6 +9,7 @@ import {
   ListingImage,
   ListingStatus,
   ListingUniversity,
+  RoomType,
 } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
 
@@ -159,8 +160,8 @@ const AREAS: readonly Area[] = [
   },
 ];
 
-interface RoomType {
-  code: string;
+interface RoomTypeSpec {
+  code: RoomType;
   label: string;
   minPrice: number;
   maxPrice: number;
@@ -169,9 +170,9 @@ interface RoomType {
   maxOccupants: number;
 }
 
-const ROOM_TYPES: readonly RoomType[] = [
+const ROOM_TYPES: readonly RoomTypeSpec[] = [
   {
-    code: 'phong_tro',
+    code: RoomType.PHONG_TRO,
     label: 'Phòng trọ',
     minPrice: 1_200_000,
     maxPrice: 2_200_000,
@@ -180,7 +181,7 @@ const ROOM_TYPES: readonly RoomType[] = [
     maxOccupants: 2,
   },
   {
-    code: 'chung_cu_mini',
+    code: RoomType.CHUNG_CU_MINI,
     label: 'Chung cư mini',
     minPrice: 2_500_000,
     maxPrice: 4_200_000,
@@ -189,7 +190,7 @@ const ROOM_TYPES: readonly RoomType[] = [
     maxOccupants: 3,
   },
   {
-    code: 'studio',
+    code: RoomType.STUDIO,
     label: 'Studio',
     minPrice: 3_000_000,
     maxPrice: 4_800_000,
@@ -198,7 +199,7 @@ const ROOM_TYPES: readonly RoomType[] = [
     maxOccupants: 2,
   },
   {
-    code: 'ky_tuc_xa',
+    code: RoomType.KY_TUC_XA,
     label: 'Ký túc xá',
     minPrice: 800_000,
     maxPrice: 1_400_000,
@@ -207,7 +208,7 @@ const ROOM_TYPES: readonly RoomType[] = [
     maxOccupants: 4,
   },
   {
-    code: 'nha_nguyen_can',
+    code: RoomType.NHA_NGUYEN_CAN,
     label: 'Nhà nguyên căn',
     minPrice: 5_500_000,
     maxPrice: 9_000_000,

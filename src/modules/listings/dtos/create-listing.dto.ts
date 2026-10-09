@@ -4,7 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
-  IsIn,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
@@ -17,9 +17,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SEARCH_ROOM_TYPE_RESPONSE_VALUES } from '@modules/search/search.constants';
-
-const LISTING_ROOM_TYPES = Object.keys(SEARCH_ROOM_TYPE_RESPONSE_VALUES);
+import { RoomType } from '../entities/room-type';
 
 export class CreateListingImageDto {
   @ApiProperty({
@@ -125,8 +123,8 @@ export class CreateListingDto {
   })
   @IsNotEmpty({ message: 'Loại hình phòng/trọ không được để trống' })
   @IsString({ message: 'Loại hình phòng/trọ phải là chuỗi' })
-  @IsIn(LISTING_ROOM_TYPES, { message: 'Loại hình phòng/trọ không hợp lệ' })
-  roomType!: string;
+  @IsEnum(RoomType, { message: 'Loại hình phòng/trọ không hợp lệ' })
+  roomType!: RoomType;
 
   @ApiProperty({
     example: 2500000,

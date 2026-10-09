@@ -1,10 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { SearchListingsQueryDto, SearchListingsResponseDto } from './dto';
-import {
-  SEARCH_DEFAULTS,
-  SearchRoomType,
-  SearchSort,
-} from './search.constants';
+import { RoomType } from '@modules/listings/entities';
+import { SEARCH_DEFAULTS, SearchSort } from './search.constants';
 import { ListingsSearchRepository } from './search.repository';
 
 export interface NormalizedSearchQuery {
@@ -13,7 +10,7 @@ export interface NormalizedSearchQuery {
   maxPrice?: number;
   minArea?: number;
   maxArea?: number;
-  roomTypes: SearchRoomType[];
+  roomTypes: RoomType[];
   amenities: number[];
   ownerId?: string;
   universityCodes: string[];

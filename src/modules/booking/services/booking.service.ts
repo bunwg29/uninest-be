@@ -26,7 +26,13 @@ import {
   type BookingActor,
   type BookingStatusChangedPayload,
 } from '../constants';
-import { Booking, BookingEvent, BookingStatus } from '../entities';
+import {
+  BOOKING_EVENT_CREATED,
+  Booking,
+  BookingEvent,
+  type BookingEventType,
+  BookingStatus,
+} from '../entities';
 import {
   canHoldAfterViewing,
   doTimeRangesOverlap,
@@ -224,7 +230,7 @@ export class BookingService {
       await queryRunner.manager.save(
         queryRunner.manager.create(BookingEvent, {
           bookingId: savedBooking.id,
-          eventType: 'created',
+          eventType: BOOKING_EVENT_CREATED,
           actor: BOOKING_ACTORS.STUDENT,
           metadata: null,
         }),
@@ -641,8 +647,8 @@ export class BookingService {
 
   private async addEvent(
     bookingId: string,
-    eventType: string,
-    actor: string,
+    eventType: BookingEventType,
+    actor: BookingActor,
     metadata: Record<string, unknown> | null = null,
   ) {
     await this.eventRepository.save(

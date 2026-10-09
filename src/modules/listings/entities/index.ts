@@ -6,5 +6,6 @@ export * from './listing-amenity';
 export * from './listing-university';
 export * from './listing-image';
 export * from './listing-status';
+export * from './room-type';
 export * from './listing-report';
 export * from './listing-view';

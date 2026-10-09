@@ -34,7 +34,7 @@ export class ListingReport {
   @Column({ type: 'uuid', name: 'reporter_id' })
   reporterId!: string;
 
-  @Column({ type: 'varchar', length: 30 })
+  @Column({ type: 'enum', enum: LISTING_REPORT_REASONS })
   reason!: ListingReportReason;
 
   @Column({ type: 'varchar', length: 500, nullable: true })

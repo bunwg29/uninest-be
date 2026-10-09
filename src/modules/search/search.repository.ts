@@ -16,8 +16,6 @@ import {
   SEARCH_DEFAULTS,
   SEARCH_LISTING_GEOGRAPHY_SQL,
   SEARCH_REFERENCE_POINT_SQL,
-  SEARCH_ROOM_TYPE_DATABASE_VALUES,
-  SEARCH_ROOM_TYPE_RESPONSE_VALUES,
 } from './search.constants';
 import type { NormalizedSearchQuery } from './search.service';
 import { escapeLikePattern } from '@common/utils';
@@ -253,16 +251,8 @@ export class ListingsSearchRepository {
     }
 
     if (query.roomTypes.length > 0) {
-      const databaseRoomTypes = [
-        ...new Set(
-          query.roomTypes.flatMap(
-            (roomType) => SEARCH_ROOM_TYPE_DATABASE_VALUES[roomType],
-          ),
-        ),
-      ];
-
       listingsQuery.andWhere('listing.roomType IN (:...roomTypes)', {
-        roomTypes: databaseRoomTypes,
+        roomTypes: query.roomTypes,
       });
     }
 
@@ -383,8 +373,7 @@ export class ListingsSearchRepository {
       price: Number(listing.price),
       area: Number(listing.area),
       address: listing.fullAddress,
-      roomType:
-        SEARCH_ROOM_TYPE_RESPONSE_VALUES[listing.roomType] ?? listing.roomType,
+      roomType: listing.roomType,
       amenityIds: (listing.listingAmenities ?? [])
         .map((item) => item.amenityId)
         .sort((first, second) => first - second),

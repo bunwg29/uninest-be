@@ -29,7 +29,7 @@ import { DatabaseInitializerService } from './database-initializer.service';
           synchronize: isSync,
           migrations: [MIGRATIONS_GLOB],
           migrationsTableName: 'migrations',
-          migrationsRun: !isSync,
+          migrationsRun: true,
           logging: isLogging,
           extra: {
             max: Number(configService.get<number>('DB_POOL_SIZE', 20)),
