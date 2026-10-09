@@ -45,7 +45,7 @@ Sau khi đổi entity, chạy `migration:generate` để tạo migration mới t
 | `npm run seed:assets` | Không upload, chỉ hiện hướng dẫn; an toàn nếu chạy nhầm |
 | `npm run seed:assets -- --upload` | Chỉ người phụ trách chạy một lần để tải 400 ảnh mẫu (lấy từ Pixabay, cần `PIXABAY_API_KEY` miễn phí trong `.env`) lên bucket R2 chung; ảnh đã tồn tại không bị ghi đè |
 | `npm run seed` | Chỉ ghi PostgreSQL cục bộ: danh mục, 20 tài khoản, 200 tin (110 Đà Nẵng, 50 Hà Nội, 40 TP.HCM), 1 hội thoại |
-| `npm run seed -- catalog` | Chỉ danh mục: vai trò & quyền, tiện ích, 34 tỉnh/thành + 3.321 phường/xã, 256 trường đại học |
+| `npm run seed -- catalog` | Chỉ danh mục: vai trò & quyền, tiện ích, 34 tỉnh/thành + 3.321 phường/xã, 256 trường đại học, từ khoá cấm của forum |
 | `npm run seed -- --bulk[=N]` | Như `npm run seed` và sinh thêm N tin (mặc định 5.000) để thử hiệu năng |
 
 - `catalog.seeder.ts`: dữ liệu danh mục, đọc từ `seeders/data/*.json`.

@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { ROLE_CODES, ROLE_NAMES, UserRoleType } from '@common/constants';
+import { ForumBannedKeyword, ModerationAction } from '@modules/forum/entities';
 import { Amenity, AmenityGroup } from '@modules/listings/entities';
 import { Province, Ward } from '@modules/locations/entities';
 import { University } from '@modules/universities/entities';
@@ -178,6 +179,22 @@ async function seedAdministrativeUnits(dataSource: DataSource): Promise<void> {
   console.log(`[Catalog] ${units.length} provinces, ${wards.length} wards`);
 }
 
+async function seedBannedKeywords(dataSource: DataSource): Promise<void> {
+  const { keywords } = readData<{
+    keywords: { keyword: string; action: ModerationAction }[];
+  }>('banned-keywords.json');
+
+  await dataSource
+    .createQueryBuilder()
+    .insert()
+    .into(ForumBannedKeyword)
+    .values(keywords.map((item) => ({ ...item, isActive: true })))
+    .orIgnore()
+    .execute();
+
+  console.log(`[Catalog] ${keywords.length} banned keywords`);
+}
+
 async function seedUniversities(dataSource: DataSource): Promise<void> {
   const universities = readData<University[]>('universities.json');
 
@@ -193,4 +210,5 @@ export async function seedCatalog(dataSource: DataSource): Promise<void> {
   await seedAmenities(dataSource);
   await seedAdministrativeUnits(dataSource);
   await seedUniversities(dataSource);
+  await seedBannedKeywords(dataSource);
 }

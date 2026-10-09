@@ -19,7 +19,7 @@
 | Decorator, guard, filter, interceptor, pipe, DTO, tiện ích dùng ≥ 2 module | `src/common/<loại>` |
 | Hạ tầng (DB, config, storage) | `src/core/<loại>` |
 | Migration | `src/core/database/migrations` |
-| Danh mục cố định (vai trò, tiện ích, địa giới, trường) | `src/core/database/seeders/catalog.seeder.ts` + `seeders/data/*.json` |
+| Danh mục cố định (vai trò, tiện ích, địa giới, trường, từ khoá cấm forum) | `src/core/database/seeders/catalog.seeder.ts` + `seeders/data/*.json` |
 | Dữ liệu mẫu (tài khoản, tin, chat) | `src/core/database/seeders/demo.seeder.ts` |
 
 Module hiện có: `auth`, `users`, `listings`, `search`, `booking`, `chat`, `forum`, `universities`, `locations`, `health`, và khung rỗng chờ làm: `reviews`, `notifications`, `payment`, `ai-chat`, `recommendations`. **Viết tiếp vào khung đã có**, không tạo module trùng nghĩa. Module mới (vd `admin`, `price-comparison`, `premium`) chỉ tạo khi được giao, theo cấu trúc ở `rules.md`.

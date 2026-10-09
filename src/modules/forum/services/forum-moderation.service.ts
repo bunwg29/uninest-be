@@ -1,5 +1,3 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import {
   ConflictException,
   Injectable,
@@ -84,7 +82,6 @@ export class ForumModerationService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.seedDefaultKeywords();
     await this.reloadKeywords();
   }
 
@@ -283,10 +280,11 @@ export class ForumModerationService implements OnModuleInit {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
-      this.logger.warn(
-        `Could not read banned keywords from the database, falling back to JSON config: ${message}`,
+      this.logger.error(
+        `Could not load banned keywords, keeping the previous list: ${message}`,
       );
-      sources = this.readDefaultKeywords();
+
+      return;
     }
 
     this.keywordRules = sources
@@ -301,80 +299,6 @@ export class ForumModerationService implements OnModuleInit {
 
     if (isExpired) {
       await this.reloadKeywords();
-    }
-  }
-
-  private async seedDefaultKeywords(): Promise<void> {
-    try {
-      const keywordCount = await this.bannedKeywordRepository.count();
-
-      if (keywordCount > 0) {
-        return;
-      }
-
-      const defaultKeywords = this.readDefaultKeywords();
-
-      if (!defaultKeywords.length) {
-        return;
-      }
-
-      await this.bannedKeywordRepository
-        .createQueryBuilder()
-        .insert()
-        .into(ForumBannedKeyword)
-        .values(
-          defaultKeywords.map((item) => ({
-            keyword: item.keyword,
-            action: item.action,
-            isActive: true,
-          })),
-        )
-        .orIgnore()
-        .execute();
-
-      this.logger.log(
-        `Loaded ${defaultKeywords.length} default banned keywords from JSON config.`,
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-
-      this.logger.warn(`Failed to load default banned keywords: ${message}`);
-    }
-  }
-
-  private readDefaultKeywords(): BannedKeywordSource[] {
-    const configuredPath = this.configService.get<string>(
-      FORUM_CONSTANTS.BANNED_KEYWORDS_PATH_ENV_KEY,
-    );
-    const filePath = configuredPath
-      ? path.resolve(process.cwd(), configuredPath)
-      : path.resolve(__dirname, '..', FORUM_CONSTANTS.BANNED_KEYWORDS_FILE);
-
-    try {
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as {
-        keywords?: { keyword?: unknown; action?: unknown }[];
-      };
-      const validActions = Object.values(ModerationAction) as unknown[];
-
-      return (parsed.keywords ?? [])
-        .filter(
-          (item): item is BannedKeywordSource =>
-            typeof item.keyword === 'string' &&
-            item.keyword.trim().length > 0 &&
-            validActions.includes(item.action),
-        )
-        .map((item) => ({
-          keyword: this.normalizeKeyword(item.keyword),
-          action: item.action,
-        }));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-
-      this.logger.warn(
-        `Could not read banned keywords file ${filePath}: ${message}`,
-      );
-
-      return [];
     }
   }
 
