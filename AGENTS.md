@@ -46,10 +46,10 @@ npm run lint
 npm install
 cp .env.example .env        # điền DB, JWT, R2
 npm run start:dev           # http://localhost:<PORT>/api/v1, Swagger ở /api/docs
-npm run seed                # danh mục + dữ liệu mẫu Đà Nẵng (chỉ dev)
+npm run seed                # danh mục + 200 tin mẫu ba miền, chỉ ghi database (dev)
 ```
 
-- `DB_SYNCHRONIZE=true`: TypeORM tự đồng bộ schema (chỉ dev nhanh). `false`: migration tự chạy khi khởi động; chạy tay bằng `npm run migration:run`.
+- Migration tự chạy khi khởi động. `DB_SYNCHRONIZE=true` còn đồng bộ entity sau migration (chỉ dev nhanh); chạy migration thủ công bằng `npm run migration:run`.
 - Cần PostgreSQL 14+ có PostGIS, unaccent, pg_trgm (pgvector từ Sprint 4).
 
 ## Bản đồ thư mục nhanh

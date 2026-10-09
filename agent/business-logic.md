@@ -20,7 +20,7 @@
 
 ### 1.1. Sản phẩm và vai trò
 
-UniNest là ứng dụng di động (Android 8+, iOS 14+) kết nối **Sinh viên** thuê trọ với **Chủ trọ** cho thuê, kèm giao diện **Quản trị viên**. Dữ liệu mẫu quanh các trường ở Đà Nẵng (Bách khoa, Sư phạm, VKU, Kinh tế).
+UniNest là ứng dụng di động (Android 8+, iOS 14+) kết nối **Sinh viên** thuê trọ với **Chủ trọ** cho thuê, kèm giao diện **Quản trị viên**. Dữ liệu mẫu phủ Hà Nội, Đà Nẵng và TP.HCM; Đà Nẵng có nhiều tin nhất.
 
 | Vai trò | Mã backend (`UserRoleType`) | Mã app (`USER_ROLES`) | Làm được gì |
 | --- | --- | --- | --- |
@@ -444,10 +444,11 @@ Mọi màn có tải dữ liệu phải có đủ **3 trạng thái: đang tải
 
 ## 7. Dữ liệu mẫu
 
-- `npm run seed` (backend) nạp danh mục (vai trò, tiện ích, tỉnh/phường, trường đại học) và dữ liệu mẫu: 64 tin quanh ĐH Bách khoa, Sư phạm, Kinh tế, VKU ở Đà Nẵng, đủ các trạng thái, mỗi phường chính ≥ 5 tin, có gắn trường, kèm 1 hội thoại chat mẫu. Chạy lại không tạo trùng.
+- `npm run seed:assets -- --upload` do một người phụ trách chạy một lần để tải 12 ảnh mẫu lên bucket R2 chung. Chạy `npm run seed:assets` không có cờ thì không upload; chạy lại với cờ cũng không ghi đè ảnh đã có. Key ảnh mẫu cố định dưới `listings/seed-assets/v1/` và không bị xoá khi sửa tin.
+- `npm run seed` (backend) chỉ ghi database cục bộ, không gọi R2: danh mục (vai trò, tiện ích, tỉnh/phường, trường đại học) và dữ liệu mẫu gồm 20 tài khoản, 200 tin (110 Đà Nẵng, 50 Hà Nội, 40 TP.HCM), nhiều trạng thái, lịch xem phòng, trường liên kết, 1 hội thoại chat mẫu. User và tin dùng UUID do PostgreSQL sinh; chạy lại không tạo trùng nếu chưa đổi tiêu đề tin mẫu.
 - `npm run seed -- catalog`: chỉ danh mục. `npm run seed -- --bulk[=N]`: thêm N tin (mặc định 5.000) cho kiểm thử hiệu năng.
 - Mật khẩu mặc định của mọi tài khoản seed: `UniNest@123`.
-  - Sinh viên: `0900000001`, `0900000211`, `0900000212`.
-  - Chủ trọ đã xác minh: `0900000201`→`0900000204`. Chủ trọ **chờ xác minh**: `0900000205`.
+  - Sinh viên: `0900000001`, `0900000211`→`0900000213`.
+  - Chủ trọ đã xác minh: `0900000201`→`0900000204`, `0900000206`→`0900000210`, `0900000220`→`0900000224`. Chủ trọ **chờ xác minh**: `0900000205`.
   - Admin: `0900000299`.
 - **Chỉ chạy seed ở môi trường dev** (bị chặn khi `NODE_ENV=production`).

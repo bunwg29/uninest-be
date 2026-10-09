@@ -7,17 +7,17 @@ NestJS (TypeScript) + PostgreSQL (PostGIS, pgvector, unaccent, pg_trgm) + Socket
 1. Sao chép `.env.example` thành `.env`, cập nhật PostgreSQL, JWT, R2.
 2. Tạo database PostgreSQL (tên theo `DB_DATABASE`, ví dụ `uninest`).
 3. `npm install`
-4. Nạp dữ liệu: `npm run seed` (xem mục Seeder).
+4. Sau khi bộ ảnh mẫu chung đã được upload một lần, nạp dữ liệu cục bộ bằng `npm run seed` (xem mục Seeder).
 5. `npm run start:dev`
 
 API mặc định tại `http://localhost:3000/api/v1` (đổi bằng `PORT`), Swagger tại `/api/docs`. Tài khoản mẫu dùng mật khẩu `UniNest@123`.
 
 ## Schema cơ sở dữ liệu
 
-Hai chế độ, chọn bằng `DB_SYNCHRONIZE`:
+Migration luôn tự chạy khi ứng dụng khởi động (và trước khi seed). Thêm tuỳ chọn `DB_SYNCHRONIZE`:
 
-- `true` (mặc định khi phát triển): TypeORM đồng bộ bảng theo entity; `DatabaseInitializerService` bật extension và tạo hàm, index tìm kiếm lúc khởi động.
-- `false`: schema do migration quản lý. Ứng dụng tự chạy migration còn thiếu khi khởi động.
+- `true` (chỉ dev nhanh): sau migration, TypeORM đồng bộ thêm bảng theo entity; `DatabaseInitializerService` bật extension và tạo hàm, index tìm kiếm.
+- `false`: schema chỉ do migration quản lý (bắt buộc ở production).
 
 | Lệnh | Tác dụng |
 |---|---|
@@ -34,6 +34,7 @@ Migration hiện có:
 2. `InitialSchema`: toàn bộ bảng, enum, index, khoá ngoại theo entity. Tự bỏ qua nếu database đã có bảng (database từng chạy synchronize), nên có thể chuyển một database cũ sang dùng migration.
 3. `SearchIndexes`: index GIST cho toạ độ, hàm `uninest_unaccent` và index trigram cho tìm theo từ khoá.
 4. `DropRedundantFavoriteUnique`: gỡ ràng buộc trùng với khoá chính trên các database cũ.
+5. `EnumColumns`: chuyển `listings.room_type`, `listing_reports.reason`, `otp_codes.type`, `booking_events.event_type`, `booking_events.actor` từ chuỗi sang enum; đổi mã loại phòng cũ (`phong_don_*`, `phong_gac_lung`, `phong_may_lanh` → `phong_tro`, `studio_mini` → `studio`) trước khi chuyển.
 
 Sau khi đổi entity, chạy `migration:generate` để tạo migration mới thay vì sửa các migration đã có.
 
@@ -41,16 +42,20 @@ Sau khi đổi entity, chạy `migration:generate` để tạo migration mới t
 
 | Lệnh | Nội dung |
 |---|---|
-| `npm run seed` | Danh mục + dữ liệu mẫu Đà Nẵng (tài khoản, 64 tin đăng có gắn trường, 1 hội thoại chat) |
+| `npm run seed:assets` | Không upload, chỉ hiện hướng dẫn; an toàn nếu chạy nhầm |
+| `npm run seed:assets -- --upload` | Chỉ người phụ trách chạy một lần để tải 12 ảnh mẫu lên bucket R2 chung; ảnh đã tồn tại không bị ghi đè |
+| `npm run seed` | Chỉ ghi PostgreSQL cục bộ: danh mục, 20 tài khoản, 200 tin (110 Đà Nẵng, 50 Hà Nội, 40 TP.HCM), 1 hội thoại |
 | `npm run seed -- catalog` | Chỉ danh mục: vai trò & quyền, tiện ích, 34 tỉnh/thành + 3.321 phường/xã, 256 trường đại học |
 | `npm run seed -- --bulk[=N]` | Như `npm run seed` và sinh thêm N tin (mặc định 5.000) để thử hiệu năng |
 
 - `catalog.seeder.ts`: dữ liệu danh mục, đọc từ `seeders/data/*.json`.
-- `demo.seeder.ts`: tài khoản mẫu, tin đăng quanh ĐH Bách khoa, Sư phạm, Kinh tế, VKU.
+- `demo.seeder.ts`: dữ liệu mẫu ba miền, CCCD 12 chữ số và địa chỉ thử nghiệm; PostgreSQL tự sinh ID user/tin.
+- `demo-assets.ts`: 12 key ảnh mẫu cố định dưới `listings/seed-assets/v1/`. Seeder chỉ ghi key vào database, không gọi R2. Ảnh mẫu được dùng chung và không bị xoá khi bỏ khỏi một tin; ảnh người dùng tải lên vẫn xoá như trước.
+- Nếu chưa upload ảnh mẫu lên bucket chung, `npm run seed` vẫn tạo database nhưng ảnh tin sẽ không hiển thị. Các máy dùng chung `R2_BUCKET_NAME` và `R2_PUBLIC_URL`.
 - Chạy lại nhiều lần không tạo trùng. Không chạy được khi `NODE_ENV=production`.
-- Seeder tự đồng bộ schema (`DB_SYNCHRONIZE=true`) hoặc chạy migration (`false`) trước khi nạp.
+- Seeder luôn chạy migration trước khi nạp; nếu `DB_SYNCHRONIZE=true` thì đồng bộ entity sau migration.
 
-Tài khoản mẫu (mật khẩu `UniNest@123`): sinh viên `0900000001`, `0900000211`, `0900000212`; chủ trọ đã xác minh `0900000201`→`0900000204`; chủ trọ chờ xác minh `0900000205`; admin `0900000299`.
+Tài khoản mẫu (mật khẩu `UniNest@123`): sinh viên `0900000001`, `0900000211`→`0900000213`; chủ trọ đã xác minh `0900000201`→`0900000204`, `0900000206`→`0900000210`, `0900000220`→`0900000224`; chủ trọ chờ xác minh `0900000205`; admin `0900000299`.
 
 ## Quy tắc đặt lịch
 
