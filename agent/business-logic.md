@@ -444,7 +444,7 @@ Mọi màn có tải dữ liệu phải có đủ **3 trạng thái: đang tải
 
 ## 7. Dữ liệu mẫu
 
-- `npm run seed:assets -- --upload` do một người phụ trách chạy một lần để tải 12 ảnh mẫu lên bucket R2 chung. Chạy `npm run seed:assets` không có cờ thì không upload; chạy lại với cờ cũng không ghi đè ảnh đã có. Key ảnh mẫu cố định dưới `listings/seed-assets/v1/` và không bị xoá khi sửa tin.
+- `npm run seed:assets -- --upload` do một người phụ trách chạy một lần để tải 400 ảnh mẫu (lấy từ Pexels, cần `PEXELS_API_KEY` miễn phí trong `.env`) lên bucket R2 chung. Chạy `npm run seed:assets` không có cờ thì không upload; chạy lại với cờ cũng không ghi đè ảnh đã có. Key ảnh mẫu cố định dưới `listings/seed-assets/v1/` và không bị xoá khi sửa tin.
 - `npm run seed` (backend) chỉ ghi database cục bộ, không gọi R2: danh mục (vai trò, tiện ích, tỉnh/phường, trường đại học) và dữ liệu mẫu gồm 20 tài khoản, 200 tin (110 Đà Nẵng, 50 Hà Nội, 40 TP.HCM), nhiều trạng thái, lịch xem phòng, trường liên kết, 1 hội thoại chat mẫu. User và tin dùng UUID do PostgreSQL sinh; chạy lại không tạo trùng nếu chưa đổi tiêu đề tin mẫu.
 - `npm run seed -- catalog`: chỉ danh mục. `npm run seed -- --bulk[=N]`: thêm N tin (mặc định 5.000) cho kiểm thử hiệu năng.
 - Mật khẩu mặc định của mọi tài khoản seed: `UniNest@123`.

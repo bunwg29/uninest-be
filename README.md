@@ -43,14 +43,14 @@ Sau khi đổi entity, chạy `migration:generate` để tạo migration mới t
 | Lệnh | Nội dung |
 |---|---|
 | `npm run seed:assets` | Không upload, chỉ hiện hướng dẫn; an toàn nếu chạy nhầm |
-| `npm run seed:assets -- --upload` | Chỉ người phụ trách chạy một lần để tải 12 ảnh mẫu lên bucket R2 chung; ảnh đã tồn tại không bị ghi đè |
+| `npm run seed:assets -- --upload` | Chỉ người phụ trách chạy một lần để tải 400 ảnh mẫu (lấy từ Pexels, cần `PEXELS_API_KEY` miễn phí trong `.env`) lên bucket R2 chung; ảnh đã tồn tại không bị ghi đè |
 | `npm run seed` | Chỉ ghi PostgreSQL cục bộ: danh mục, 20 tài khoản, 200 tin (110 Đà Nẵng, 50 Hà Nội, 40 TP.HCM), 1 hội thoại |
 | `npm run seed -- catalog` | Chỉ danh mục: vai trò & quyền, tiện ích, 34 tỉnh/thành + 3.321 phường/xã, 256 trường đại học |
 | `npm run seed -- --bulk[=N]` | Như `npm run seed` và sinh thêm N tin (mặc định 5.000) để thử hiệu năng |
 
 - `catalog.seeder.ts`: dữ liệu danh mục, đọc từ `seeders/data/*.json`.
 - `demo.seeder.ts`: dữ liệu mẫu ba miền, CCCD 12 chữ số và địa chỉ thử nghiệm; PostgreSQL tự sinh ID user/tin.
-- `demo-assets.ts`: 12 key ảnh mẫu cố định dưới `listings/seed-assets/v1/`. Seeder chỉ ghi key vào database, không gọi R2. Ảnh mẫu được dùng chung và không bị xoá khi bỏ khỏi một tin; ảnh người dùng tải lên vẫn xoá như trước.
+- `demo-assets.ts`: 400 key ảnh mẫu cố định (`room-001`→`room-400`) dưới `listings/seed-assets/v1/`. Seeder chỉ ghi key vào database, không gọi R2. Ảnh mẫu được dùng chung và không bị xoá khi bỏ khỏi một tin; ảnh người dùng tải lên vẫn xoá như trước.
 - Nếu chưa upload ảnh mẫu lên bucket chung, `npm run seed` vẫn tạo database nhưng ảnh tin sẽ không hiển thị. Các máy dùng chung `R2_BUCKET_NAME` và `R2_PUBLIC_URL`.
 - Chạy lại nhiều lần không tạo trùng. Không chạy được khi `NODE_ENV=production`.
 - Seeder luôn chạy migration trước khi nạp; nếu `DB_SYNCHRONIZE=true` thì đồng bộ entity sau migration.

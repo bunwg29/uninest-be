@@ -56,7 +56,7 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 | `DatabaseModule`, `data-source.ts` | Kết nối TypeORM, `SnakeNamingStrategy`, migration |
 | `LISTING_SEARCH_INDEXES_SQL`, `UNACCENT_FUNCTION_SQL`, `KEYWORD_TRIGRAM_INDEXES_SQL` | Index tìm kiếm, hàm `uninest_unaccent` (tìm không dấu) |
 | `R2StorageService` | Mọi việc với file: `generatePresignedUploadUrlForImage`, `generatePresignedUploadUrlForVideo`, `getPresignedDownloadUrl`, `getPublicUrl(key)`, `getObjectKey(urlOrKey)`, `getKeyFromPublicUrl`, `assertValidImageObject(key)`, `assertValidVideoObject(key)`, `objectExists`, `deleteFile`, `uploadDemoImageIfMissing` |
-| `DEMO_SEED_IMAGE_PREFIX`, `demo-assets.ts`, `seed-assets.ts` | Bộ 12 ảnh mẫu dùng chung: key bất biến trong R2; `seed:assets` chỉ upload khi có `--upload`, `seed` chỉ ghi database |
+| `DEMO_SEED_IMAGE_PREFIX`, `demo-assets.ts`, `seed-assets.ts` | Bộ 400 ảnh mẫu dùng chung: key bất biến trong R2; `seed:assets` chỉ upload khi có `--upload`, `seed` chỉ ghi database |
 | `STORAGE_LIMITS` | Định dạng, dung lượng, thời hạn presigned URL |
 | `POST /storage/presign-upload`, `/storage/presign-video-upload` | App xin URL tải ảnh/video — **không viết endpoint presign mới cho từng module** (trừ avatar đã có `/profile/avatar/presign`) |
 

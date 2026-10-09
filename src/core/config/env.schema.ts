@@ -77,6 +77,10 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  PEXELS_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
   JWT_ACCESS_SECRET?: string;
 
   @IsString()
