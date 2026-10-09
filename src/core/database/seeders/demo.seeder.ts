@@ -1,6 +1,6 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import * as bcrypt from 'bcryptjs';
-import { DataSource, DeepPartial, In } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { UserRoleType } from '@common/constants';
 import { Conversation, Message, MessageType } from '@modules/chat/entities';
 import {
@@ -11,152 +11,324 @@ import {
   ListingUniversity,
   RoomType,
 } from '@modules/listings/entities';
+import { Ward } from '@modules/locations/entities';
+import { University } from '@modules/universities/entities';
 import { User } from '@modules/users/entities';
+import { DEMO_ASSETS } from './demo-assets';
 
 export const DEMO_PASSWORD = 'UniNest@123';
 
-const DA_NANG_PROVINCE_CODE = '48';
-const DA_NANG_PROVINCE_NAME = 'Thành phố Đà Nẵng';
-const BASE_LISTING_COUNT = 64;
+const BASE_LISTING_COUNT = 200;
 const INSERT_BATCH_SIZE = 250;
 const PASSWORD_HASH_ROUNDS = 10;
-const COORDINATE_JITTER_DEGREES = 0.004;
-const IMAGES_PER_LISTING = 4;
+const COORDINATE_JITTER_DEGREES = 0.002;
+const MIN_IMAGES_PER_LISTING = 3;
+const MAX_IMAGES_PER_LISTING = 6;
+const IMAGE_PERMUTATION_STEP = 197;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-interface DemoAccount {
-  phone: string;
-  fullName: string;
-  roleId: UserRoleType;
-  isLandlordVerified?: boolean;
-}
+type RegionCode = 'dn' | 'hn' | 'hcm';
 
-export const DEMO_ACCOUNTS: readonly DemoAccount[] = [
-  {
-    phone: '0900000001',
-    fullName: 'Sinh viên UniNest',
-    roleId: UserRoleType.STUDENT,
-  },
-  {
-    phone: '0900000211',
-    fullName: 'Sinh viên Bách khoa',
-    roleId: UserRoleType.STUDENT,
-  },
-  {
-    phone: '0900000212',
-    fullName: 'Sinh viên Kinh tế',
-    roleId: UserRoleType.STUDENT,
-  },
-  {
-    phone: '0900000201',
-    fullName: 'Nguyễn Văn Hùng',
-    roleId: UserRoleType.LANDLORD,
-    isLandlordVerified: true,
-  },
-  {
-    phone: '0900000202',
-    fullName: 'Trần Thị Mai',
-    roleId: UserRoleType.LANDLORD,
-    isLandlordVerified: true,
-  },
-  {
-    phone: '0900000203',
-    fullName: 'Lê Quang Vinh',
-    roleId: UserRoleType.LANDLORD,
-    isLandlordVerified: true,
-  },
-  {
-    phone: '0900000204',
-    fullName: 'Phạm Thanh Tùng',
-    roleId: UserRoleType.LANDLORD,
-    isLandlordVerified: true,
-  },
-  {
-    phone: '0900000205',
-    fullName: 'Võ Thị Lan (chờ xác minh)',
-    roleId: UserRoleType.LANDLORD,
-    isLandlordVerified: false,
-  },
-  {
-    phone: '0900000299',
-    fullName: 'Quản trị viên UniNest',
-    roleId: UserRoleType.ADMIN,
-  },
-];
-
-interface Area {
+interface DemoArea {
   wardCode: string;
   wardName: string;
   latitude: number;
   longitude: number;
   nearbySchool: string;
   universityCodes: string[];
+  streets: string[];
 }
 
-const AREAS: readonly Area[] = [
+interface DemoRegion {
+  code: RegionCode;
+  provinceCode: string;
+  provinceName: string;
+  baseCount: number;
+  priceFactor: number;
+  areas: DemoArea[];
+}
+
+const REGIONS: readonly DemoRegion[] = [
   {
-    wardCode: '20200',
-    wardName: 'Phường Hoà Khánh',
-    latitude: 16.0739,
-    longitude: 108.1499,
-    nearbySchool: 'ĐH Bách khoa Đà Nẵng',
-    universityCodes: ['DDK', 'DDS'],
+    code: 'dn',
+    provinceCode: '48',
+    provinceName: 'Thành phố Đà Nẵng',
+    baseCount: 110,
+    priceFactor: 1,
+    areas: [
+      {
+        wardCode: '20200',
+        wardName: 'Phường Hoà Khánh',
+        latitude: 16.0739,
+        longitude: 108.1499,
+        nearbySchool: 'ĐH Bách khoa Đà Nẵng',
+        universityCodes: ['DDK', 'DDS'],
+        streets: ['Nguyễn Lương Bằng', 'Ngô Sĩ Liên', 'Âu Cơ'],
+      },
+      {
+        wardCode: '20197',
+        wardName: 'Phường Liên Chiểu',
+        latitude: 16.0617,
+        longitude: 108.1585,
+        nearbySchool: 'ĐH Sư phạm Đà Nẵng',
+        universityCodes: ['DDS', 'DDK'],
+        streets: ['Tôn Đức Thắng', 'Hoàng Văn Thái', 'Nguyễn Sinh Sắc'],
+      },
+      {
+        wardCode: '20285',
+        wardName: 'Phường Ngũ Hành Sơn',
+        latitude: 15.9757,
+        longitude: 108.2531,
+        nearbySchool: 'ĐH CNTT & TT Việt - Hàn (VKU)',
+        universityCodes: ['VKU', 'KTD'],
+        streets: ['Trần Đại Nghĩa', 'Nam Kỳ Khởi Nghĩa', 'Lê Văn Hiến'],
+      },
+      {
+        wardCode: '20285',
+        wardName: 'Phường Ngũ Hành Sơn',
+        latitude: 16.0481,
+        longitude: 108.2402,
+        nearbySchool: 'ĐH Kinh tế Đà Nẵng',
+        universityCodes: ['DDQ', 'KTD'],
+        streets: ['Ngũ Hành Sơn', 'Lê Văn Hiến', 'Hồ Xuân Hương'],
+      },
+      {
+        wardCode: '20242',
+        wardName: 'Phường Hải Châu',
+        latitude: 16.0678,
+        longitude: 108.2208,
+        nearbySchool: 'ĐH Kinh tế Đà Nẵng',
+        universityCodes: ['DDQ', 'DDF'],
+        streets: ['Nguyễn Văn Linh', 'Phan Đăng Lưu', 'Hùng Vương'],
+      },
+      {
+        wardCode: '20209',
+        wardName: 'Phường Thanh Khê',
+        latitude: 16.068,
+        longitude: 108.19,
+        nearbySchool: 'ĐH Sư phạm Đà Nẵng',
+        universityCodes: ['DDS', 'DDK'],
+        streets: ['Hà Huy Tập', 'Điện Biên Phủ', 'Trần Cao Vân'],
+      },
+      {
+        wardCode: '20263',
+        wardName: 'Phường Sơn Trà',
+        latitude: 16.085,
+        longitude: 108.243,
+        nearbySchool: 'ĐH Kinh tế Đà Nẵng',
+        universityCodes: ['DDQ'],
+        streets: ['Ngô Quyền', 'Phạm Văn Đồng', 'Võ Văn Kiệt'],
+      },
+      {
+        wardCode: '20260',
+        wardName: 'Phường Cẩm Lệ',
+        latitude: 16.015,
+        longitude: 108.2,
+        nearbySchool: 'ĐH CNTT & TT Việt - Hàn (VKU)',
+        universityCodes: ['VKU', 'DSK'],
+        streets: ['Cách Mạng Tháng Tám', 'Ông Ích Đường', 'Lê Đại Hành'],
+      },
+    ],
   },
   {
-    wardCode: '20197',
-    wardName: 'Phường Liên Chiểu',
-    latitude: 16.0617,
-    longitude: 108.1585,
-    nearbySchool: 'ĐH Sư phạm Đà Nẵng',
-    universityCodes: ['DDS', 'DDK'],
+    code: 'hn',
+    provinceCode: '01',
+    provinceName: 'Thành phố Hà Nội',
+    baseCount: 50,
+    priceFactor: 1.2,
+    areas: [
+      {
+        wardCode: '00292',
+        wardName: 'Phường Bạch Mai',
+        latitude: 21.0037,
+        longitude: 105.8495,
+        nearbySchool: 'Đại học Bách khoa Hà Nội',
+        universityCodes: ['BKA', 'KHA'],
+        streets: ['Tạ Quang Bửu', 'Trần Đại Nghĩa', 'Bạch Mai'],
+      },
+      {
+        wardCode: '00256',
+        wardName: 'Phường Hai Bà Trưng',
+        latitude: 21.009,
+        longitude: 105.858,
+        nearbySchool: 'Đại học Kinh tế Quốc dân',
+        universityCodes: ['KHA', 'BKA'],
+        streets: ['Giải Phóng', 'Lê Thanh Nghị', 'Đại Cồ Việt'],
+      },
+      {
+        wardCode: '00166',
+        wardName: 'Phường Cầu Giấy',
+        latitude: 21.035,
+        longitude: 105.794,
+        nearbySchool: 'ĐH Công nghệ - ĐHQG Hà Nội',
+        universityCodes: ['QHI', 'QHT', 'SPH'],
+        streets: ['Xuân Thủy', 'Cầu Giấy', 'Trần Thái Tông'],
+      },
+      {
+        wardCode: '00235',
+        wardName: 'Phường Đống Đa',
+        latitude: 21.016,
+        longitude: 105.821,
+        nearbySchool: 'Đại học Ngoại thương',
+        universityCodes: ['NTH', 'GHA'],
+        streets: ['Chùa Láng', 'Thái Hà', 'Láng Hạ'],
+      },
+      {
+        wardCode: '00367',
+        wardName: 'Phường Thanh Xuân',
+        latitude: 20.995,
+        longitude: 105.806,
+        nearbySchool: 'Đại học Kiến trúc Hà Nội',
+        universityCodes: ['KTA', 'YHB'],
+        streets: ['Nguyễn Trãi', 'Khuất Duy Tiến', 'Vũ Trọng Phụng'],
+      },
+    ],
   },
   {
-    wardCode: '20285',
-    wardName: 'Phường Ngũ Hành Sơn',
-    latitude: 15.9757,
-    longitude: 108.2531,
-    nearbySchool: 'ĐH CNTT & TT Việt - Hàn (VKU)',
-    universityCodes: ['VKU'],
+    code: 'hcm',
+    provinceCode: '79',
+    provinceName: 'Thành phố Hồ Chí Minh',
+    baseCount: 40,
+    priceFactor: 1.35,
+    areas: [
+      {
+        wardCode: '26800',
+        wardName: 'Phường Linh Xuân',
+        latitude: 10.874,
+        longitude: 106.799,
+        nearbySchool: 'ĐH Công nghệ Thông tin - ĐHQG TP.HCM',
+        universityCodes: ['QSC', 'QST', 'VNU-HCM'],
+        streets: ['Lê Văn Việt', 'Kha Vạn Cân', 'Quốc lộ 1A'],
+      },
+      {
+        wardCode: '26824',
+        wardName: 'Phường Thủ Đức',
+        latitude: 10.849,
+        longitude: 106.771,
+        nearbySchool: 'ĐH Sư phạm Kỹ thuật TP.HCM',
+        universityCodes: ['SPK', 'QSC'],
+        streets: ['Võ Văn Ngân', 'Đặng Văn Bi', 'Hoàng Diệu 2'],
+      },
+      {
+        wardCode: '26929',
+        wardName: 'Phường Bình Thạnh',
+        latitude: 10.804,
+        longitude: 106.711,
+        nearbySchool: 'ĐH Công nghệ TP.HCM',
+        universityCodes: ['DKC', 'UEF'],
+        streets: ['Điện Biên Phủ', 'Ung Văn Khiêm', 'Xô Viết Nghệ Tĩnh'],
+      },
+      {
+        wardCode: '26743',
+        wardName: 'Phường Bến Thành',
+        latitude: 10.772,
+        longitude: 106.696,
+        nearbySchool: 'Đại học Kinh tế TP.HCM',
+        universityCodes: ['KSA', 'MBS'],
+        streets: ['Lê Lai', 'Nguyễn Thị Nghĩa', 'Phạm Ngũ Lão'],
+      },
+      {
+        wardCode: '27073',
+        wardName: 'Phường Phú Nhuận',
+        latitude: 10.798,
+        longitude: 106.679,
+        nearbySchool: 'Đại học Công nghiệp TP.HCM',
+        universityCodes: ['IUH', 'NTS'],
+        streets: ['Phan Xích Long', 'Nguyễn Văn Trỗi', 'Phan Đăng Lưu'],
+      },
+    ],
+  },
+];
+
+interface DemoAccount {
+  phone: string;
+  fullName: string;
+  roleId: UserRoleType;
+  regionCode: RegionCode;
+  isLandlordVerified?: boolean;
+}
+
+const STUDENTS: readonly DemoAccount[] = [
+  {
+    phone: '0900000001',
+    fullName: 'Nguyễn Minh Anh',
+    roleId: UserRoleType.STUDENT,
+    regionCode: 'dn',
   },
   {
-    wardCode: '20285',
-    wardName: 'Phường Ngũ Hành Sơn',
-    latitude: 16.0481,
-    longitude: 108.2402,
-    nearbySchool: 'ĐH Kinh tế Đà Nẵng',
-    universityCodes: ['DDQ'],
+    phone: '0900000211',
+    fullName: 'Trần Hoàng Nam',
+    roleId: UserRoleType.STUDENT,
+    regionCode: 'hn',
   },
   {
-    wardCode: '20242',
-    wardName: 'Phường Hải Châu',
-    latitude: 16.0678,
-    longitude: 108.2208,
-    nearbySchool: 'ĐH Kinh tế Đà Nẵng',
-    universityCodes: ['DDQ'],
+    phone: '0900000212',
+    fullName: 'Lê Thu Hà',
+    roleId: UserRoleType.STUDENT,
+    regionCode: 'hcm',
   },
   {
-    wardCode: '20209',
-    wardName: 'Phường Thanh Khê',
-    latitude: 16.068,
-    longitude: 108.19,
-    nearbySchool: 'ĐH Sư phạm Đà Nẵng',
-    universityCodes: ['DDS'],
+    phone: '0900000213',
+    fullName: 'Phạm Gia Huy',
+    roleId: UserRoleType.STUDENT,
+    regionCode: 'dn',
   },
+];
+
+const LANDLORD_NAMES = [
+  'Nguyễn Văn Hùng',
+  'Trần Thị Mai',
+  'Lê Quang Vinh',
+  'Phạm Thanh Tùng',
+  'Võ Thị Lan',
+  'Đặng Minh Tuấn',
+  'Hoàng Thị Hương',
+  'Bùi Quốc Bảo',
+  'Đỗ Thanh Hằng',
+  'Nguyễn Đức Long',
+  'Trương Thị Ngọc',
+  'Phan Hữu Phúc',
+  'Lý Minh Châu',
+  'Hồ Văn Sơn',
+  'Mai Thị Phương',
+] as const;
+
+const LANDLORD_REGIONS: readonly RegionCode[] = [
+  'dn',
+  'dn',
+  'dn',
+  'dn',
+  'dn',
+  'hn',
+  'hn',
+  'hn',
+  'hn',
+  'hcm',
+  'hcm',
+  'hcm',
+  'hcm',
+  'dn',
+  'dn',
+];
+
+export const DEMO_ACCOUNTS: readonly DemoAccount[] = [
+  ...STUDENTS,
+  ...LANDLORD_NAMES.map((fullName, index) => {
+    const phoneSuffix = index < 10 ? 201 + index : 220 + index - 10;
+
+    return {
+      phone: `0900000${phoneSuffix}`,
+      fullName,
+      roleId: UserRoleType.LANDLORD,
+      regionCode: LANDLORD_REGIONS[index],
+      isLandlordVerified: index !== 4,
+    };
+  }),
   {
-    wardCode: '20263',
-    wardName: 'Phường Sơn Trà',
-    latitude: 16.085,
-    longitude: 108.243,
-    nearbySchool: 'ĐH Kinh tế Đà Nẵng',
-    universityCodes: ['DDQ'],
-  },
-  {
-    wardCode: '20260',
-    wardName: 'Phường Cẩm Lệ',
-    latitude: 16.015,
-    longitude: 108.2,
-    nearbySchool: 'ĐH CNTT & TT Việt - Hàn (VKU)',
-    universityCodes: ['VKU'],
+    phone: '0900000299',
+    fullName: 'Quản trị viên UniNest',
+    roleId: UserRoleType.ADMIN,
+    regionCode: 'dn',
   },
 ];
 
@@ -175,9 +347,9 @@ const ROOM_TYPES: readonly RoomTypeSpec[] = [
     code: RoomType.PHONG_TRO,
     label: 'Phòng trọ',
     minPrice: 1_200_000,
-    maxPrice: 2_200_000,
+    maxPrice: 2_400_000,
     minArea: 14,
-    maxArea: 24,
+    maxArea: 25,
     maxOccupants: 2,
   },
   {
@@ -193,16 +365,16 @@ const ROOM_TYPES: readonly RoomTypeSpec[] = [
     code: RoomType.STUDIO,
     label: 'Studio',
     minPrice: 3_000_000,
-    maxPrice: 4_800_000,
+    maxPrice: 5_000_000,
     minArea: 25,
-    maxArea: 38,
+    maxArea: 40,
     maxOccupants: 2,
   },
   {
     code: RoomType.KY_TUC_XA,
     label: 'Ký túc xá',
     minPrice: 800_000,
-    maxPrice: 1_400_000,
+    maxPrice: 1_500_000,
     minArea: 16,
     maxArea: 28,
     maxOccupants: 4,
@@ -216,37 +388,18 @@ const ROOM_TYPES: readonly RoomTypeSpec[] = [
     maxArea: 80,
     maxOccupants: 6,
   },
+  {
+    code: RoomType.CAN_HO_DICH_VU,
+    label: 'Căn hộ dịch vụ',
+    minPrice: 4_000_000,
+    maxPrice: 7_000_000,
+    minArea: 28,
+    maxArea: 50,
+    maxOccupants: 3,
+  },
 ];
 
-const STREETS = [
-  'Nguyễn Lương Bằng',
-  'Tôn Đức Thắng',
-  'Ngô Sĩ Liên',
-  'Hoàng Văn Thái',
-  'Trần Đại Nghĩa',
-  'Lê Văn Hiến',
-  'Nguyễn Văn Linh',
-  'Hà Huy Tập',
-  'Điện Biên Phủ',
-  'Phan Đăng Lưu',
-];
-
-const AMENITY_POOL = [1, 2, 3, 6, 7, 8, 10, 11, 14, 17];
-
-const PHOTO_IDS = [
-  'photo-1579632151052-92f741fb9b79',
-  'photo-1570570665905-346e1b6be193',
-  'photo-1552189864-e05b02af1697',
-  'photo-1543607875-4d92312234c5',
-  'photo-1560448075-57d0285fc59b',
-  'photo-1612320743558-020669ff20e8',
-  'photo-1616486338812-3dadae4b4ace',
-  'photo-1616594039964-ae9021a400a0',
-  'photo-1618221195710-dd6b41faaea6',
-  'photo-1505693416388-ac5ce068fe85',
-  'photo-1615874959474-d609969a20ed',
-  'photo-1522708323590-d24dbb6b0267',
-];
+const AMENITY_POOL = [1, 2, 3, 6, 7, 8, 10, 11, 14, 17] as const;
 
 const DEMO_CHAT = [
   { fromStudent: true, content: 'Dạ chào anh, phòng này còn trống không ạ?' },
@@ -271,10 +424,30 @@ const createRandom = (seed: number) => {
   };
 };
 
-const createStableId = (key: string): string => {
-  const hex = createHash('md5').update(key).digest('hex');
+const getRegion = (code: RegionCode): DemoRegion => {
+  const region = REGIONS.find((item) => item.code === code);
 
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+  if (!region) throw new Error(`Unknown demo region: ${code}`);
+
+  return region;
+};
+
+const pickRegion = (index: number, isBulk: boolean): DemoRegion => {
+  if (isBulk) {
+    const bucket = index % 20;
+
+    return REGIONS[bucket < 11 ? 0 : bucket < 16 ? 1 : 2];
+  }
+
+  let offset = index;
+
+  for (const region of REGIONS) {
+    if (offset < region.baseCount) return region;
+
+    offset -= region.baseCount;
+  }
+
+  throw new Error(`Demo listing index exceeds base count: ${index}`);
 };
 
 const pickStatus = (index: number, isBulk: boolean): ListingStatus => {
@@ -289,7 +462,72 @@ const pickStatus = (index: number, isBulk: boolean): ListingStatus => {
 
   if (bucket === 18) return ListingStatus.REJECTED;
 
+  if (bucket === 19) return ListingStatus.RENTED;
+
   return ListingStatus.ACTIVE;
+};
+
+const buildViewingSchedule = (index: number) => ({
+  mon: { morning: index % 2 === 0, afternoon: true, evening: index % 3 !== 0 },
+  tue: { morning: false, afternoon: true, evening: true },
+  wed: { morning: true, afternoon: index % 2 === 0, evening: true },
+  thu: { morning: false, afternoon: true, evening: true },
+  fri: { morning: true, afternoon: true, evening: index % 3 !== 1 },
+  sat: { morning: true, afternoon: true, evening: false },
+  sun: { morning: index % 2 === 1, afternoon: true, evening: false },
+});
+
+const requireUser = (users: Map<string, User>, phone: string): User => {
+  const user = users.get(phone);
+
+  if (!user) throw new Error(`Demo account ${phone} was not created`);
+
+  return user;
+};
+
+const validateCatalog = async (dataSource: DataSource): Promise<void> => {
+  const wardCodes = [
+    ...new Set(
+      REGIONS.flatMap((region) => region.areas.map((area) => area.wardCode)),
+    ),
+  ];
+  const universityCodes = [
+    ...new Set(
+      REGIONS.flatMap((region) =>
+        region.areas.flatMap((area) => area.universityCodes),
+      ),
+    ),
+  ];
+  const [wards, universities] = await Promise.all([
+    dataSource.getRepository(Ward).find({ where: { code: In(wardCodes) } }),
+    dataSource
+      .getRepository(University)
+      .find({ where: { code: In(universityCodes) } }),
+  ]);
+  const wardByCode = new Map(wards.map((ward) => [ward.code, ward]));
+  const foundUniversities = new Set(
+    universities.map((university) => university.code),
+  );
+
+  for (const region of REGIONS) {
+    for (const area of region.areas) {
+      if (wardByCode.get(area.wardCode)?.provinceCode !== region.provinceCode) {
+        throw new Error(
+          `Invalid demo ward ${area.wardCode} in region ${region.code}`,
+        );
+      }
+
+      for (const code of area.universityCodes) {
+        if (!foundUniversities.has(code)) {
+          throw new Error(`Missing demo university: ${code}`);
+        }
+      }
+    }
+  }
+
+  if (DEMO_ASSETS.length < MAX_IMAGES_PER_LISTING) {
+    throw new Error('Not enough shared demo images');
+  }
 };
 
 async function seedAccounts(
@@ -297,10 +535,17 @@ async function seedAccounts(
 ): Promise<Map<string, User>> {
   const repository = dataSource.getRepository(User);
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, PASSWORD_HASH_ROUNDS);
-  const users = new Map<string, User>();
-
-  for (const account of DEMO_ACCOUNTS) {
-    const existing = await repository.findOneBy({ phone: account.phone });
+  const existingUsers = await repository.find({
+    where: { phone: In(DEMO_ACCOUNTS.map((account) => account.phone)) },
+  });
+  const existingByPhone = new Map(
+    existingUsers.map((user) => [user.phone, user]),
+  );
+  const accounts = DEMO_ACCOUNTS.map((account, index) => {
+    const existing = existingByPhone.get(account.phone);
+    const region = getRegion(account.regionCode);
+    const area = region.areas[index % region.areas.length];
+    const streetAddress = `${20 + index * 7} ${area.streets[index % area.streets.length]}`;
     const data: Partial<User> = {
       phone: account.phone,
       email: existing?.email ?? `${account.phone}@uninest.local`,
@@ -310,170 +555,267 @@ async function seedAccounts(
       isActive: true,
       isVerified: true,
       phoneVerified: true,
+      identityNumber: `900${String(index + 1).padStart(9, '0')}`,
       landlordVerifiedAt: account.isLandlordVerified ? new Date() : null,
+      school:
+        account.roleId === UserRoleType.STUDENT ? area.nearbySchool : null,
+      provinceCode: region.provinceCode,
+      wardCode: area.wardCode,
+      streetAddress,
+      fullAddress: `${streetAddress}, ${area.wardName}, ${region.provinceName}`,
     };
 
-    users.set(
-      account.phone,
-      await repository.save(
-        existing ? repository.merge(existing, data) : repository.create(data),
-      ),
+    return existing
+      ? repository.merge(existing, data)
+      : repository.create(data);
+  });
+  const saved = await repository.save(accounts, { chunk: 100 });
+
+  console.log(`[Demo] ${saved.length} accounts ready`);
+
+  return new Map(
+    saved.map((user) => {
+      if (!user.phone)
+        throw new Error('Demo account was saved without a phone');
+
+      return [user.phone, user] as const;
+    }),
+  );
+}
+
+interface ListingDraft {
+  ownerId: string;
+  title: string;
+  data: Partial<Listing>;
+  imageKeys: string[];
+  amenityIds: number[];
+  universityCodes: string[];
+}
+
+const buildListingDraft = (
+  index: number,
+  isBulk: boolean,
+  ownersByRegion: Map<RegionCode, User[]>,
+): ListingDraft => {
+  const region = pickRegion(index, isBulk);
+  const owners = ownersByRegion.get(region.code) ?? [];
+
+  if (owners.length === 0)
+    throw new Error(`No verified demo landlord in ${region.code}`);
+
+  const owner = owners[index % owners.length];
+  const area = region.areas[index % region.areas.length];
+  const random = createRandom(index * 7919 + (isBulk ? 17 : 3));
+  const roomType = ROOM_TYPES[Math.floor(random() * ROOM_TYPES.length)];
+  const streetAddress = `${1 + Math.floor(random() * 220)} ${area.streets[Math.floor(random() * area.streets.length)]}`;
+  const price =
+    Math.round(
+      ((roomType.minPrice +
+        random() * (roomType.maxPrice - roomType.minPrice)) *
+        region.priceFactor) /
+        100_000,
+    ) * 100_000;
+  const size = Math.round(
+    roomType.minArea + random() * (roomType.maxArea - roomType.minArea),
+  );
+  const latitude =
+    area.latitude + (random() - 0.5) * 2 * COORDINATE_JITTER_DEGREES;
+  const longitude =
+    area.longitude + (random() - 0.5) * 2 * COORDINATE_JITTER_DEGREES;
+  const createdAt = new Date(Date.now() - Math.floor(random() * 120) * DAY_MS);
+  const ordinal = (isBulk ? BASE_LISTING_COUNT : 0) + index + 1;
+  const title = `${roomType.label} gần ${area.nearbySchool} số ${ordinal}`;
+  const descriptions = [
+    'Phòng thoáng mát, có cửa sổ và chỗ để xe. Khu vực yên tĩnh, phù hợp sinh viên.',
+    'Nhà sạch sẽ, lối đi riêng và khu dân cư an ninh. Thuận tiện đi học và mua sắm.',
+    'Không gian sáng, có internet và khu sinh hoạt chung. Có thể vào ở ngay.',
+    'Phòng được giữ gìn tốt, gần quán ăn và các tuyến đường chính. Ưu tiên người ở lâu dài.',
+  ];
+  const amenityCount = 3 + Math.floor(random() * 4);
+  const imageCount =
+    MIN_IMAGES_PER_LISTING +
+    Math.floor(
+      random() * (MAX_IMAGES_PER_LISTING - MIN_IMAGES_PER_LISTING + 1),
     );
+  const firstImageIndex =
+    (index * 2 * IMAGE_PERMUTATION_STEP) % DEMO_ASSETS.length;
+  const secondImageIndex =
+    ((index * 2 + 1) * IMAGE_PERMUTATION_STEP) % DEMO_ASSETS.length;
+  let coverImageIndex = Math.floor(random() * DEMO_ASSETS.length);
+
+  while (
+    coverImageIndex === firstImageIndex ||
+    coverImageIndex === secondImageIndex
+  ) {
+    coverImageIndex = (coverImageIndex + 1) % DEMO_ASSETS.length;
   }
 
-  console.log(
-    `[Demo] ${DEMO_ACCOUNTS.length} accounts (password ${DEMO_PASSWORD})`,
-  );
+  const imageKeys = new Set([
+    DEMO_ASSETS[coverImageIndex].key,
+    DEMO_ASSETS[firstImageIndex].key,
+    DEMO_ASSETS[secondImageIndex].key,
+  ]);
 
-  return users;
-}
+  while (imageKeys.size < imageCount) {
+    imageKeys.add(DEMO_ASSETS[Math.floor(random() * DEMO_ASSETS.length)].key);
+  }
+
+  return {
+    ownerId: owner.id,
+    title,
+    data: {
+      ownerId: owner.id,
+      title,
+      description: descriptions[index % descriptions.length],
+      roomType: roomType.code,
+      price: String(price),
+      area: size.toFixed(2),
+      maxOccupants: roomType.maxOccupants,
+      electricPrice: '3500',
+      waterPrice: '80000',
+      deposit: String(price),
+      streetAddress,
+      provinceCode: region.provinceCode,
+      wardCode: area.wardCode,
+      fullAddress: `${streetAddress}, ${area.wardName}, ${region.provinceName}`,
+      location: { type: 'Point', coordinates: [longitude, latitude] },
+      viewingSchedule: buildViewingSchedule(index),
+      status: pickStatus(index, isBulk),
+      createdAt,
+      updatedAt: createdAt,
+    },
+    imageKeys: [...imageKeys],
+    amenityIds: Array.from(
+      { length: amenityCount },
+      (_, order) => AMENITY_POOL[(index * 3 + order * 3) % AMENITY_POOL.length],
+    ),
+    universityCodes: area.universityCodes,
+  };
+};
 
 async function seedListings(
   dataSource: DataSource,
-  owners: User[],
+  ownersByRegion: Map<RegionCode, User[]>,
   total: number,
-  keyPrefix: string,
   isBulk: boolean,
-): Promise<number> {
+): Promise<{ created: number; firstListingId: string | null }> {
   let created = 0;
+  let firstListingId: string | null = null;
 
   for (let offset = 0; offset < total; offset += INSERT_BATCH_SIZE) {
-    const indexes = Array.from(
+    const drafts = Array.from(
       { length: Math.min(INSERT_BATCH_SIZE, total - offset) },
-      (_, position) => offset + position,
+      (_, position) =>
+        buildListingDraft(offset + position, isBulk, ownersByRegion),
     );
-    const ids = indexes.map((index) => createStableId(`${keyPrefix}-${index}`));
-    const existingIds = new Set(
-      (
-        await dataSource.getRepository(Listing).find({
-          select: { id: true },
-          where: { id: In(ids) },
-          withDeleted: true,
-        })
-      ).map((listing) => listing.id),
-    );
-    const listings: DeepPartial<Listing>[] = [];
-    const images: DeepPartial<ListingImage>[] = [];
-    const amenities: DeepPartial<ListingAmenity>[] = [];
-    const universities: Pick<
-      ListingUniversity,
-      'listingId' | 'universityCode' | 'position'
-    >[] = [];
-
-    indexes.forEach((index, position) => {
-      const id = ids[position];
-      const area = AREAS[index % AREAS.length];
-
-      area.universityCodes.forEach((universityCode, order) =>
-        universities.push({ listingId: id, universityCode, position: order }),
+    const batch = await dataSource.transaction(async (manager) => {
+      const existing = await manager.getRepository(Listing).find({
+        select: { id: true, ownerId: true, title: true },
+        where: { title: In(drafts.map((draft) => draft.title)) },
+        withDeleted: true,
+      });
+      const existingByTitleAndOwner = new Map(
+        existing.map((listing) => [
+          `${listing.ownerId}:${listing.title}`,
+          listing.id,
+        ]),
       );
-
-      if (existingIds.has(id)) return;
-
-      const random = createRandom(index * 7919 + (isBulk ? 17 : 3));
-      const roomType = ROOM_TYPES[Math.floor(random() * ROOM_TYPES.length)];
-      const streetAddress = `${1 + Math.floor(random() * 220)} ${STREETS[Math.floor(random() * STREETS.length)]}`;
-      const price =
-        Math.round(
-          (roomType.minPrice +
-            random() * (roomType.maxPrice - roomType.minPrice)) /
-            100_000,
-        ) * 100_000;
-      const size = Math.round(
-        roomType.minArea + random() * (roomType.maxArea - roomType.minArea),
+      const missing = drafts.filter(
+        (draft) =>
+          !existingByTitleAndOwner.has(`${draft.ownerId}:${draft.title}`),
       );
-      const latitude =
-        area.latitude + (random() - 0.5) * 2 * COORDINATE_JITTER_DEGREES;
-      const longitude =
-        area.longitude + (random() - 0.5) * 2 * COORDINATE_JITTER_DEGREES;
-      const createdAt = new Date(
-        Date.now() - Math.floor(random() * 120) * DAY_MS,
-      );
+      const saved = missing.length
+        ? await manager.save(
+            Listing,
+            missing.map((draft) => manager.create(Listing, draft.data)),
+            { chunk: INSERT_BATCH_SIZE },
+          )
+        : [];
+      const images: ListingImage[] = [];
+      const amenities: ListingAmenity[] = [];
+      const universities: ListingUniversity[] = [];
 
-      listings.push({
-        id,
-        ownerId: owners[index % owners.length].id,
-        title: `${roomType.label} gần ${area.nearbySchool} số ${index + 1}`,
-        description: `${roomType.label} sạch sẽ, an ninh tốt, phù hợp sinh viên. Gần ${area.nearbySchool}, thuận tiện đi lại, chợ và quán ăn xung quanh.`,
-        roomType: roomType.code,
-        price: String(price),
-        area: size.toFixed(2),
-        maxOccupants: roomType.maxOccupants,
-        electricPrice: '3500',
-        waterPrice: '80000',
-        deposit: String(price),
-        streetAddress,
-        provinceCode: DA_NANG_PROVINCE_CODE,
-        wardCode: area.wardCode,
-        fullAddress: `${streetAddress}, ${area.wardName}, ${DA_NANG_PROVINCE_NAME}`,
-        location: { type: 'Point', coordinates: [longitude, latitude] },
-        viewingSchedule: null,
-        status: pickStatus(index, isBulk),
-        createdAt,
-        updatedAt: createdAt,
+      saved.forEach((listing, index) => {
+        const draft = missing[index];
+
+        existingByTitleAndOwner.set(
+          `${draft.ownerId}:${draft.title}`,
+          listing.id,
+        );
+        draft.imageKeys.forEach((key, order) =>
+          images.push(
+            manager.create(ListingImage, {
+              listingId: listing.id,
+              url: key,
+              isCover: order === 0,
+              sortOrder: order,
+            }),
+          ),
+        );
+        draft.amenityIds.forEach((amenityId) =>
+          amenities.push(
+            manager.create(ListingAmenity, {
+              listingId: listing.id,
+              amenityId,
+            }),
+          ),
+        );
+        draft.universityCodes.forEach((universityCode, position) =>
+          universities.push(
+            manager.create(ListingUniversity, {
+              listingId: listing.id,
+              universityCode,
+              position,
+            }),
+          ),
+        );
       });
 
-      for (let order = 0; order < IMAGES_PER_LISTING; order += 1) {
-        const photo = PHOTO_IDS[(index * 3 + order * 5) % PHOTO_IDS.length];
-
-        images.push({
-          listingId: id,
-          url: `https://images.unsplash.com/${photo}?w=800&q=80&sig=${index}${order}`,
-          isCover: order === 0,
-          sortOrder: order,
-        });
-      }
-
-      [...AMENITY_POOL]
-        .sort(() => random() - 0.5)
-        .slice(0, 3 + Math.floor(random() * 4))
-        .forEach((amenityId) => amenities.push({ listingId: id, amenityId }));
-    });
-
-    await dataSource.transaction(async (manager) => {
-      if (listings.length > 0) {
-        await manager.save(Listing, listings, { chunk: INSERT_BATCH_SIZE });
+      if (images.length) {
         await manager.save(ListingImage, images, { chunk: INSERT_BATCH_SIZE });
         await manager.save(ListingAmenity, amenities, {
           chunk: INSERT_BATCH_SIZE,
         });
+        await manager.save(ListingUniversity, universities, {
+          chunk: INSERT_BATCH_SIZE,
+        });
       }
 
-      await manager
-        .createQueryBuilder()
-        .insert()
-        .into(ListingUniversity)
-        .values(universities)
-        .orIgnore()
-        .execute();
+      return {
+        created: saved.length,
+        firstListingId:
+          existingByTitleAndOwner.get(
+            `${drafts[0].ownerId}:${drafts[0].title}`,
+          ) ?? null,
+      };
     });
-    created += listings.length;
+
+    created += batch.created;
+
+    if (offset === 0) firstListingId = batch.firstListingId;
   }
 
-  return created;
+  return { created, firstListingId };
 }
 
 async function seedChat(
   dataSource: DataSource,
+  listingId: string | null,
   student: User,
   landlord: User,
 ): Promise<void> {
-  const listing = await dataSource
-    .getRepository(Listing)
-    .findOneBy({ id: createStableId('dn-base-0'), ownerId: landlord.id });
-
-  if (!listing) return;
+  if (!listingId) return;
 
   const conversationRepository = dataSource.getRepository(Conversation);
   const messageRepository = dataSource.getRepository(Message);
   const conversation =
     (await conversationRepository.findOneBy({
-      listingId: listing.id,
+      listingId,
       studentId: student.id,
     })) ??
     (await conversationRepository.save(
       conversationRepository.create({
-        listingId: listing.id,
+        listingId,
         studentId: student.id,
         landlordId: landlord.id,
       }),
@@ -505,50 +847,62 @@ async function seedChat(
     lastMessageAt: new Date(startedAt + (DEMO_CHAT.length - 1) * 60_000),
   });
 
-  console.log(`[Demo] chat between ${student.phone} and ${landlord.phone}`);
+  console.log('[Demo] Sample conversation ready');
 }
-
-const requireUser = (users: Map<string, User>, phone: string): User => {
-  const user = users.get(phone);
-
-  if (!user) throw new Error(`Demo account ${phone} was not created`);
-
-  return user;
-};
 
 export async function seedDemo(
   dataSource: DataSource,
   bulkCount = 0,
 ): Promise<void> {
+  if (
+    REGIONS.reduce((total, region) => total + region.baseCount, 0) !==
+    BASE_LISTING_COUNT
+  ) {
+    throw new Error('Demo region listing counts do not match the base count');
+  }
+
+  await validateCatalog(dataSource);
+
   const users = await seedAccounts(dataSource);
-  const owners = DEMO_ACCOUNTS.filter(
-    (account) => account.isLandlordVerified,
-  ).map((account) => requireUser(users, account.phone));
-  const baseCreated = await seedListings(
+  const ownersByRegion = new Map<RegionCode, User[]>(
+    REGIONS.map((region) => [
+      region.code,
+      DEMO_ACCOUNTS.filter(
+        (account) =>
+          account.roleId === UserRoleType.LANDLORD &&
+          account.regionCode === region.code &&
+          account.isLandlordVerified,
+      ).map((account) => requireUser(users, account.phone)),
+    ]),
+  );
+  const base = await seedListings(
     dataSource,
-    owners,
+    ownersByRegion,
     BASE_LISTING_COUNT,
-    'dn-base',
     false,
   );
 
   console.log(
-    `[Demo] ${baseCreated} new Da Nang listings (${BASE_LISTING_COUNT} in total)`,
+    `[Demo] ${base.created} new listings (200 total: 110 Da Nang, 50 Ha Noi, 40 Ho Chi Minh City)`,
   );
 
   if (bulkCount > 0) {
-    const bulkCreated = await seedListings(
+    const bulk = await seedListings(
       dataSource,
-      owners,
+      ownersByRegion,
       bulkCount,
-      'dn-bulk',
       true,
     );
 
     console.log(
-      `[Demo] bulk mode: ${bulkCreated} new listings (${bulkCount} in total)`,
+      `[Demo] ${bulk.created} new bulk listings (${bulkCount} total)`,
     );
   }
 
-  await seedChat(dataSource, requireUser(users, '0900000001'), owners[0]);
+  await seedChat(
+    dataSource,
+    base.firstListingId,
+    requireUser(users, '0900000001'),
+    requireUser(users, '0900000201'),
+  );
 }

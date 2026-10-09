@@ -5,3 +5,5 @@ export const STORAGE_LIMITS = {
   MAX_VIDEO_BYTES: 100 * 1024 * 1024,
   ALLOWED_VIDEO_TYPES: ['video/mp4', 'video/quicktime'],
 } as const;
+
+export const DEMO_SEED_IMAGE_PREFIX = 'listings/seed-assets/v1/';

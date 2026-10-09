@@ -6,9 +6,11 @@ const DEFAULT_BULK_COUNT = 5000;
 
 const USAGE = `
 Usage:
-  npm run seed                     catalog + demo data
+  npm run seed                     catalog + 200 demo listings; database only
   npm run seed -- catalog          roles, amenities, provinces/wards, universities only
   npm run seed -- --bulk[=N]       catalog + demo data + N extra listings (default ${DEFAULT_BULK_COUNT})
+  npm run seed:assets              no-op safety check
+  npm run seed:assets -- --upload  upload missing shared demo images to R2
 `;
 
 const parseArguments = (args: string[]) => {
@@ -40,10 +42,10 @@ async function run(): Promise<void> {
   await dataSource.initialize();
 
   try {
+    await dataSource.runMigrations();
+
     if (process.env.DB_SYNCHRONIZE === 'true') {
       await dataSource.synchronize();
-    } else {
-      await dataSource.runMigrations();
     }
 
     await seedCatalog(dataSource);

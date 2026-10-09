@@ -7,6 +7,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
+  S3ServiceException,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -14,7 +15,7 @@ import {
   PresignedUploadUrlResponse,
   PresignedDownloadUrlResponse,
 } from './r2-storage.interface';
-import { STORAGE_LIMITS } from './storage.constants';
+import { DEMO_SEED_IMAGE_PREFIX, STORAGE_LIMITS } from './storage.constants';
 
 @Injectable()
 export class R2StorageService {
@@ -226,6 +227,12 @@ export class R2StorageService {
   }
 
   async deleteFile(key: string): Promise<boolean> {
+    if (key.startsWith(DEMO_SEED_IMAGE_PREFIX)) {
+      this.logger.log(`Protected demo asset was not deleted: ${key}`);
+
+      return true;
+    }
+
     if (!this.isConfigured || !this.s3Client) {
       this.logger.log(`Mock delete file key: ${key}`);
 
@@ -245,6 +252,71 @@ export class R2StorageService {
       this.logger.error(`Error deleting file from R2: ${key}`, error);
 
       return false;
+    }
+  }
+
+  async uploadDemoImageIfMissing(
+    key: string,
+    loadImage: () => Promise<Buffer>,
+  ): Promise<'created' | 'existing'> {
+    if (!key.startsWith(DEMO_SEED_IMAGE_PREFIX)) {
+      throw new Error(`Invalid demo asset key: ${key}`);
+    }
+
+    if (!this.s3Client) {
+      throw new Error('R2 credentials are required to upload demo assets');
+    }
+
+    try {
+      const existing = await this.s3Client.send(
+        new HeadObjectCommand({ Bucket: this.bucketName, Key: key }),
+      );
+
+      if (
+        existing.ContentType !== 'image/jpeg' ||
+        !existing.ContentLength ||
+        existing.ContentLength > STORAGE_LIMITS.MAX_IMAGE_BYTES
+      ) {
+        throw new Error(`Existing demo asset is invalid: ${key}`);
+      }
+
+      return 'existing';
+    } catch (error) {
+      if (
+        !(error instanceof S3ServiceException) ||
+        error.$metadata.httpStatusCode !== 404
+      ) {
+        throw error;
+      }
+    }
+
+    const body = await loadImage();
+
+    if (body.length === 0 || body.length > STORAGE_LIMITS.MAX_IMAGE_BYTES) {
+      throw new Error(`Demo asset size is invalid: ${key}`);
+    }
+
+    try {
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+          Body: body,
+          ContentType: 'image/jpeg',
+          IfNoneMatch: '*',
+        }),
+      );
+
+      return 'created';
+    } catch (error) {
+      if (
+        error instanceof S3ServiceException &&
+        error.$metadata.httpStatusCode === 412
+      ) {
+        return 'existing';
+      }
+
+      throw error;
     }
   }
 
