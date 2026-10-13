@@ -27,23 +27,16 @@ import { PresignedUploadUrlResponse } from './r2-storage.interface';
 export class StorageController {
   constructor(private readonly storageService: R2StorageService) {}
 
-  @Post(['presign-upload', 'presigned-upload-url'])
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Tạo presigned URL (hiệu lực 5 phút) để tải ảnh trực tiếp lên R2',
-    description:
-      'Chỉ nhận ảnh jpg/png tối đa 100MB. Backend kiểm tra lại định dạng và dung lượng đối tượng sau khi tải lên.',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'Tạo presigned URL thành công',
-  })
   @Post('presign-video-upload')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Tạo presigned URL (hiệu lực 5 phút) để tải video tin đăng lên R2',
     description:
       'Chỉ nhận video mp4/mov tối đa 100MB. Backend kiểm tra lại định dạng và dung lượng đối tượng sau khi tải lên.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Tạo presigned URL thành công',
   })
   async createPresignedVideoUploadUrl(
     @Body() dto: CreatePresignedVideoUploadDto,
@@ -59,6 +52,10 @@ export class StorageController {
     summary: 'Tạo presigned URL (hiệu lực 5 phút) để tải ảnh trực tiếp lên R2',
     description:
       'Chỉ nhận ảnh jpg/png tối đa 100MB. Backend kiểm tra lại định dạng và dung lượng đối tượng sau khi tải lên.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Tạo presigned URL thành công',
   })
   async createPresignedUploadUrl(
     @Body() dto: CreatePresignedUploadUrlDto,
