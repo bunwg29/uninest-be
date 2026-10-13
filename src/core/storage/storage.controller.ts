@@ -30,7 +30,8 @@ export class StorageController {
   @Post('presign-video-upload')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Tạo presigned URL (hiệu lực 5 phút) để tải video tin đăng lên R2',
+    summary:
+      'Tạo presigned URL (hiệu lực 5 phút) để tải video tin đăng hoặc bài viết forum lên R2',
     description:
       'Chỉ nhận video mp4/mov tối đa 100MB. Backend kiểm tra lại định dạng và dung lượng đối tượng sau khi tải lên.',
   })
@@ -43,6 +44,7 @@ export class StorageController {
   ): Promise<PresignedUploadUrlResponse> {
     return this.storageService.generatePresignedUploadUrlForVideo(
       dto.contentType,
+      dto.folder,
     );
   }
 

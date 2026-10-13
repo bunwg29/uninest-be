@@ -69,6 +69,7 @@ Sprint sau chỉ phụ thuộc sprint trước. Trong một sprint, mỗi nhóm 
 | --- | --- | --- |
 | Dung lượng ảnh | jpg/png, **tối đa 100MB/ảnh** | 5MB |
 | Video tin đăng | Mỗi tin **tối đa 1 video** mp4/mov, tối đa 100MB, key `listings/videos/...` | Không có |
+| Video bài forum | Mỗi bài **tối đa 1 video** mp4/mov, tối đa 100MB, key `forum/videos/...` (chốt 13/10/2026). Chat **không** hỗ trợ video | Không có |
 | Danh sách so sánh | Tối đa 4 tin, **lưu trên máy** (AsyncStorage), không lưu server | Tạm thời trong phiên |
 | Phòng xem gần đây | Lưu trên máy, tách theo từng tài khoản, tối đa 20 tin | Không có |
 | Trường đại học | Sinh viên chọn **1 trường** khi đăng ký/hồ sơ. Chủ trọ chọn **tối đa 3 trường cho từng tin** (lúc đăng tin). Bộ lọc tìm kiếm chọn **tối đa 5 trường** | Không chi tiết |
@@ -134,7 +135,7 @@ Sprint sau chỉ phụ thuộc sprint trước. Trong một sprint, mỗi nhóm 
 - Kiểm tra hợp lệ ở **cả app (zod) lẫn server (class-validator)**, cùng con số.
 
 **Lưu trữ R2**
-- `POST /storage/presign-upload` (ảnh) và `POST /storage/presign-video-upload` (video): yêu cầu đăng nhập, presigned URL hiệu lực **5 phút**, nhận mục đích (`listings`, `avatars`, `chat`, `forum`…), loại tệp, dung lượng; trả `uploadUrl`, `objectKey`, URL công khai.
+- `POST /storage/presign-upload` (ảnh) và `POST /storage/presign-video-upload` (video): yêu cầu đăng nhập, presigned URL hiệu lực **5 phút**, nhận mục đích (`listings`, `avatars`, `chat`, `forum`…), loại tệp, dung lượng; trả `uploadUrl`, `objectKey`, URL công khai. Video chỉ nhận `folder` là `listings` (mặc định) hoặc `forum`.
 - Backend kiểm tra lại định dạng và dung lượng sau khi tải lên. Object key đặt theo mục đích + UUID.
 - Sửa tin xong → backend xoá khỏi R2 các ảnh bị bỏ. Tin xoá mềm thì giữ ảnh.
 
@@ -267,7 +268,8 @@ expired, cancelled, rejected → (kết thúc)
 **Quy tắc bắt buộc**
 - 4 chuyên mục: `roommate` Tìm bạn ở ghép, `experience` Kinh nghiệm thuê trọ, `question` Hỏi đáp, `area_review` Review khu vực.
 - Bài `roommate` bắt buộc tiêu chí: giới tính (Nữ/Nam/Không quan trọng), chi phí/người, ngày dọn vào, tiêu chí sinh hoạt, khu vực (nhập như địa chỉ); trạng thái `open` Còn chỗ / `full` Đã đủ.
-- Tiêu đề ≤ 150, nội dung ≤ 5000, bình luận ≤ 1000 ký tự, tối đa **10 ảnh/bài** (thư mục `forum/`).
+- Tiêu đề ≤ 150, nội dung ≤ 5000, bình luận ≤ 1000 ký tự, tối đa **10 ảnh/bài** (thư mục `forum/`), tối đa **1 video/bài** (mp4/mov, ≤100MB, thư mục `forum/videos/`).
+- Bài viết gửi `videoKey` khi tạo/sửa (gửi `null` để gỡ), trả về `videoKey` + `videoUrl`. Một video chỉ gắn với một bài; đổi hoặc gỡ video thì backend xoá tệp cũ khỏi R2.
 - Vòng đời bài: `draft` (không kiểm duyệt) → `published` → `hidden` (chờ Admin) → Admin `restore` hoặc `remove` (xoá mềm). Bình luận `published`/`hidden`, **trả lời tối đa 1 cấp**.
 - Chỉ tác giả hoặc Admin sửa/xoá. Không sửa nội dung đang bị ẩn.
 - Lọc nội dung trước khi lưu (tiêu đề, nội dung, các trường ở ghép): từ khoá cấm trong bảng `forum_banned_keywords` (Admin quản lý). `block` → chặn (422). `warn` (vd số điện thoại) → chặn tới khi client gửi `acknowledgeWarnings: true`. **Số tài khoản ngân hàng luôn bị chặn.**

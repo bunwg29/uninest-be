@@ -64,6 +64,9 @@ export class ForumPost {
   @Column({ type: 'text', array: true, name: 'image_keys', default: '{}' })
   imageKeys!: string[];
 
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'video_key' })
+  videoKey!: string | null;
+
   @Column({ type: 'jsonb', nullable: true })
   roommate!: RoommateCriteria | null;
 

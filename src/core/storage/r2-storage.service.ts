@@ -91,9 +91,10 @@ export class R2StorageService {
 
   async generatePresignedUploadUrlForVideo(
     contentType: string,
+    folder: (typeof STORAGE_LIMITS.VIDEO_FOLDERS)[number] = 'listings',
   ): Promise<PresignedUploadUrlResponse> {
     const extension = contentType === 'video/quicktime' ? 'mov' : 'mp4';
-    const key = `listings/videos/${Date.now()}-${randomUUID()}.${extension}`;
+    const key = `${folder}/videos/${Date.now()}-${randomUUID()}.${extension}`;
 
     return this.getPresignedUploadUrl({
       key,
