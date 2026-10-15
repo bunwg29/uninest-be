@@ -17,6 +17,7 @@ export const FORUM_CONSTANTS = {
   COMMENT_MAX_LENGTH: 1000,
   REPORT_NOTE_MAX_LENGTH: 500,
   IMAGE_KEY_PREFIX: 'forum/',
+  VIDEO_KEY_PREFIX: 'forum/videos/',
 } as const;
 
 export const FORUM_CATEGORY_LABELS: Record<ForumCategory, string> = {

@@ -58,7 +58,7 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 | `R2StorageService` | Mọi việc với file: `generatePresignedUploadUrlForImage`, `generatePresignedUploadUrlForVideo`, `getPresignedDownloadUrl`, `getPublicUrl(key)`, `getObjectKey(urlOrKey)`, `getKeyFromPublicUrl`, `assertValidImageObject(key)`, `assertValidVideoObject(key)`, `objectExists`, `deleteFile`, `uploadDemoImageIfMissing` |
 | `DEMO_SEED_IMAGE_PREFIX`, `demo-assets.ts`, `seed-assets.ts` | Bộ 400 ảnh mẫu dùng chung: key bất biến trong R2; `seed:assets` chỉ upload khi có `--upload`, `seed` chỉ ghi database |
 | `STORAGE_LIMITS` | Định dạng, dung lượng, thời hạn presigned URL |
-| `POST /storage/presign-upload`, `/storage/presign-video-upload` | App xin URL tải ảnh/video — **không viết endpoint presign mới cho từng module** (trừ avatar đã có `/profile/avatar/presign`) |
+| `POST /storage/presign-upload`, `/storage/presign-video-upload` | App xin URL tải ảnh/video (video nhận `folder`: `listings`, `forum`) — **không viết endpoint presign mới cho từng module** (trừ avatar đã có `/profile/avatar/presign`) |
 
 ---
 

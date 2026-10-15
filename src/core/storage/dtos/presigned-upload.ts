@@ -87,4 +87,17 @@ export class CreatePresignedVideoUploadDto {
     message: 'Video có dung lượng tối đa 100MB',
   })
   fileSize?: number;
+
+  @ApiPropertyOptional({
+    description: 'Thư mục lưu video theo mục đích sử dụng',
+    example: 'listings',
+    enum: STORAGE_LIMITS.VIDEO_FOLDERS,
+    default: 'listings',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn([...STORAGE_LIMITS.VIDEO_FOLDERS], {
+    message: 'Thư mục lưu video không hợp lệ',
+  })
+  folder?: (typeof STORAGE_LIMITS.VIDEO_FOLDERS)[number];
 }
