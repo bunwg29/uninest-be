@@ -211,7 +211,10 @@ export class ForumPostsService {
         );
     const imageKeys = [...new Set(dto.imageKeys ?? [])];
 
+    const videoKey = dto.videoKey ?? null;
+
     await this.assertImagesUsable(imageKeys, [], null);
+    await this.assertVideoUsable(videoKey, null, null);
 
     const post = this.postRepository.create({
       authorId: viewer.userId,
@@ -219,6 +222,7 @@ export class ForumPostsService {
       title: dto.title,
       content: dto.content,
       imageKeys,
+      videoKey,
       roommate,
       roommateStatus: roommate
         ? (dto.roommateStatus ?? RoommateStatus.OPEN)
@@ -255,6 +259,7 @@ export class ForumPostsService {
     }
 
     const previousImageKeys = post.imageKeys;
+    const previousVideoKey = post.videoKey;
     const category = dto.category ?? post.category;
     const roommate =
       dto.roommate !== undefined
@@ -269,12 +274,17 @@ export class ForumPostsService {
         ? [...new Set(dto.imageKeys)]
         : post.imageKeys;
 
+    const nextVideoKey =
+      dto.videoKey !== undefined ? dto.videoKey : previousVideoKey;
+
     await this.assertImagesUsable(nextImageKeys, previousImageKeys, post.id);
+    await this.assertVideoUsable(nextVideoKey, previousVideoKey, post.id);
 
     post.category = category;
     post.title = dto.title ?? post.title;
     post.content = dto.content ?? post.content;
     post.imageKeys = nextImageKeys;
+    post.videoKey = nextVideoKey;
     post.roommate = roommate;
     post.roommateStatus = roommate
       ? (dto.roommateStatus ?? post.roommateStatus ?? RoommateStatus.OPEN)
@@ -293,7 +303,11 @@ export class ForumPostsService {
     }
 
     await this.postRepository.save(post);
-    await this.deleteRemovedImages(previousImageKeys, post.imageKeys);
+    await this.deleteRemovedFiles(previousImageKeys, post.imageKeys);
+    await this.deleteRemovedFiles(
+      previousVideoKey ? [previousVideoKey] : [],
+      post.videoKey ? [post.videoKey] : [],
+    );
 
     const [presentedPost] = await this.presentPosts([post], viewer);
 
@@ -535,7 +549,34 @@ export class ForumPostsService {
     );
   }
 
-  private async deleteRemovedImages(
+  private async assertVideoUsable(
+    nextVideoKey: string | null,
+    previousVideoKey: string | null,
+    postId: string | null,
+  ): Promise<void> {
+    if (!nextVideoKey || nextVideoKey === previousVideoKey) {
+      return;
+    }
+
+    const usedQuery = this.postRepository
+      .createQueryBuilder('post')
+      .withDeleted()
+      .where('post.videoKey = :nextVideoKey', { nextVideoKey });
+
+    if (postId) {
+      usedQuery.andWhere('post.id != :postId', { postId });
+    }
+
+    if (await usedQuery.getExists()) {
+      throw new BadRequestException(
+        'Video đã được sử dụng ở bài viết khác, vui lòng tải video mới lên',
+      );
+    }
+
+    await this.storageService.assertValidVideoObject(nextVideoKey);
+  }
+
+  private async deleteRemovedFiles(
     previousImageKeys: string[],
     nextImageKeys: string[],
   ): Promise<void> {
@@ -552,7 +593,7 @@ export class ForumPostsService {
 
     if (results.some((isDeleted) => !isDeleted)) {
       this.logger.warn(
-        `Failed to delete some post images from R2: ${removedKeys.join(', ')}`,
+        `Failed to delete some post media from R2: ${removedKeys.join(', ')}`,
       );
     }
   }

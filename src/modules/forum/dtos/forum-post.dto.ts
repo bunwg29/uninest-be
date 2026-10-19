@@ -38,6 +38,10 @@ const FORUM_IMAGE_KEY_PATTERN = new RegExp(
   `^${FORUM_CONSTANTS.IMAGE_KEY_PREFIX}(?!.*\\.\\.)[A-Za-z0-9/_.-]+$`,
 );
 
+const FORUM_VIDEO_KEY_PATTERN = new RegExp(
+  `^${FORUM_CONSTANTS.VIDEO_KEY_PREFIX}[A-Za-z0-9_-]+\\.(mp4|mov)$`,
+);
+
 export const trimString = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
 
@@ -184,6 +188,19 @@ export class CreateForumPostDto {
     message: 'Ảnh bài viết phải được upload vào thư mục forum',
   })
   imageKeys?: string[];
+
+  @ApiPropertyOptional({
+    example: 'forum/videos/1730000000000-uuid.mp4',
+    description:
+      'Object key video đã upload lên R2 (thư mục forum/videos), tối đa 1 video; gửi null để gỡ video',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString({ message: 'Object key video phải là chuỗi' })
+  @Matches(FORUM_VIDEO_KEY_PATTERN, {
+    message: 'Video bài viết phải được upload vào thư mục forum/videos',
+  })
+  videoKey?: string | null;
 
   @ApiPropertyOptional({
     type: RoommateCriteriaDto,

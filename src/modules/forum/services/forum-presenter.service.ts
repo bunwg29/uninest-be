@@ -56,6 +56,10 @@ export class ForumPresenterService {
       imageUrls: post.imageKeys.map((key) =>
         this.storageService.getPublicUrl(key),
       ),
+      videoKey: post.videoKey,
+      videoUrl: post.videoKey
+        ? this.storageService.getPublicUrl(post.videoKey)
+        : null,
       roommate,
       roommateStatus: post.roommateStatus,
       roommateStatusLabel: post.roommateStatus
