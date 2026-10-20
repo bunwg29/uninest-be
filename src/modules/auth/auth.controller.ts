@@ -74,7 +74,7 @@ export class AuthController {
   }
 
   @Public()
-  @Post('otp/send')
+  @Post(['otp/send', 'send-otp'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Gửi hoặc gửi lại mã xác thực OTP',
@@ -91,7 +91,7 @@ export class AuthController {
   }
 
   @Public()
-  @Post('otp/verify')
+  @Post(['otp/verify', 'verify-otp'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Xác thực mã OTP',
@@ -110,7 +110,7 @@ export class AuthController {
   }
 
   @Public()
-  @Post('refresh-token')
+  @Post(['refresh', 'refresh-token'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Làm mới Access Token bằng Refresh Token',
@@ -198,12 +198,7 @@ export class AuthController {
   async changePassword(
     @CurrentUser('userId') userId: string,
     @Body() dto: ChangePasswordDto,
-    @Req() req: Request,
   ) {
-    return this.authService.changePassword(
-      userId,
-      dto,
-      req.headers['x-device-id']?.toString(),
-    );
+    return this.authService.changePassword(userId, dto);
   }
 }

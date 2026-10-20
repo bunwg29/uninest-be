@@ -9,7 +9,7 @@ export * from './forum';
 export * from './reviews';
 export * from './notifications';
 export * from './payment';
-export * from './comparison';
 export * from './recommendations';
 export * from './ai-chat';
 export * from './locations';
+export * from './universities';

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppConfigModule, DatabaseModule, StorageModule } from '@core';
 import {
   HealthModule,
@@ -12,32 +13,33 @@ import {
   ReviewsModule,
   NotificationsModule,
   PaymentModule,
-  ComparisonModule,
   RecommendationsModule,
   AiChatModule,
   LocationsModule,
+  UniversitiesModule,
 } from '@modules';
 
 @Module({
   imports: [
+    EventEmitterModule.forRoot(),
     AppConfigModule,
     DatabaseModule,
     StorageModule,
     HealthModule,
     AuthModule,
     UsersModule,
-    ListingsModule,
     SearchModule,
+    ListingsModule,
     BookingModule,
     ChatModule,
     ForumModule,
     ReviewsModule,
     NotificationsModule,
     PaymentModule,
-    ComparisonModule,
     RecommendationsModule,
     AiChatModule,
     LocationsModule,
+    UniversitiesModule,
   ],
 })
 export class AppModule {}

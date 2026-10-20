@@ -1,122 +1,66 @@
-import * as dotenv from 'dotenv';
-import * as path from 'path';
-import { DataSource } from 'typeorm';
-import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
-import {
-  Role,
-  Permission,
-  RolePermission,
-  User,
-} from '../../../modules/users/entities';
-import { RefreshToken, OtpCode } from '../../../modules/auth/entities';
-import { Province, Ward } from '../../../modules/locations/entities';
-import {
-  Amenity,
-  Listing,
-  ListingAmenity,
-  ListingImage,
-} from '../../../modules/listings/entities';
-import { seedRbac } from './rbac.seeder';
-import { seedLocations } from './locations.seeder';
-import { seedAmenities } from './amenities.seeder';
+import dataSource from '../data-source';
+import { seedCatalog } from './catalog.seeder';
+import { seedDemo } from './demo.seeder';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+const DEFAULT_BULK_COUNT = 5000;
 
-const SEEDERS: Record<
-  string,
-  { name: string; description: string; fn: (ds: DataSource) => Promise<void> }
-> = {
-  rbac: {
-    name: 'RBAC Seeder',
-    description:
-      'Nạp vai trò (0: Student, 1: Landlord, 2: Admin) và bảng permissions',
-    fn: seedRbac,
-  },
-  locations: {
-    name: 'Locations Seeder',
-    description: 'Nạp 34 tỉnh/thành phố và 3.321 phường/xã từ dataset VN units',
-    fn: seedLocations,
-  },
-  amenities: {
-    name: 'Amenities Seeder',
-    description:
-      'Nạp danh mục tiện ích với mã số (1..16) và nhóm số (0: Nội thất, 1: Tiện ích, 2: An ninh, 3: Phòng)',
-    fn: seedAmenities,
-  },
+const USAGE = `
+Usage:
+  npm run seed                     catalog + 200 demo listings; database only
+  npm run seed -- catalog          roles, amenities, provinces/wards, universities only
+  npm run seed -- --bulk[=N]       catalog + demo data + N extra listings (default ${DEFAULT_BULK_COUNT})
+  npm run seed:assets              no-op safety check
+  npm run seed:assets -- --upload  upload missing shared demo images to R2
+`;
+
+const parseArguments = (args: string[]) => {
+  const bulkArgument = args.find((arg) => arg.startsWith('--bulk'));
+  const bulkValue = Number(bulkArgument?.split('=')[1]);
+
+  return {
+    isCatalogOnly: args.includes('catalog'),
+    isHelp: args.includes('--help'),
+    bulkCount: bulkArgument ? bulkValue || DEFAULT_BULK_COUNT : 0,
+  };
 };
 
-async function run() {
-  const arg = process.argv[2]?.trim().toLowerCase();
+async function run(): Promise<void> {
+  const { isCatalogOnly, isHelp, bulkCount } = parseArguments(
+    process.argv.slice(2),
+  );
 
-  if (!arg) {
-    console.log('\n[Seeder CLI] Thieu ten seeder can chay.');
-    console.log('\nCach dung:');
-    console.log('   npm run seed -- <ten_seeder>');
-    console.log('   (Vi du: npm run seed -- rbac)');
-    console.log('\nDanh sach cac seeders co san:');
+  if (isHelp) {
+    console.log(USAGE);
 
-    for (const [key, item] of Object.entries(SEEDERS)) {
-      console.log(`   - ${key}: ${item.name} (${item.description})`);
-    }
-
-    process.exit(1);
+    return;
   }
 
-  const cleanKey = arg.replace(/\.seeder(\.ts)?$/, '');
-  const seeder = SEEDERS[cleanKey];
-
-  if (!seeder) {
-    console.log(`\n[Seeder CLI] Khong tim thay seeder: "${arg}"`);
-    console.log('Cac seeder hop le: ' + Object.keys(SEEDERS).join(', '));
-    process.exit(1);
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Seeding is disabled in production');
   }
 
-  const isSync =
-    process.env.DB_SYNCHRONIZE === 'true' || process.env.DB_SYNCHRONIZE === '1';
-
-  const dataSource = new DataSource({
-    type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
-    port: Number(process.env.DB_PORT) || 5432,
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE || 'uninest',
-    entities: [
-      Role,
-      Permission,
-      RolePermission,
-      User,
-      RefreshToken,
-      OtpCode,
-      Province,
-      Ward,
-      Amenity,
-      Listing,
-      ListingAmenity,
-      ListingImage,
-    ],
-    synchronize: isSync,
-    namingStrategy: new SnakeNamingStrategy(),
-  });
+  await dataSource.initialize();
 
   try {
-    console.log(
-      `\n[Seeder CLI] Dang ket noi database ${process.env.DB_DATABASE || 'uninest'}...`,
-    );
-    await dataSource.initialize();
-    console.log(`[Seeder CLI] Bat dau chay ${seeder.name}...`);
+    await dataSource.runMigrations();
 
-    await seeder.fn(dataSource);
-
-    console.log(`[Seeder CLI] Hoan thanh thanh cong!\n`);
-  } catch (error) {
-    console.error('[Seeder CLI] Loi trong qua trinh seed:', error);
-    process.exit(1);
-  } finally {
-    if (dataSource.isInitialized) {
-      await dataSource.destroy();
+    if (process.env.DB_SYNCHRONIZE === 'true') {
+      await dataSource.synchronize();
     }
+
+    await seedCatalog(dataSource);
+
+    if (!isCatalogOnly) {
+      await seedDemo(dataSource, bulkCount);
+    }
+
+    console.log('[Seed] Done');
+  } finally {
+    await dataSource.destroy();
   }
 }
 
-void run();
+run().catch((error: unknown) => {
+  console.error('[Seed] Failed:', error);
+  process.exit(1);
+});

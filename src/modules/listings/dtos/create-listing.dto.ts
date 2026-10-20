@@ -1,37 +1,39 @@
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
+  IsBoolean,
+  IsEnum,
   IsInt,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
-  IsUrl,
+  Matches,
   Max,
   MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { RoomType } from '../entities/room-type';
 
 export class CreateListingImageDto {
   @ApiProperty({
-    example:
-      'https://pub-250e35ee14664cab87368a3ea466d91f.r2.dev/listings/1715800000000-uuid.jpg',
-    description:
-      'URL ảnh sau khi đã upload lên Cloudflare R2 (bắt buộc giao thức http/https, không nhận URI cục bộ)',
+    example: 'listings/1715800000000-uuid.jpg',
+    description: 'Object key của ảnh sau khi đã tải lên storage',
   })
-  @IsNotEmpty({ message: 'URL ảnh không được để trống' })
-  @IsUrl(
-    { protocols: ['http', 'https'], require_protocol: true },
+  @IsNotEmpty({ message: 'Object key ảnh không được để trống' })
+  @IsString({ message: 'Object key ảnh phải là chuỗi' })
+  @Matches(
+    /^(?!.*\.\.)(?!.*\/\/)listings\/[A-Za-z0-9][A-Za-z0-9._/-]*[A-Za-z0-9]$/,
     {
-      message:
-        'URL ảnh phải là liên kết web (http/https) hợp lệ từ Cloudflare R2',
+      message: 'Object key ảnh tin đăng không hợp lệ',
     },
   )
-  @MaxLength(1000, { message: 'URL ảnh tối đa 1000 ký tự' })
-  url!: string;
+  @MaxLength(1000, { message: 'Object key ảnh tối đa 1000 ký tự' })
+  key!: string;
 
   @ApiPropertyOptional({
     example: true,
@@ -40,6 +42,60 @@ export class CreateListingImageDto {
   @IsOptional()
   @Transform(({ value }) => value === true || value === 'true')
   isCover?: boolean;
+}
+
+export class ViewingSlotDto {
+  @ApiProperty({ example: true, description: 'Có thể xem phòng vào buổi sáng' })
+  @IsBoolean({ message: 'Trạng thái buổi sáng phải là kiểu boolean' })
+  morning!: boolean;
+
+  @ApiProperty({
+    example: false,
+    description: 'Có thể xem phòng vào buổi chiều',
+  })
+  @IsBoolean({ message: 'Trạng thái buổi chiều phải là kiểu boolean' })
+  afternoon!: boolean;
+
+  @ApiProperty({ example: true, description: 'Có thể xem phòng vào buổi tối' })
+  @IsBoolean({ message: 'Trạng thái buổi tối phải là kiểu boolean' })
+  evening!: boolean;
+}
+
+export class ViewingScheduleDto {
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Hai' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  mon!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Ba' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  tue!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Tư' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  wed!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Năm' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  thu!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Sáu' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  fri!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng thứ Bảy' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  sat!: ViewingSlotDto;
+
+  @ApiProperty({ type: ViewingSlotDto, description: 'Lịch xem phòng Chủ nhật' })
+  @ValidateNested()
+  @Type(() => ViewingSlotDto)
+  sun!: ViewingSlotDto;
 }
 
 export class CreateListingDto {
@@ -67,8 +123,8 @@ export class CreateListingDto {
   })
   @IsNotEmpty({ message: 'Loại hình phòng/trọ không được để trống' })
   @IsString({ message: 'Loại hình phòng/trọ phải là chuỗi' })
-  @MaxLength(50, { message: 'Loại hình phòng/trọ tối đa 50 ký tự' })
-  roomType!: string;
+  @IsEnum(RoomType, { message: 'Loại hình phòng/trọ không hợp lệ' })
+  roomType!: RoomType;
 
   @ApiProperty({
     example: 2500000,
@@ -175,17 +231,42 @@ export class CreateListingDto {
   @Max(180, { message: 'Kinh độ phải nằm trong khoảng -180 đến 180' })
   longitude!: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     type: [CreateListingImageDto],
     description:
-      'Danh sách ảnh phòng đã upload lên Cloudflare R2, tối đa 10 ảnh',
+      'Danh sách object key của ảnh phòng đã tải lên, từ 1 đến 10 ảnh',
   })
-  @IsOptional()
   @IsArray({ message: 'Danh sách ảnh phải là mảng' })
+  @ArrayMinSize(1, { message: 'Cần ít nhất 1 ảnh phòng' })
   @ArrayMaxSize(10, { message: 'Chỉ được chọn tối đa 10 ảnh' })
   @ValidateNested({ each: true })
   @Type(() => CreateListingImageDto)
-  images?: CreateListingImageDto[];
+  images!: CreateListingImageDto[];
+
+  @ApiPropertyOptional({
+    example: 'listings/videos/1715800000000-uuid.mp4',
+    description:
+      'Object key của video giới thiệu phòng đã tải lên, tối đa 1 video',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString({ message: 'Object key video phải là chuỗi' })
+  @Matches(/^listings\/videos\/[A-Za-z0-9_-]+\.(mp4|mov)$/, {
+    message: 'Object key video không hợp lệ',
+  })
+  videoKey?: string | null;
+
+  @ApiPropertyOptional({
+    example: ['DDK', 'VKU'],
+    type: [String],
+    description: 'Mã các trường đại học gần phòng, tối đa 3 trường',
+  })
+  @IsOptional()
+  @IsArray({ message: 'Danh sách trường phải là mảng' })
+  @ArrayMaxSize(3, { message: 'Chỉ chọn được tối đa 3 trường đại học' })
+  @IsString({ each: true, message: 'Mã trường không hợp lệ' })
+  @MaxLength(20, { each: true, message: 'Mã trường không hợp lệ' })
+  universityCodes?: string[];
 
   @ApiPropertyOptional({
     example: [1, 2, 3],
@@ -198,4 +279,17 @@ export class CreateListingDto {
   @Min(0, { each: true, message: 'Mã tiện ích không được là số âm' })
   @Type(() => Number)
   amenityIds?: number[];
+
+  @ApiPropertyOptional({
+    type: ViewingScheduleDto,
+    description: 'Lịch cho xem phòng định kỳ trong tuần',
+    example: {
+      mon: { morning: true, afternoon: false, evening: true },
+      tue: { morning: false, afternoon: true, evening: false },
+    },
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ViewingScheduleDto)
+  viewingSchedule?: ViewingScheduleDto;
 }

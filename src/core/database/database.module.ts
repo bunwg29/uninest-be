@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
+import { MIGRATIONS_GLOB } from './data-source';
 import { DatabaseInitializerService } from './database-initializer.service';
 
 @Module({
@@ -26,7 +27,13 @@ import { DatabaseInitializerService } from './database-initializer.service';
           database: configService.get<string>('DB_DATABASE', 'uninest_db'),
           autoLoadEntities: true,
           synchronize: isSync,
+          migrations: [MIGRATIONS_GLOB],
+          migrationsTableName: 'migrations',
+          migrationsRun: true,
           logging: isLogging,
+          extra: {
+            max: Number(configService.get<number>('DB_POOL_SIZE', 20)),
+          },
           namingStrategy: new SnakeNamingStrategy(),
         };
       },

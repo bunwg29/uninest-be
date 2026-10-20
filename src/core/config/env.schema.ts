@@ -51,6 +51,10 @@ export class EnvironmentVariables {
   @IsOptional()
   DB_LOGGING?: boolean | string;
 
+  @IsOptional()
+  @IsNumber()
+  DB_POOL_SIZE: number = 20;
+
   @IsString()
   @IsOptional()
   R2_ACCOUNT_ID?: string;
@@ -73,11 +77,15 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  PIXABAY_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
   JWT_ACCESS_SECRET?: string;
 
   @IsString()
   @IsOptional()
-  JWT_ACCESS_EXPIRES_IN?: string = '15m';
+  JWT_ACCESS_EXPIRES_IN?: string = '1h';
 
   @IsString()
   @IsOptional()
@@ -85,7 +93,19 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
-  JWT_REFRESH_EXPIRES_IN?: string = '7d';
+  JWT_REFRESH_EXPIRES_IN?: string = '30d';
+
+  @IsNumber()
+  @IsOptional()
+  BOOKING_RESPONSE_HOURS: number = 24;
+
+  @IsNumber()
+  @IsOptional()
+  HOLDING_DAYS: number = 7;
+
+  @IsNumber()
+  @IsOptional()
+  CANCEL_FREE_HOURS: number = 24;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

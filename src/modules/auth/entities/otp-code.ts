@@ -11,6 +11,7 @@ export enum OtpType {
   LOGIN = 'LOGIN',
   FORGOT_PASSWORD = 'FORGOT_PASSWORD',
   PHONE_CHANGE = 'PHONE_CHANGE',
+  EMAIL_CHANGE = 'EMAIL_CHANGE',
 }
 
 @Entity('otp_codes')
@@ -22,10 +23,10 @@ export class OtpCode {
   @Column({ type: 'varchar', length: 150 })
   identifier!: string;
 
-  @Column({ type: 'varchar', length: 6 })
-  code!: string;
+  @Column({ type: 'varchar', length: 64, name: 'code_hash' })
+  codeHash!: string;
 
-  @Column({ type: 'varchar', length: 20, default: OtpType.REGISTER })
+  @Column({ type: 'enum', enum: OtpType, default: OtpType.REGISTER })
   type!: OtpType;
 
   @Column({ type: 'timestamptz', name: 'expires_at' })
@@ -37,6 +38,9 @@ export class OtpCode {
 
   @Column({ type: 'smallint', default: 0 })
   attempts!: number;
+
+  @Column({ type: 'timestamptz', name: 'locked_until', nullable: true })
+  lockedUntil!: Date | null;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;

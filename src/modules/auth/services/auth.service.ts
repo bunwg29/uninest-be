@@ -26,6 +26,12 @@ import { OtpType } from '../entities/otp-code';
 import { UserRoleType, ROLE_CODES, ROLE_NAMES } from '@common/constants';
 import { User } from '../../users/entities/user';
 import { LocationsService } from '../../locations/locations.service';
+import { R2StorageService } from '@core/storage';
+
+const TOKEN_ISSUING_OTP_TYPES: readonly OtpType[] = [
+  OtpType.REGISTER,
+  OtpType.LOGIN,
+];
 
 @Injectable()
 export class AuthService {
@@ -34,6 +40,7 @@ export class AuthService {
     private readonly otpService: OtpService,
     private readonly tokenService: TokenService,
     private readonly locationsService: LocationsService,
+    private readonly storageService: R2StorageService,
   ) {}
 
   private mapToAuthUserDto(user: User, permissions: string[]): AuthUserDto {
@@ -45,7 +52,9 @@ export class AuthService {
       email: user.email,
       phone: user.phone,
       fullName: user.fullName,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: user.avatarUrl
+        ? this.storageService.getPublicUrl(user.avatarUrl)
+        : null,
       roleId: user.roleId,
       role: roleCode,
       roleName: roleName,
@@ -106,10 +115,22 @@ export class AuthService {
       fullAddress = dto.streetAddress.trim();
     }
 
+    const universityCodes = dto.universityCodes ?? [];
+
+    if (universityCodes.length > 0) {
+      if (dto.roleId !== UserRoleType.STUDENT) {
+        throw new BadRequestException(
+          'Chủ trọ chọn trường đại học gần phòng khi đăng tin',
+        );
+      }
+
+      await this.usersService.assertUniversitiesExist(universityCodes);
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const identifier = dto.phone || dto.email!;
 
-    await this.usersService.create({
+    const createdUser = await this.usersService.create({
       email: dto.email || null,
       phone: dto.phone || null,
       fullName: dto.fullName.trim(),
@@ -122,6 +143,10 @@ export class AuthService {
       streetAddress: dto.streetAddress?.trim() || null,
       fullAddress,
     });
+
+    if (universityCodes.length > 0) {
+      await this.usersService.updateUniversities(createdUser, universityCodes);
+    }
 
     await this.otpService.sendOtp(identifier, OtpType.REGISTER);
 
@@ -147,12 +172,24 @@ export class AuthService {
     dto: VerifyOtpDto,
     ipAddress?: string,
   ): Promise<AuthTokenDto> {
+    if (!TOKEN_ISSUING_OTP_TYPES.includes(dto.type)) {
+      throw new BadRequestException(
+        'Loại mã OTP này không dùng để đăng nhập hoặc kích hoạt tài khoản',
+      );
+    }
+
     await this.otpService.verifyOtp(dto.identifier, dto.code, dto.type);
 
     const user = await this.usersService.findByIdentifier(dto.identifier);
 
     if (!user) {
       throw new NotFoundException('Không tìm thấy thông tin tài khoản');
+    }
+
+    if (!user.isActive) {
+      throw new ForbiddenException(
+        'Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên',
+      );
     }
 
     if (!user.isVerified) {
@@ -259,7 +296,6 @@ export class AuthService {
   }
 
   async logout(dto: RefreshTokenDto): Promise<{ message: string }> {
-    await this.tokenService.revokeToken(dto.refreshToken);
     await this.tokenService.revokeToken(dto.refreshToken, dto.deviceId);
 
     return { message: 'Đăng xuất thành công' };
@@ -327,7 +363,6 @@ export class AuthService {
   async changePassword(
     userId: string,
     dto: ChangePasswordDto,
-    deviceId?: string,
   ): Promise<{ message: string }> {
     if (dto.newPassword !== dto.confirmPassword) {
       throw new BadRequestException(
@@ -357,8 +392,11 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
 
     await this.usersService.updatePassword(userId, passwordHash);
-    await this.tokenService.revokeOtherUserTokens(userId, deviceId);
+    await this.tokenService.revokeAllUserTokens(userId);
 
-    return { message: 'Đổi mật khẩu thành công' };
+    return {
+      message:
+        'Đổi mật khẩu thành công. Vui lòng đăng nhập lại trên mọi thiết bị',
+    };
   }
 }

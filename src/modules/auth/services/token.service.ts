@@ -21,8 +21,8 @@ export interface JwtPayload {
 @Injectable()
 export class TokenService {
   private readonly logger = new Logger(TokenService.name);
-  private readonly ACCESS_EXPIRES_IN_SEC: number = 15 * 60;
-  private readonly REFRESH_EXPIRES_IN_DAYS: number = 7;
+  private readonly ACCESS_EXPIRES_IN_SEC: number = 60 * 60;
+  private readonly REFRESH_EXPIRES_IN_DAYS: number = 30;
 
   constructor(
     private readonly jwtService: JwtService,
@@ -131,7 +131,7 @@ export class TokenService {
 
     if (existingToken.isRevoked) {
       this.logger.warn(
-        `[Security] Phat hien reuse refresh token da bi thu hoi cua user: ${existingToken.userId}. Dang thu hoi toan bo session!`,
+        `[Security] Reuse of a revoked refresh token detected for user: ${existingToken.userId}. Revoking all sessions!`,
       );
       await this.revokeAllUserTokens(existingToken.userId);
       throw new UnauthorizedException(
@@ -156,9 +156,16 @@ export class TokenService {
       );
     }
 
-    await this.refreshTokenRepository.update(existingToken.id, {
-      isRevoked: true,
-    });
+    const rotation = await this.refreshTokenRepository.update(
+      { id: existingToken.id, isRevoked: false },
+      { isRevoked: true },
+    );
+
+    if (!rotation.affected) {
+      throw new UnauthorizedException(
+        'Phiên đăng nhập đã được làm mới ở nơi khác. Vui lòng thử lại',
+      );
+    }
 
     const permissions = await this.usersService.getUserPermissions(user.roleId);
 
@@ -181,15 +188,22 @@ export class TokenService {
 
   async revokeToken(rawRefreshToken: string, deviceId?: string): Promise<void> {
     const tokenHash = this.hashToken(rawRefreshToken);
+    const existingToken = await this.refreshTokenRepository.findOne({
+      where: { tokenHash },
+      select: { id: true, userId: true },
+    });
 
-    await this.refreshTokenRepository.update(
-      { tokenHash },
-      { isRevoked: true },
-    );
+    if (!existingToken) {
+      return;
+    }
+
+    await this.refreshTokenRepository.update(existingToken.id, {
+      isRevoked: true,
+    });
 
     if (deviceId) {
       await this.refreshTokenRepository.update(
-        { deviceId, isRevoked: false },
+        { userId: existingToken.userId, deviceId, isRevoked: false },
         { isRevoked: true },
       );
     }
@@ -200,26 +214,5 @@ export class TokenService {
       { userId, isRevoked: false },
       { isRevoked: true },
     );
-  }
-
-  async revokeOtherUserTokens(
-    userId: string,
-    deviceId?: string,
-  ): Promise<void> {
-    const activeTokens = await this.refreshTokenRepository.find({
-      where: { userId, isRevoked: false },
-    });
-
-    const tokensToRevoke = activeTokens.filter(
-      (token) => !deviceId || token.deviceId !== deviceId,
-    );
-
-    for (const token of tokensToRevoke) {
-      token.isRevoked = true;
-    }
-
-    if (tokensToRevoke.length > 0) {
-      await this.refreshTokenRepository.save(tokensToRevoke);
-    }
   }
 }

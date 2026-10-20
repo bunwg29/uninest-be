@@ -25,17 +25,3 @@ export class ApiResponseDto<T = unknown> {
   })
   messages!: string | string[];
 }
-
-export function createApiResponse<T>(
-  data: T | null = null,
-  messages: string | string[] = 'Operation completed successfully',
-  status: boolean = true,
-  error: string | null = null,
-): ApiResponseDto<T> {
-  return {
-    status,
-    data,
-    error,
-    messages,
-  };
-}

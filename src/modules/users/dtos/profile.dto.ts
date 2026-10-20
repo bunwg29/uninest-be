@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsEmail,
   IsInt,
@@ -12,32 +13,55 @@ import {
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'Nguyễn Xuân Hoài' })
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @MinLength(2, { message: 'Họ và tên tối thiểu 2 ký tự' })
   @MaxLength(50, { message: 'Họ và tên tối đa 50 ký tự' })
   name?: string;
 
-  @ApiPropertyOptional({ example: 'xuanhoai@gmail.com' })
+  @ApiPropertyOptional({
+    example: ['DDK'],
+    type: [String],
+    description:
+      'Mã trường đại học đang học (chỉ dành cho sinh viên, tối đa 1)',
+  })
   @IsOptional()
-  @IsEmail({}, { message: 'Email không đúng định dạng' })
-  @MaxLength(150)
-  email?: string;
-
-  @ApiPropertyOptional({ example: 'ĐH Bách khoa - ĐH Đà Nẵng' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  school?: string;
+  @IsArray({ message: 'Danh sách trường phải là mảng' })
+  @ArrayMaxSize(1, { message: 'Sinh viên chỉ chọn được 1 trường đại học' })
+  @IsString({ each: true, message: 'Mã trường không hợp lệ' })
+  @MaxLength(20, { each: true, message: 'Mã trường không hợp lệ' })
+  universityCodes?: string[];
 
   @ApiPropertyOptional({ example: 'Sinh viên năm 3 Bách khoa' })
   @IsOptional()
   @IsString()
   @MaxLength(300, { message: 'Giới thiệu tối đa 300 ký tự' })
   bio?: string;
+
+  @ApiPropertyOptional({ example: '48', description: 'Mã tỉnh/thành phố' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '20194', description: 'Mã phường/xã' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  wardCode?: string;
+
+  @ApiPropertyOptional({ example: '54 Nguyễn Lương Bằng' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  streetAddress?: string;
 
   @ApiPropertyOptional({ example: ['Hòa Khánh', 'Khuê Mỹ'], type: [String] })
   @IsOptional()
@@ -63,7 +87,7 @@ export class PresignAvatarDto {
   @ApiProperty({ example: 1048576 })
   @IsInt()
   @Min(1, { message: 'Dung lượng ảnh phải lớn hơn 0' })
-  @Max(5 * 1024 * 1024, { message: 'Ảnh đại diện tối đa 5MB' })
+  @Max(100 * 1024 * 1024, { message: 'Ảnh đại diện tối đa 100MB' })
   fileSize!: number;
 }
 
@@ -83,6 +107,14 @@ export class RequestPhoneOtpDto {
     message: 'Số điện thoại không hợp lệ',
   })
   newPhone!: string;
+}
+
+export class RequestEmailOtpDto {
+  @ApiProperty({ example: 'xuanhoai@gmail.com' })
+  @IsNotEmpty({ message: 'Email mới không được để trống' })
+  @IsEmail({}, { message: 'Email không đúng định dạng' })
+  @MaxLength(150)
+  newEmail!: string;
 }
 
 export class VerifyPhoneOtpDto {
@@ -105,13 +137,49 @@ export class ProfileResponseDto {
   @ApiProperty() phoneVerified!: boolean;
   @ApiPropertyOptional() email!: string | null;
   @ApiPropertyOptional() school!: string | null;
+  @ApiProperty({ type: [Object] }) universities!: {
+    code: string;
+    name: string;
+  }[];
   @ApiPropertyOptional() bio!: string | null;
+  @ApiPropertyOptional() provinceCode!: string | null;
+  @ApiPropertyOptional() provinceName!: string | null;
+  @ApiPropertyOptional() wardCode!: string | null;
+  @ApiPropertyOptional() wardName!: string | null;
+  @ApiPropertyOptional() streetAddress!: string | null;
+  @ApiPropertyOptional() fullAddress!: string | null;
   @ApiProperty({ type: [String] }) interestedAreas!: string[];
   @ApiProperty() role!: string;
+  @ApiPropertyOptional({ enum: ['pending_verification', 'verified'] })
+  verificationStatus!: 'pending_verification' | 'verified' | null;
   @ApiProperty() stats!: {
     savedRooms: number;
     appointments: number;
     reviews: number;
   };
   @ApiProperty() createdAt!: Date;
+}
+
+export class LandlordVerificationDto {
+  @ApiProperty({ example: '048200012345', description: 'Số CCCD/CMND' })
+  @Matches(/^(\d{9}|\d{12})$/, {
+    message: 'Số CCCD/CMND phải gồm 9 hoặc 12 chữ số',
+  })
+  identityNumber!: string;
+
+  @ApiPropertyOptional({ example: '48' })
+  @IsOptional()
+  @IsString()
+  provinceCode?: string;
+
+  @ApiPropertyOptional({ example: '20194' })
+  @IsOptional()
+  @IsString()
+  wardCode?: string;
+
+  @ApiPropertyOptional({ example: '54 Nguyễn Lương Bằng' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  streetAddress?: string;
 }

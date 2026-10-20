@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
@@ -7,6 +7,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
+  S3ServiceException,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -14,6 +15,7 @@ import {
   PresignedUploadUrlResponse,
   PresignedDownloadUrlResponse,
 } from './r2-storage.interface';
+import { DEMO_SEED_IMAGE_PREFIX, STORAGE_LIMITS } from './storage.constants';
 
 @Injectable()
 export class R2StorageService {
@@ -66,13 +68,11 @@ export class R2StorageService {
   }
 
   async generatePresignedUploadUrlForImage(
-    fileName: string,
+    _fileName: string,
     contentType: string,
     folder: string = 'listings',
   ): Promise<PresignedUploadUrlResponse> {
-    const rawExt = fileName.includes('.') ? fileName.split('.').pop() : 'jpg';
-    const sanitizedExt =
-      rawExt?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const sanitizedExt = contentType === 'image/png' ? 'png' : 'jpg';
     const randomId = randomUUID();
     const cleanFolder =
       folder
@@ -85,14 +85,29 @@ export class R2StorageService {
     return this.getPresignedUploadUrl({
       key,
       contentType,
-      expiresInSeconds: 900,
+      expiresInSeconds: STORAGE_LIMITS.PRESIGN_EXPIRES_SECONDS,
+    });
+  }
+
+  async generatePresignedUploadUrlForVideo(
+    contentType: string,
+    folder: (typeof STORAGE_LIMITS.VIDEO_FOLDERS)[number] = 'listings',
+  ): Promise<PresignedUploadUrlResponse> {
+    const extension = contentType === 'video/quicktime' ? 'mov' : 'mp4';
+    const key = `${folder}/videos/${Date.now()}-${randomUUID()}.${extension}`;
+
+    return this.getPresignedUploadUrl({
+      key,
+      contentType,
+      expiresInSeconds: STORAGE_LIMITS.PRESIGN_EXPIRES_SECONDS,
     });
   }
 
   async getPresignedUploadUrl(
     options: PresignedUploadUrlOptions,
   ): Promise<PresignedUploadUrlResponse> {
-    const expiresIn = options.expiresInSeconds ?? 900;
+    const expiresIn =
+      options.expiresInSeconds ?? STORAGE_LIMITS.PRESIGN_EXPIRES_SECONDS;
 
     if (!this.isConfigured || !this.s3Client) {
       return {
@@ -147,11 +162,78 @@ export class R2StorageService {
     };
   }
 
-  getPublicUrl(key: string): string {
-    return this.resolvePublicUrl(key);
+  getPublicUrl(storageReference: string): string {
+    const objectKey = this.getObjectKey(storageReference);
+
+    return objectKey ? this.resolvePublicUrl(objectKey) : storageReference;
+  }
+
+  getObjectKey(storageReference: string | null | undefined): string | null {
+    if (!storageReference) return null;
+
+    const normalizedReference = storageReference.trim();
+
+    if (!normalizedReference) return null;
+
+    if (/^https?:\/\//i.test(normalizedReference)) {
+      const configuredStorageKey =
+        this.getKeyFromPublicUrl(normalizedReference);
+
+      if (configuredStorageKey) return configuredStorageKey;
+
+      try {
+        const pathname = decodeURIComponent(
+          new URL(normalizedReference).pathname,
+        );
+        const knownFolderMatch = pathname.match(
+          /\/(listings|avatars)\/([^?#]+)/,
+        );
+
+        if (!knownFolderMatch) return null;
+
+        const legacyKey = `${knownFolderMatch[1]}/${knownFolderMatch[2]}`;
+
+        return legacyKey.includes('..') || legacyKey.includes('\\')
+          ? null
+          : legacyKey;
+      } catch {
+        return null;
+      }
+    }
+
+    const key = normalizedReference.replace(/^\/+/, '');
+
+    if (!key || key.includes('..') || key.includes('\\')) return null;
+
+    return key;
+  }
+
+  getKeyFromPublicUrl(publicUrl: string): string | null {
+    const normalizedBaseUrl = this.publicUrl.replace(/\/$/, '');
+
+    if (normalizedBaseUrl && publicUrl.startsWith(`${normalizedBaseUrl}/`)) {
+      return decodeURIComponent(publicUrl.slice(normalizedBaseUrl.length + 1));
+    }
+
+    try {
+      const parsedUrl = new URL(publicUrl);
+      const defaultR2Host = `${this.bucketName}.r2.cloudflarestorage.com`;
+
+      if (parsedUrl.hostname !== defaultR2Host) return null;
+
+      return decodeURIComponent(parsedUrl.pathname.replace(/^\//, '')) || null;
+    } catch {
+      return null;
+    }
   }
 
   async deleteFile(key: string): Promise<boolean> {
+    if (key.startsWith(DEMO_SEED_IMAGE_PREFIX)) {
+      this.logger.log(`Protected demo asset was not deleted: ${key}`);
+
+      return true;
+    }
+
     if (!this.isConfigured || !this.s3Client) {
       this.logger.log(`Mock delete file key: ${key}`);
 
@@ -172,6 +254,125 @@ export class R2StorageService {
 
       return false;
     }
+  }
+
+  async uploadDemoImageIfMissing(
+    key: string,
+    loadImage: () => Promise<Buffer>,
+  ): Promise<'created' | 'existing'> {
+    if (!key.startsWith(DEMO_SEED_IMAGE_PREFIX)) {
+      throw new Error(`Invalid demo asset key: ${key}`);
+    }
+
+    if (!this.s3Client) {
+      throw new Error('R2 credentials are required to upload demo assets');
+    }
+
+    try {
+      const existing = await this.s3Client.send(
+        new HeadObjectCommand({ Bucket: this.bucketName, Key: key }),
+      );
+
+      if (
+        existing.ContentType !== 'image/jpeg' ||
+        !existing.ContentLength ||
+        existing.ContentLength > STORAGE_LIMITS.MAX_IMAGE_BYTES
+      ) {
+        throw new Error(`Existing demo asset is invalid: ${key}`);
+      }
+
+      return 'existing';
+    } catch (error) {
+      if (
+        !(error instanceof S3ServiceException) ||
+        error.$metadata.httpStatusCode !== 404
+      ) {
+        throw error;
+      }
+    }
+
+    const body = await loadImage();
+
+    if (body.length === 0 || body.length > STORAGE_LIMITS.MAX_IMAGE_BYTES) {
+      throw new Error(`Demo asset size is invalid: ${key}`);
+    }
+
+    try {
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+          Body: body,
+          ContentType: 'image/jpeg',
+          IfNoneMatch: '*',
+        }),
+      );
+
+      return 'created';
+    } catch (error) {
+      if (
+        error instanceof S3ServiceException &&
+        error.$metadata.httpStatusCode === 412
+      ) {
+        return 'existing';
+      }
+
+      throw error;
+    }
+  }
+
+  async assertValidImageObject(key: string): Promise<void> {
+    if (!this.isConfigured || !this.s3Client) return;
+
+    try {
+      const head = await this.s3Client.send(
+        new HeadObjectCommand({ Bucket: this.bucketName, Key: key }),
+      );
+      const contentType = head.ContentType?.toLowerCase() ?? '';
+      const contentLength = head.ContentLength ?? 0;
+      const isAllowedType = (
+        STORAGE_LIMITS.ALLOWED_IMAGE_TYPES as readonly string[]
+      ).includes(contentType);
+
+      if (isAllowedType && contentLength <= STORAGE_LIMITS.MAX_IMAGE_BYTES) {
+        return;
+      }
+
+      await this.deleteFile(key);
+    } catch {
+      throw new BadRequestException('Không tìm thấy ảnh đã tải lên');
+    }
+
+    throw new BadRequestException(
+      'Ảnh phải là jpg hoặc png và có dung lượng tối đa 100MB',
+    );
+  }
+
+  async assertValidVideoObject(key: string): Promise<void> {
+    if (!this.isConfigured || !this.s3Client) return;
+
+    try {
+      const head = await this.s3Client.send(
+        new HeadObjectCommand({ Bucket: this.bucketName, Key: key }),
+      );
+      const contentType = head.ContentType?.toLowerCase() ?? '';
+      const contentLength = head.ContentLength ?? 0;
+      const isAllowedType = (
+        STORAGE_LIMITS.ALLOWED_VIDEO_TYPES as readonly string[]
+      ).includes(contentType);
+
+      if (isAllowedType && contentLength <= STORAGE_LIMITS.MAX_VIDEO_BYTES) {
+        return;
+      }
+
+      await this.deleteFile(key);
+    } catch {
+      throw new BadRequestException('Không tìm thấy video đã tải lên');
+    }
+
+    throw new BadRequestException(
+      'Video phải là mp4 hoặc mov và có dung lượng tối đa 100MB',
+    );
   }
 
   async objectExists(key: string): Promise<boolean> {

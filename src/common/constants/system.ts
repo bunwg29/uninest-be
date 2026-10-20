@@ -14,12 +14,6 @@ export enum UserRoleType {
 
 export type UserRole = UserRoleType;
 
-export const USER_ROLES = {
-  STUDENT: UserRoleType.STUDENT,
-  LANDLORD: UserRoleType.LANDLORD,
-  ADMIN: UserRoleType.ADMIN,
-} as const;
-
 export const ROLE_NAMES: Record<UserRoleType, string> = {
   [UserRoleType.STUDENT]: 'Sinh viên',
   [UserRoleType.LANDLORD]: 'Chủ trọ',

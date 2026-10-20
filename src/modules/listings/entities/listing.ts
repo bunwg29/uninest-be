@@ -13,8 +13,11 @@ import {
 import { User } from '@modules/users/entities';
 import type { Province, Ward } from '@modules/locations/entities';
 import { ListingStatus } from './listing-status';
+import { RoomType } from './room-type';
 import { ListingImage } from './listing-image';
 import { ListingAmenity } from './listing-amenity';
+import { ListingUniversity } from './listing-university';
+import { Favorite } from './favorite';
 
 type ListingPoint = {
   type: 'Point';
@@ -22,6 +25,9 @@ type ListingPoint = {
 };
 
 @Entity('listings')
+@Index('idx_listings_active_created_at', ['createdAt', 'id'], {
+  where: "status = 'active' AND deleted_at IS NULL",
+})
 export class Listing {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -36,8 +42,8 @@ export class Listing {
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
-  @Column({ type: 'varchar', length: 50, name: 'room_type' })
-  roomType!: string;
+  @Column({ type: 'enum', enum: RoomType, name: 'room_type' })
+  roomType!: RoomType;
 
   @Column({ type: 'numeric', precision: 12, scale: 0 })
   price!: string;
@@ -74,6 +80,9 @@ export class Listing {
   })
   deposit!: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'video_key' })
+  videoKey!: string | null;
+
   @Column({ type: 'varchar', length: 255, name: 'street_address' })
   streetAddress!: string;
 
@@ -96,6 +105,9 @@ export class Listing {
   })
   location!: ListingPoint;
 
+  @Column({ type: 'jsonb', nullable: true, name: 'viewing_schedule' })
+  viewingSchedule!: Record<string, unknown> | null;
+
   @Index('idx_listings_status')
   @Column({
     type: 'enum',
@@ -103,6 +115,9 @@ export class Listing {
     default: ListingStatus.PENDING,
   })
   status!: ListingStatus;
+
+  @Column({ type: 'integer', name: 'view_count', default: 0 })
+  viewCount!: number;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
@@ -132,4 +147,13 @@ export class Listing {
     cascade: true,
   })
   listingAmenities!: ListingAmenity[];
+
+  @OneToMany(
+    () => ListingUniversity,
+    (listingUniversity) => listingUniversity.listing,
+  )
+  listingUniversities!: ListingUniversity[];
+
+  @OneToMany(() => Favorite, (favorite) => favorite.listing)
+  favorites!: Favorite[];
 }

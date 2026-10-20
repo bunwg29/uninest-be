@@ -4,15 +4,21 @@ import { User, Role, Permission, RolePermission } from './entities';
 import { UsersService } from './users.service';
 import { RolesService } from './roles.service';
 import { UsersController } from './users.controller';
+import { LandlordProfileController } from './landlord-profile.controller';
+import { LandlordProfileService } from './landlord-profile.service';
 import { AuthModule } from '../auth/auth.module';
+import { LocationsModule } from '../locations/locations.module';
+import { UniversitiesModule } from '../universities/universities.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Role, Permission, RolePermission]),
     forwardRef(() => AuthModule),
+    LocationsModule,
+    UniversitiesModule,
   ],
-  controllers: [UsersController],
-  providers: [UsersService, RolesService],
+  controllers: [UsersController, LandlordProfileController],
+  providers: [UsersService, RolesService, LandlordProfileService],
   exports: [UsersService, RolesService, TypeOrmModule],
 })
 export class UsersModule {}

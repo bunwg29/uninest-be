@@ -2,6 +2,7 @@ import {
   IsString,
   IsNotEmpty,
   Length,
+  Matches,
   MinLength,
   MaxLength,
 } from 'class-validator';
@@ -28,11 +29,14 @@ export class ResetPasswordDto {
 
   @ApiProperty({
     example: 'NewSecret@123',
-    description: 'Mật khẩu mới (tối thiểu 6 ký tự)',
+    description: 'Mật khẩu mới (tối thiểu 8 ký tự, gồm chữ cái và chữ số)',
   })
   @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
   @IsString()
-  @MinLength(6, { message: 'Mật khẩu mới phải từ 6 ký tự trở lên' })
+  @MinLength(8, { message: 'Mật khẩu mới phải từ 8 ký tự trở lên' })
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d)/, {
+    message: 'Mật khẩu mới phải chứa cả chữ cái và chữ số',
+  })
   @MaxLength(32)
   newPassword!: string;
 }

@@ -1,4 +1,6 @@
 import {
+  forwardRef,
+  Inject,
   BadRequestException,
   ConflictException,
   Controller,
@@ -11,9 +13,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '@common/decorators';
-import { JwtAuthGuard } from '@common/guards';
+import { UserRoleType } from '@common/constants';
+import { CurrentUser, Roles } from '@common/decorators';
+import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import { R2StorageService } from '@core/storage';
+import { ChangePasswordDto } from '../auth/dtos';
+import { AuthService } from '../auth/services/auth.service';
 import { OtpService } from '../auth/services/otp.service';
 import { OtpType } from '../auth/entities/otp-code';
 import { User } from './entities/user';
@@ -21,7 +26,9 @@ import { UsersService } from './users.service';
 import {
   ConfirmAvatarDto,
   PresignAvatarDto,
+  LandlordVerificationDto,
   ProfileResponseDto,
+  RequestEmailOtpDto,
   RequestPhoneOtpDto,
   UpdateProfileDto,
   VerifyPhoneOtpDto,
@@ -30,11 +37,13 @@ import {
 @ApiTags('Profile')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller('profile')
+@Controller(['profile', 'users/me'])
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
     private readonly otpService: OtpService,
+    @Inject(forwardRef(() => AuthService))
+    private readonly authService: AuthService,
     private readonly r2StorageService: R2StorageService,
   ) {}
 
@@ -43,38 +52,75 @@ export class UsersController {
   async getProfile(
     @CurrentUser('userId') userId: string,
   ): Promise<ProfileResponseDto> {
-    const user = await this.usersService.findById(userId);
+    const user = await this.usersService.findProfileById(userId);
 
     if (!user) {
       throw new BadRequestException('Không tìm thấy hồ sơ cá nhân');
     }
 
-    return this.mapProfile(user);
+    return this.buildProfile(user);
   }
 
   @Patch()
   @ApiOperation({ summary: 'Cập nhật hồ sơ cá nhân' })
   async updateProfile(
     @CurrentUser('userId') userId: string,
+    @CurrentUser('roleId') roleId: UserRoleType,
     @Body() dto: UpdateProfileDto,
   ): Promise<ProfileResponseDto> {
-    if (dto.email) {
-      const existingUser = await this.usersService.findByEmail(dto.email);
+    const address = await this.usersService.resolveAddress(dto);
 
-      if (existingUser && existingUser.id !== userId) {
-        throw new ConflictException('Email này đã được sử dụng');
-      }
-    }
-
-    const user = await this.usersService.update(userId, {
+    await this.usersService.update(userId, {
+      ...address,
       fullName: dto.name?.trim(),
-      email: dto.email?.trim().toLowerCase(),
-      school: dto.school?.trim(),
       bio: dto.bio?.trim(),
       interestedAreas: dto.interestedAreas,
     });
 
-    return this.mapProfile(user);
+    if (dto.universityCodes) {
+      await this.usersService.updateUniversities(
+        { id: userId, roleId },
+        dto.universityCodes,
+      );
+    }
+
+    const user = await this.usersService.findProfileById(userId);
+
+    if (!user) {
+      throw new BadRequestException('Không tìm thấy hồ sơ cá nhân');
+    }
+
+    return this.buildProfile(user);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Đổi mật khẩu và thu hồi toàn bộ phiên đăng nhập',
+  })
+  async changePassword(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(userId, dto);
+  }
+
+  @Post('landlord-verification')
+  @Roles(UserRoleType.LANDLORD)
+  @UseGuards(RolesGuard)
+  @ApiOperation({
+    summary: 'Chủ trọ gửi thông tin xác minh cơ bản để được phép đăng tin',
+  })
+  async submitLandlordVerification(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: LandlordVerificationDto,
+  ): Promise<ProfileResponseDto> {
+    const user = await this.usersService.completeLandlordVerification(
+      userId,
+      dto,
+    );
+
+    return this.buildProfile(user);
   }
 
   @Post('avatar/presign')
@@ -111,9 +157,7 @@ export class UsersController {
       throw new BadRequestException('Ảnh đại diện không thuộc tài khoản này');
     }
 
-    if (!(await this.r2StorageService.objectExists(dto.objectKey))) {
-      throw new BadRequestException('Không tìm thấy ảnh đã tải lên');
-    }
+    await this.r2StorageService.assertValidImageObject(dto.objectKey);
 
     const user = await this.usersService.findById(userId);
 
@@ -121,10 +165,10 @@ export class UsersController {
       throw new BadRequestException('Không tìm thấy hồ sơ cá nhân');
     }
 
-    const oldAvatarKey = user.avatarUrl?.split('/').slice(-3).join('/');
+    const oldAvatarKey = this.r2StorageService.getObjectKey(user.avatarUrl);
     const avatarUrl = this.r2StorageService.getPublicUrl(dto.objectKey);
 
-    await this.usersService.update(userId, { avatarUrl });
+    await this.usersService.update(userId, { avatarUrl: dto.objectKey });
 
     if (oldAvatarKey?.startsWith(avatarPrefix)) {
       await this.r2StorageService.deleteFile(oldAvatarKey);
@@ -179,6 +223,12 @@ export class UsersController {
       OtpType.PHONE_CHANGE,
     );
 
+    const existingUser = await this.usersService.findByPhone(newPhone);
+
+    if (existingUser && existingUser.id !== userId) {
+      throw new ConflictException('Số điện thoại này đã được sử dụng');
+    }
+
     await this.usersService.update(userId, {
       phone: newPhone,
       phoneVerified: true,
@@ -187,20 +237,106 @@ export class UsersController {
     return { phone: newPhone, phoneVerified: true };
   }
 
-  private mapProfile(user: User): ProfileResponseDto {
+  @Post('email/request-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Gửi OTP đổi email' })
+  async requestEmailOtp(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: RequestEmailOtpDto,
+  ) {
+    const newEmail = dto.newEmail.trim().toLowerCase();
+    const existingUser = await this.usersService.findByEmail(newEmail);
+
+    if (existingUser && existingUser.id !== userId) {
+      throw new ConflictException('Email này đã được sử dụng');
+    }
+
+    const requestId = `${userId}:${newEmail}`;
+    const result = await this.otpService.sendOtp(
+      requestId,
+      OtpType.EMAIL_CHANGE,
+    );
+
+    return {
+      requestId,
+      expiresIn: Math.floor((result.expiresAt.getTime() - Date.now()) / 1000),
+    };
+  }
+
+  @Post('email/verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Xác nhận OTP đổi email' })
+  async verifyEmailOtp(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: VerifyPhoneOtpDto,
+  ) {
+    const requestPrefix = `${userId}:`;
+
+    if (!dto.requestId.startsWith(requestPrefix)) {
+      throw new BadRequestException('Mã yêu cầu không hợp lệ');
+    }
+
+    const newEmail = dto.requestId.slice(requestPrefix.length).toLowerCase();
+
+    await this.otpService.verifyOtp(
+      dto.requestId,
+      dto.otp,
+      OtpType.EMAIL_CHANGE,
+    );
+
+    const existingUser = await this.usersService.findByEmail(newEmail);
+
+    if (existingUser && existingUser.id !== userId) {
+      throw new ConflictException('Email này đã được sử dụng');
+    }
+
+    await this.usersService.update(userId, { email: newEmail });
+
+    return { email: newEmail };
+  }
+
+  private async buildProfile(user: User): Promise<ProfileResponseDto> {
+    const [stats, universities] = await Promise.all([
+      this.usersService.getProfileStats(user.id),
+      this.usersService.getUniversities(user.id),
+    ]);
+
+    return this.mapProfile(user, stats, universities);
+  }
+
+  private mapProfile(
+    user: User,
+    stats: ProfileResponseDto['stats'],
+    universities: ProfileResponseDto['universities'],
+  ): ProfileResponseDto {
     return {
       id: user.id,
       name: user.fullName,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: user.avatarUrl
+        ? this.r2StorageService.getPublicUrl(user.avatarUrl)
+        : null,
       phone: user.phone,
       phoneVerified:
         user.phoneVerified || (user.isVerified && Boolean(user.phone)),
       email: user.email,
       school: user.school,
+      universities,
       bio: user.bio,
+      provinceCode: user.provinceCode,
+      provinceName: user.province?.fullName ?? null,
+      wardCode: user.wardCode,
+      wardName: user.ward?.fullName ?? null,
+      streetAddress: user.streetAddress,
+      fullAddress: user.fullAddress,
       interestedAreas: user.interestedAreas || [],
       role: user.role?.code || 'student',
-      stats: { savedRooms: 0, appointments: 0, reviews: 0 },
+      stats,
+      verificationStatus:
+        user.roleId === UserRoleType.LANDLORD
+          ? user.landlordVerifiedAt
+            ? 'verified'
+            : 'pending_verification'
+          : null,
       createdAt: user.createdAt,
     };
   }
