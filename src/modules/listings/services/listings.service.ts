@@ -34,6 +34,7 @@ import { R2StorageService } from '@core/storage';
 import { Conversation } from '@modules/chat/entities';
 import { Province, Ward } from '@modules/locations/entities';
 import { User } from '@modules/users/entities';
+import { Report, ReportEntityType } from '@modules/admin/entities';
 import {
   Amenity,
   Favorite,
@@ -510,14 +511,27 @@ export class ListingsService {
     }
 
     try {
-      await reportRepository.save(
-        reportRepository.create({
-          listingId: id,
-          reporterId: userId,
-          reason: dto.reason,
-          note: dto.note?.trim() || null,
-        }),
-      );
+      await this.dataSource.transaction(async (manager) => {
+        await manager.save(
+          ListingReport,
+          manager.create(ListingReport, {
+            listingId: id,
+            reporterId: userId,
+            reason: dto.reason,
+            note: dto.note?.trim() || null,
+          }),
+        );
+        await manager.save(
+          Report,
+          manager.create(Report, {
+            reporterId: userId,
+            entityType: ReportEntityType.LISTING,
+            entityId: id,
+            reason: dto.reason,
+            note: dto.note?.trim() || null,
+          }),
+        );
+      });
     } catch (error) {
       if (
         error instanceof QueryFailedError &&
@@ -773,6 +787,10 @@ export class ListingsService {
             coordinates: [dto.longitude, dto.latitude],
           },
           status: nextStatus,
+          rejectionReason:
+            nextStatus === ListingStatus.PENDING
+              ? null
+              : listing.rejectionReason,
           videoKey: dto.videoKey ?? null,
           viewingSchedule: dto.viewingSchedule
             ? { ...dto.viewingSchedule }
@@ -1197,6 +1215,7 @@ export class ListingsService {
         isVerified: listing.owner.isVerified,
       },
       status: listing.status,
+      rejectionReason: listing.rejectionReason,
       viewingSchedule: listing.viewingSchedule,
       averageRating: null,
       viewCount: canSeeStats ? listing.viewCount : null,
@@ -1308,6 +1327,7 @@ export class ListingsService {
         ? this.storageService.getPublicUrl(listing.videoKey)
         : undefined,
       status: listing.deletedAt ? 'deleted' : listing.status,
+      rejectionReason: listing.rejectionReason ?? undefined,
       isFeatured: false,
       viewCount: listing.viewCount,
       contactCount: engagement?.contactCount ?? 0,
