@@ -9,5 +9,6 @@ export interface ReportWarningIssuedPayload {
   userId: string;
   entityType: ReportEntityType;
   entityId: string;
+  postId?: string;
   reason: string;
 }

@@ -286,6 +286,13 @@ export class AdminReportsService {
         throw new NotFoundException('Không tìm thấy chủ nội dung');
       }
 
+      const warningPostId =
+        action === ReportResolutionAction.WARN &&
+        report.entityType === ReportEntityType.FORUM_COMMENT
+          ? (await manager.findOneBy(ForumComment, { id: report.entityId }))
+              ?.postId
+          : null;
+
       const audit = await this.auditService.record(
         manager,
         actorId,
@@ -300,6 +307,7 @@ export class AdminReportsService {
         status,
         action,
         warningRecipientId,
+        warningPostId,
         auditId: audit.id,
         entityType: report.entityType,
         entityId: report.entityId,
@@ -312,6 +320,7 @@ export class AdminReportsService {
         userId: result.warningRecipientId,
         entityType: result.entityType,
         entityId: result.entityId,
+        postId: result.warningPostId ?? undefined,
         reason: normalizedReason,
       });
     }
