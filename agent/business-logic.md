@@ -323,6 +323,8 @@ expired, cancelled, rejected → (kết thúc)
 - App đăng ký push token khi mở app lần đầu và khi được cấp quyền; badge số chưa đọc.
 - Nhắc lịch hẹn cho cả hai bên trước giờ xem.
 
+**API:** `GET /notifications`, `GET /notifications/unread-count`, `GET|PATCH /notifications/preferences`, `PATCH /notifications/:id/read`, `PATCH /notifications/:id/unread`, `PATCH /notifications/read-all`, `POST|DELETE /notifications/devices`; `GET|POST /saved-searches`, `PATCH|DELETE /saved-searches/:id`.
+
 ### 4.12. FR-PRICECOMPARE — So sánh giá theo khu vực (Sprint 3 · Chưa làm)
 
 **Task:** TSK-S3-07 (job tổng hợp, P2), TSK-S3-08 (biểu đồ, P2). **Màn hình:** S-13.
