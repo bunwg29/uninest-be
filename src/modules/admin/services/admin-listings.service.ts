@@ -95,7 +95,8 @@ export class AdminListingsService {
         throw new ConflictException('Tin đăng đã được xử lý');
       }
 
-      await this.auditService.record(
+      const listing = await manager.findOneByOrFail(Listing, { id });
+      const audit = await this.auditService.record(
         manager,
         actorId,
         'listing.approve',
@@ -104,12 +105,24 @@ export class AdminListingsService {
         'Duyệt tin đăng chờ kiểm duyệt',
       );
 
-      return { id, status: ListingStatus.ACTIVE };
+      return {
+        id,
+        status: ListingStatus.ACTIVE,
+        ownerId: listing.ownerId,
+        auditId: audit.id,
+      };
     });
 
     this.eventEmitter.emit(LISTING_EVENTS.ACTIVATED, { listingId: id });
 
-    return result;
+    this.eventEmitter.emit(LISTING_EVENTS.REVIEWED, {
+      listingId: id,
+      ownerId: result.ownerId,
+      status: result.status,
+      auditId: result.auditId,
+    });
+
+    return { id: result.id, status: result.status };
   }
 
   async reject(actorId: string, id: string, reason: string) {
@@ -119,7 +132,7 @@ export class AdminListingsService {
       throw new BadRequestException('Vui lòng nhập lý do từ chối');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const updated = await manager.update(
         Listing,
         { id, status: ListingStatus.PENDING },
@@ -131,7 +144,8 @@ export class AdminListingsService {
         throw new ConflictException('Tin đăng đã được xử lý');
       }
 
-      await this.auditService.record(
+      const listing = await manager.findOneByOrFail(Listing, { id });
+      const audit = await this.auditService.record(
         manager,
         actorId,
         'listing.reject',
@@ -140,8 +154,24 @@ export class AdminListingsService {
         normalizedReason,
       );
 
-      return { id, status: ListingStatus.REJECTED, reason: normalizedReason };
+      return {
+        id,
+        status: ListingStatus.REJECTED,
+        reason: normalizedReason,
+        ownerId: listing.ownerId,
+        auditId: audit.id,
+      };
     });
+
+    this.eventEmitter.emit(LISTING_EVENTS.REVIEWED, {
+      listingId: id,
+      ownerId: result.ownerId,
+      status: result.status,
+      reason: result.reason,
+      auditId: result.auditId,
+    });
+
+    return { id: result.id, status: result.status, reason: result.reason };
   }
 
   private async assertPending(repository: Repository<Listing>, id: string) {

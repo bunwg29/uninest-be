@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, In, Repository } from 'typeorm';
 import { createPaginatedResult } from '@common/dtos';
 import { UserRoleType } from '@common/constants';
@@ -19,6 +20,7 @@ import {
 } from '@modules/forum/entities';
 import { Listing, ListingStatus } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
+import { ADMIN_EVENTS } from '../constants';
 import {
   AdminReportsQueryDto,
   ReportResolutionAction,
@@ -35,6 +37,7 @@ export class AdminReportsService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly auditService: AdminAuditService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async list(query: AdminReportsQueryDto) {
@@ -171,7 +174,7 @@ export class AdminReportsService {
       throw new BadRequestException('Vui lòng nhập lý do xử lý');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const report = await manager.findOne(Report, {
         where: { id: reportId },
         lock: { mode: 'pessimistic_write' },
@@ -274,7 +277,16 @@ export class AdminReportsService {
         );
       }
 
-      await this.auditService.record(
+      const warningRecipientId =
+        action === ReportResolutionAction.WARN
+          ? await this.getTargetOwnerId(manager, report)
+          : null;
+
+      if (action === ReportResolutionAction.WARN && !warningRecipientId) {
+        throw new NotFoundException('Không tìm thấy chủ nội dung');
+      }
+
+      const audit = await this.auditService.record(
         manager,
         actorId,
         `report.${action}`,
@@ -283,8 +295,28 @@ export class AdminReportsService {
         normalizedReason,
       );
 
-      return { id: report.id, status, action };
+      return {
+        id: report.id,
+        status,
+        action,
+        warningRecipientId,
+        auditId: audit.id,
+        entityType: report.entityType,
+        entityId: report.entityId,
+      };
     });
+
+    if (result.warningRecipientId) {
+      this.eventEmitter.emit(ADMIN_EVENTS.REPORT_WARNING_ISSUED, {
+        auditId: result.auditId,
+        userId: result.warningRecipientId,
+        entityType: result.entityType,
+        entityId: result.entityId,
+        reason: normalizedReason,
+      });
+    }
+
+    return { id: result.id, status: result.status, action: result.action };
   }
 
   private async getTargetLabels(
