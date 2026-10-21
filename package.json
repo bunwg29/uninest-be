@@ -16,6 +16,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
+    "test:admin": "node -r ts-node/register -r tsconfig-paths/register scripts/verify-admin.cjs",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration:run": "npm run typeorm -- migration:run -d src/core/database/data-source.ts",
     "migration:revert": "npm run typeorm -- migration:revert -d src/core/database/data-source.ts",
