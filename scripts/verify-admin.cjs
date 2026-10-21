@@ -54,13 +54,13 @@ async function login(baseUrl, phone) {
   return data.accessToken;
 }
 
-async function waitForNotification(prefix, userId) {
+async function waitForNotification(prefix, userId, listingId = null) {
   const deadline = Date.now() + 10_000;
 
   while (Date.now() < deadline) {
     const result = await database.query(
-      'SELECT id, event_key, body, payload FROM notifications WHERE user_id = $1 AND event_key LIKE $2 ORDER BY created_at DESC LIMIT 1',
-      [userId, `${prefix}%`],
+      "SELECT id, event_key, body, payload FROM notifications WHERE user_id = $1 AND event_key LIKE $2 AND ($3::text IS NULL OR payload->>'listingId' = $3) ORDER BY created_at DESC LIMIT 1",
+      [userId, `${prefix}%`, listingId],
     );
 
     if (result.rows[0]) return result.rows[0];
@@ -123,14 +123,14 @@ async function run() {
     await request(baseUrl, `/admin/listings/${approvedListing.id}/approve`, {
       method: 'PATCH', token: adminToken,
     }, 409);
-    const approvedNotification = await waitForNotification('listing-reviewed:', approvedListing.owner_id);
+    const approvedNotification = await waitForNotification('listing-reviewed:', approvedListing.owner_id, approvedListing.id);
 
     assert.equal(approvedNotification.payload.listingId, approvedListing.id);
 
     await request(baseUrl, `/admin/listings/${rejectedListing.id}/reject`, {
       method: 'PATCH', token: adminToken, body: { reason: 'Ảnh không rõ nội dung' },
     });
-    const rejectedNotification = await waitForNotification('listing-reviewed:', rejectedListing.owner_id);
+    const rejectedNotification = await waitForNotification('listing-reviewed:', rejectedListing.owner_id, rejectedListing.id);
 
     assert.match(rejectedNotification.body, /Ảnh không rõ nội dung/);
 
