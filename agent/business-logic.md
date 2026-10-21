@@ -44,7 +44,7 @@ UniNest là ứng dụng di động (Android 8+, iOS 14+) kết nối **Sinh vi�
 | --- | --- | --- | --- |
 | 1 | 07/09 – 27/09/2026 | Hạ tầng, xác thực, hồ sơ, khung app, component chung, R2, đăng tin, seed, quản lý tin | **Đã xong** |
 | 2 | 28/09 – 09/10/2026 | Tìm kiếm + bản đồ, chi tiết + so sánh, đặt lịch + giữ chỗ, chat, forum | **Đã xong, đang review** |
-| 3 | 12/10 – 23/10/2026 | Đánh giá, quản trị + audit log, thông báo, so sánh giá khu vực, thanh toán sandbox | Chưa làm |
+| 3 | 12/10 – 23/10/2026 | Đánh giá, quản trị + audit log, thông báo, so sánh giá khu vực, thanh toán sandbox | Đang triển khai |
 | 4 | 26/10 – 06/11/2026 | Chatbot AI (RAG), gợi ý cá nhân hoá, Premium, tối ưu hiệu năng, tối ưu media | Chưa làm |
 | 5 | 09/11 – 21/11/2026 | Docker + CI/CD, triển khai + backup, EAS build, E2E + quét bảo mật, rà soát RTM | Chưa làm |
 
@@ -296,7 +296,7 @@ expired, cancelled, rejected → (kết thúc)
 
 **Gợi ý kỹ thuật:** bảng `reviews` (booking_id FK, điểm từng tiêu chí, comment, edited_until), service tính lại `avg_rating` trên listing; dùng module `reviews` đã có khung.
 
-### 4.10. FR-ADMIN — Kiểm duyệt & quản trị (Sprint 3 · Chưa làm)
+### 4.10. FR-ADMIN — Kiểm duyệt & quản trị (Sprint 3 · Đã triển khai trên nhánh task, chờ review)
 
 **Task:** TSK-S3-03 (API, P0), TSK-S3-04 (giao diện quản trị, P0 — khuyến nghị web-admin riêng).
 
@@ -309,12 +309,14 @@ expired, cancelled, rejected → (kết thúc)
 - **Mọi** hành động duyệt/từ chối/khoá/gỡ ghi `audit_logs`: người làm, thời điểm, hành động, đối tượng, lý do. Tra cứu lại được.
 - Dữ liệu nhạy cảm (mật khẩu, token) không bao giờ trả về, kể cả API admin.
 
-### 4.11. FR-NOTIFY — Thông báo (Sprint 3 · Chưa làm)
+**API:** `GET /admin/overview`, `GET /admin/listings`, `GET /admin/listings/:id`, `PATCH /admin/listings/:id/approve`, `PATCH /admin/listings/:id/reject`, `GET /admin/reports`, `GET /admin/reports/:id`, `PATCH /admin/reports/:id/resolve`, `GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/lock`, `PATCH /admin/users/:id/unlock`, `GET /admin/audit-logs`, `POST /users/:id/reports`.
+
+### 4.11. FR-NOTIFY — Thông báo (Sprint 3 · Đã triển khai trên nhánh task, chờ review)
 
 **Task:** TSK-S3-05 (pipeline, P0), TSK-S3-06 (trung tâm thông báo + cài đặt, P0). **Màn hình:** N-01 Danh sách (4 tab), N-02 Rỗng, N-03 Cài đặt thông báo.
 
 **Quy tắc bắt buộc**
-- **Nơi duy nhất dùng Redis + BullMQ**: queue `notifications`. Listener `@OnEvent` nhận sự kiện có sẵn (`message.created`, `booking.created`, `booking.status_changed`, `listing.activated`…) → enqueue → consumer tạo bản ghi `notifications` + gửi push FCM/APNs.
+- **Nơi duy nhất dùng Redis + BullMQ**: queue `notifications`. Listener `@OnEvent` nhận sự kiện có sẵn (`message.created`, `booking.created`, `booking.status_changed`, `listing.activated`…) → lưu bản ghi `notifications` và enqueue gửi push qua Expo Push Service đến FCM/APNs. Khi Redis không hoạt động, bản ghi vẫn được lưu và gửi trực tiếp theo cơ chế dự phòng.
 - Module khác chỉ cần **phát thêm sự kiện**, không sửa kiến trúc Thông báo.
 - Loại thông báo bật/tắt riêng: **tin mới, tin nhắn, nhắc lịch, hệ thống**. Thông báo **giao dịch và đặt lịch không tắt hoàn toàn được**.
 - Thiết bị offline → vẫn lưu, hiện lại trong danh sách.
