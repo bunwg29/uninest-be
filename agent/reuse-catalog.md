@@ -22,7 +22,9 @@
 | Danh mục cố định (vai trò, tiện ích, địa giới, trường, từ khoá cấm forum) | `src/core/database/seeders/catalog.seeder.ts` + `seeders/data/*.json` |
 | Dữ liệu mẫu (tài khoản, tin, chat) | `src/core/database/seeders/demo.seeder.ts` |
 
-Module hiện có: `auth`, `users`, `listings`, `search`, `booking`, `chat`, `forum`, `universities`, `locations`, `health`, và khung rỗng chờ làm: `reviews`, `notifications`, `payment`, `ai-chat`, `recommendations`. **Viết tiếp vào khung đã có**, không tạo module trùng nghĩa. Module mới (vd `admin`, `price-comparison`, `premium`) chỉ tạo khi được giao, theo cấu trúc ở `rules.md`.
+Module hiện có: `auth`, `users`, `listings`, `search`, `booking`, `chat`, `forum`, `admin`, `universities`, `locations`, `health`, và khung rỗng chờ làm: `reviews`, `notifications`, `payment`, `ai-chat`, `recommendations`. **Viết tiếp vào khung đã có**, không tạo module trùng nghĩa. Module mới (vd `price-comparison`, `premium`) chỉ tạo khi được giao, theo cấu trúc ở `rules.md`.
+
+`admin` có `AdminListingsService` (duyệt/từ chối tin), `AdminReportsService` (báo cáo tập trung), `AdminUsersService` (khoá/mở khoá), `AdminAuditService` (ghi và tra cứu nhật ký). Các API quản trị nằm dưới `/admin/*`; báo cáo tài khoản dùng `POST /users/:id/reports`. Dùng lại các service này khi mở rộng nghiệp vụ kiểm duyệt.
 
 Module A cần dữ liệu của module B → import **service đã export** của B (B khai báo trong `exports` của module), không truy vấn thẳng bảng của B từ A trừ khi chỉ đọc đơn giản qua `DataSource`/repository có sẵn.
 
