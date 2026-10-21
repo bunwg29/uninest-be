@@ -570,6 +570,10 @@ export class ListingsService {
     listing.status = status;
     const updatedListing = await this.listingRepository.save(listing);
 
+    if (canShow) {
+      this.eventEmitter.emit(LISTING_EVENTS.ACTIVATED, { listingId: id });
+    }
+
     this.eventEmitter.emit(LISTING_EVENTS.AVAILABILITY_CHANGED, {
       listingId: id,
     });
