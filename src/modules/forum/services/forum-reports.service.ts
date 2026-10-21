@@ -7,6 +7,11 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { createPaginatedResult } from '@common/dtos';
+import {
+  Report,
+  ReportEntityType,
+  ReportStatus,
+} from '@modules/admin/entities';
 import { FORUM_REPORT_REASON_LABELS } from '../constants';
 import {
   AdminForumPostsQueryDto,
@@ -265,6 +270,20 @@ export class ForumReportsService {
         throw new ConflictException('Bạn đã báo cáo nội dung này trước đó');
       }
 
+      await manager.save(
+        Report,
+        manager.create(Report, {
+          reporterId: viewer.userId,
+          entityType:
+            target.type === ForumReportTargetType.POST
+              ? ReportEntityType.FORUM_POST
+              : ReportEntityType.FORUM_COMMENT,
+          entityId: target.id,
+          reason: dto.reason,
+          note: dto.note ?? null,
+        }),
+      );
+
       const reportCount = await manager.count(ForumReport, {
         where: {
           targetType: target.type,
@@ -337,6 +356,18 @@ export class ForumReportsService {
       ForumReport,
       { targetType, targetId, isResolved: false },
       { isResolved: true },
+    );
+    await manager.update(
+      Report,
+      {
+        entityType:
+          targetType === ForumReportTargetType.POST
+            ? ReportEntityType.FORUM_POST
+            : ReportEntityType.FORUM_COMMENT,
+        entityId: targetId,
+        status: ReportStatus.PENDING,
+      },
+      { status: ReportStatus.RESOLVED, resolvedAt: new Date() },
     );
   }
 

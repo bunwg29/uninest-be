@@ -17,6 +17,7 @@ import {
   AiChatModule,
   LocationsModule,
   UniversitiesModule,
+  AdminModule,
 } from '@modules';
 
 @Module({
@@ -40,6 +41,7 @@ import {
     AiChatModule,
     LocationsModule,
     UniversitiesModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

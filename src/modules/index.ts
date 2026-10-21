@@ -13,3 +13,4 @@ export * from './recommendations';
 export * from './ai-chat';
 export * from './locations';
 export * from './universities';
+export * from './admin';
