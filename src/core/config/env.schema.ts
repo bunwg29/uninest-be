@@ -106,6 +106,14 @@ export class EnvironmentVariables {
   @IsNumber()
   @IsOptional()
   CANCEL_FREE_HOURS: number = 24;
+
+  @IsString()
+  @IsOptional()
+  REDIS_URL: string = 'redis://localhost:6379';
+
+  @IsString()
+  @IsOptional()
+  EXPO_PUSH_ACCESS_TOKEN?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
