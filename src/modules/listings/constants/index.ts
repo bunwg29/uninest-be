@@ -1,3 +1,5 @@
+import { ListingStatus } from '../entities/listing-status';
+
 export const LISTING_EVENTS = {
   AVAILABILITY_CHANGED: 'listing.availability_changed',
   ACTIVATED: 'listing.activated',
@@ -14,7 +16,7 @@ export interface ListingActivatedPayload {
 export interface ListingReviewedPayload {
   listingId: string;
   ownerId: string;
-  status: 'active' | 'rejected';
+  status: ListingStatus.ACTIVE | ListingStatus.REJECTED;
   reason?: string;
   auditId: string;
 }
