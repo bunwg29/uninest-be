@@ -12,12 +12,22 @@ import { Queue, Worker, type Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { Between, In, LessThanOrEqual, Repository } from 'typeorm';
 import {
+  ADMIN_EVENTS,
+  type ReportWarningIssuedPayload,
+} from '@modules/admin/constants';
+import { ReportEntityType } from '@modules/admin/entities';
+import {
   BOOKING_EVENTS,
   type BookingStatusChangedPayload,
 } from '@modules/booking/constants';
 import { Booking, BookingStatus } from '@modules/booking/entities';
 import { CHAT_EVENTS } from '@modules/chat/constants';
 import type { MessageCreatedEvent } from '@modules/chat/services/chat.service';
+import {
+  LISTING_EVENTS,
+  type ListingReviewedPayload,
+} from '@modules/listings/constants';
+import { ListingStatus } from '@modules/listings/entities';
 import {
   PAYMENT_EVENTS,
   type PaymentCompletedPayload,
@@ -140,6 +150,49 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
         screen: 'ChatRoom',
         conversationId: event.message.conversationId,
       },
+    });
+  }
+
+  @OnEvent(LISTING_EVENTS.REVIEWED)
+  onListingReviewed(event: ListingReviewedPayload): void {
+    this.schedule({
+      userId: event.ownerId,
+      eventKey: `listing-reviewed:${event.auditId}`,
+      type: NotificationType.SYSTEM,
+      title:
+        event.status === ListingStatus.ACTIVE
+          ? 'Tin đăng đã được duyệt'
+          : 'Tin đăng bị từ chối',
+      body:
+        event.status === ListingStatus.ACTIVE
+          ? 'Tin đăng của bạn đã được duyệt và đang hiển thị.'
+          : `Tin đăng của bạn chưa được duyệt. Lý do: ${event.reason ?? 'Không có lý do'}`,
+      payload: { screen: 'ListingDetail', listingId: event.listingId },
+    });
+  }
+
+  @OnEvent(ADMIN_EVENTS.REPORT_WARNING_ISSUED)
+  onReportWarning(event: ReportWarningIssuedPayload): void {
+    const payload: Record<string, string> = {};
+
+    if (event.entityType === ReportEntityType.LISTING) {
+      payload.screen = 'ListingDetail';
+      payload.listingId = event.entityId;
+    } else if (
+      event.entityType === ReportEntityType.FORUM_POST ||
+      (event.entityType === ReportEntityType.FORUM_COMMENT && event.postId)
+    ) {
+      payload.screen = 'ForumPostDetail';
+      payload.postId = event.postId ?? event.entityId;
+    }
+
+    this.schedule({
+      userId: event.userId,
+      eventKey: `report-warning:${event.auditId}`,
+      type: NotificationType.SYSTEM,
+      title: 'Cảnh báo từ quản trị viên',
+      body: event.reason,
+      payload,
     });
   }
 
