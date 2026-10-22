@@ -324,8 +324,10 @@ expired, cancelled, rejected → (kết thúc)
 - **Bộ lọc đã lưu** (`saved_searches`: user_id, tiêu chí, bật/tắt): lưu từ màn bộ lọc S-06; khi tin chuyển `active` (`listing.activated`) đối chiếu và tạo thông báo tin mới phù hợp.
 - App đăng ký push token khi mở app lần đầu và khi được cấp quyền; badge số chưa đọc.
 - Nhắc lịch hẹn cho cả hai bên trước giờ xem.
+- **Kết quả duyệt tin** (duyệt / từ chối / bị quản trị viên ẩn) và **cảnh báo từ quản trị viên** luôn được gửi, không bị chặn bởi công tắc "Hệ thống".
+- App: Sinh viên có 4 tab Tất cả / Lịch hẹn (`booking` + `reminder`) / Tin mới / Cộng đồng; Chủ trọ có chip Tất cả / Chưa đọc (`unread=true`) / Giao dịch / Lịch hẹn. Cài đặt hiện rõ mục "luôn bật" (giao dịch, đặt lịch).
 
-**API:** `GET /notifications`, `GET /notifications/unread-count`, `GET|PATCH /notifications/preferences`, `PATCH /notifications/:id/read`, `PATCH /notifications/:id/unread`, `PATCH /notifications/read-all`, `POST|DELETE /notifications/devices`; `GET|POST /saved-searches`, `PATCH|DELETE /saved-searches/:id`.
+**API:** `GET /notifications` (lọc `type`, `unread`), `GET /notifications/unread-count`, `GET|PATCH /notifications/preferences`, `PATCH /notifications/:id/read`, `PATCH /notifications/:id/unread`, `PATCH /notifications/read-all`, `POST|DELETE /notifications/devices`; `GET|POST /saved-searches`, `PATCH|DELETE /saved-searches/:id`.
 
 ### 4.12. FR-PRICECOMPARE — So sánh giá theo khu vực (Sprint 3 · Chưa làm)
 
