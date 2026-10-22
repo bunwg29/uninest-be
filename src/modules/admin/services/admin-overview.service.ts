@@ -28,9 +28,7 @@ export class AdminOverviewService {
       series,
     ] = await Promise.all([
       listings.count({ where: { status: ListingStatus.PENDING } }),
-      this.dataSource.getRepository(Report).count({
-        where: { status: ReportStatus.PENDING },
-      }),
+      this.countPendingReportGroups(),
       listings.count({ where: { status: ListingStatus.ACTIVE } }),
       this.dataSource.getRepository(User).count(),
       this.countSignups(),
@@ -46,6 +44,17 @@ export class AdminOverviewService {
       newUsersYesterday: signups.yesterday,
       series,
     };
+  }
+
+  private async countPendingReportGroups() {
+    const row = await this.dataSource
+      .getRepository(Report)
+      .createQueryBuilder('report')
+      .select('COUNT(DISTINCT (report.entityType, report.entityId))', 'total')
+      .where('report.status = :status', { status: ReportStatus.PENDING })
+      .getRawOne<{ total: string }>();
+
+    return Number(row?.total ?? 0);
   }
 
   private async countSignups() {

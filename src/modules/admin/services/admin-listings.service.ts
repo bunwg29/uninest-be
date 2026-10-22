@@ -157,6 +157,17 @@ export class AdminListingsService {
 
   async approve(actorId: string, id: string) {
     const result = await this.dataSource.transaction(async (manager) => {
+      const pending = await manager.findOne(Listing, {
+        where: { id, status: ListingStatus.PENDING },
+        relations: { owner: true },
+      });
+
+      if (pending && !pending.owner.isActive) {
+        throw new BadRequestException(
+          'Tài khoản chủ trọ đang bị khoá, không thể duyệt tin',
+        );
+      }
+
       const updated = await manager.update(
         Listing,
         { id, status: ListingStatus.PENDING },

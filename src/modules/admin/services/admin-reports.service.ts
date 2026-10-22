@@ -30,7 +30,7 @@ import {
 import { Report, ReportEntityType, ReportStatus } from '../entities';
 import { AdminAuditService } from './admin-audit.service';
 
-export interface ReportTarget {
+interface ReportTarget {
   label: string;
   hidden: boolean;
   ownerName: string | null;
@@ -242,16 +242,22 @@ export class AdminReportsService {
     }
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const report = await manager.findOne(Report, {
-        where: { id: reportId },
-        lock: { mode: 'pessimistic_write' },
-      });
+      const report = await manager.findOneBy(Report, { id: reportId });
 
       if (!report) {
         throw new NotFoundException('Không tìm thấy báo cáo');
       }
 
-      if (report.status !== ReportStatus.PENDING) {
+      const pendingReports = await manager.find(Report, {
+        where: {
+          entityType: report.entityType,
+          entityId: report.entityId,
+          status: ReportStatus.PENDING,
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (pendingReports.length === 0) {
         throw new ConflictException('Báo cáo đã được xử lý');
       }
 

@@ -40,7 +40,8 @@ const ownedReportsSql = (ownerRef: string) => `
   LEFT JOIN listings listing ON report.entity_type = 'listing' AND listing.id = report.entity_id
   LEFT JOIN forum_posts post ON report.entity_type = 'forum_post' AND post.id = report.entity_id
   LEFT JOIN forum_comments comment ON report.entity_type = 'forum_comment' AND comment.id = report.entity_id
-  WHERE listing.owner_id = ${ownerRef} OR post.author_id = ${ownerRef} OR comment.author_id = ${ownerRef} OR (report.entity_type = 'user' AND report.entity_id = ${ownerRef})`;
+  WHERE report.status <> 'dismissed'
+    AND (listing.owner_id = ${ownerRef} OR post.author_id = ${ownerRef} OR comment.author_id = ${ownerRef} OR (report.entity_type = 'user' AND report.entity_id = ${ownerRef}))`;
 
 @Injectable()
 export class AdminUsersService {
