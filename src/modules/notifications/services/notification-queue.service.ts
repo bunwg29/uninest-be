@@ -246,7 +246,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
         eventKey: `payment:${event.transactionId}:${userId}`,
         type: NotificationType.PAYMENT,
         title: 'Thanh toán đã được xác nhận',
-        body: `${event.purpose === 'deposit' ? 'Tiền cọc' : 'Tiền phòng'} ${event.amount.toLocaleString('vi-VN')} đ đã được thanh toán thành công. Mã giao dịch: ${event.transactionId}`,
+        body: `Tiền cọc ${event.amount.toLocaleString('vi-VN')} đ đã được thanh toán thành công. Mã giao dịch: ${event.transactionId}`,
         payload: {
           screen: 'BookingDetail',
           bookingId: event.bookingId,
