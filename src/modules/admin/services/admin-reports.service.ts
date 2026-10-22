@@ -20,6 +20,7 @@ import {
 } from '@modules/forum/entities';
 import { Listing, ListingStatus } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
+import { ForumModerationService } from '@modules/forum/services/forum-moderation.service';
 import { ADMIN_EVENTS } from '../constants';
 import {
   AdminReportsQueryDto,
@@ -29,6 +30,26 @@ import {
 import { Report, ReportEntityType, ReportStatus } from '../entities';
 import { AdminAuditService } from './admin-audit.service';
 
+export interface ReportTarget {
+  label: string;
+  hidden: boolean;
+  ownerName: string | null;
+}
+
+export interface ReportContent {
+  title: string | null;
+  body: string | null;
+  ownerId: string;
+  ownerName: string;
+  createdAt: Date;
+  viewCount: number | null;
+  commentCount: number | null;
+  category: string | null;
+  status: string;
+  price: string | null;
+  address: string | null;
+}
+
 @Injectable()
 export class AdminReportsService {
   constructor(
@@ -37,6 +58,7 @@ export class AdminReportsService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly auditService: AdminAuditService,
+    private readonly moderationService: ForumModerationService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -63,6 +85,16 @@ export class AdminReportsService {
       .addSelect('report.entityId', 'entityId')
       .addSelect('COUNT(report.id)', 'reportCount')
       .addSelect('MAX(report.createdAt)', 'latestAt')
+      .addSelect('MODE() WITHIN GROUP (ORDER BY report.reason)', 'mainReason')
+      .addSelect(
+        `CASE WHEN BOOL_OR(report.status = :pendingStatus) THEN :pendingStatus WHEN BOOL_OR(report.status = :resolvedStatus) THEN :resolvedStatus ELSE :dismissedStatus END`,
+        'status',
+      )
+      .setParameters({
+        pendingStatus: ReportStatus.PENDING,
+        resolvedStatus: ReportStatus.RESOLVED,
+        dismissedStatus: ReportStatus.DISMISSED,
+      })
       .groupBy('report.entityType')
       .addGroupBy('report.entityId')
       .orderBy('MAX(report.createdAt)', 'DESC')
@@ -74,23 +106,39 @@ export class AdminReportsService {
         entityId: string;
         reportCount: string;
         latestAt: Date;
+        mainReason: string;
+        status: ReportStatus;
       }>();
-    const labels = await this.getTargetLabels(rows);
-    const items = rows.map((row) => ({
-      id: row.id,
-      entityType: row.entityType,
-      entityId: row.entityId,
-      targetLabel: labels.get(row.entityId) ?? 'Nội dung không còn tồn tại',
-      reportCount: Number(row.reportCount),
-      latestAt: row.latestAt,
-    }));
+    const [targets, counts] = await Promise.all([
+      this.getTargets(rows),
+      this.countByEntityType(query.status),
+    ]);
+    const items = rows.map((row) => {
+      const target = targets.get(row.entityId);
 
-    return createPaginatedResult(
-      items,
-      Number(totalRow?.total ?? 0),
-      query.page,
-      query.limit,
-    );
+      return {
+        id: row.id,
+        entityType: row.entityType,
+        entityId: row.entityId,
+        targetLabel: target?.label ?? 'Nội dung không còn tồn tại',
+        targetHidden: target?.hidden ?? false,
+        ownerName: target?.ownerName ?? null,
+        mainReason: row.mainReason,
+        status: row.status,
+        reportCount: Number(row.reportCount),
+        latestAt: row.latestAt,
+      };
+    });
+
+    return {
+      ...createPaginatedResult(
+        items,
+        Number(totalRow?.total ?? 0),
+        query.page,
+        query.limit,
+      ),
+      counts,
+    };
   }
 
   async getDetail(id: string) {
@@ -112,16 +160,35 @@ export class AdminReportsService {
       },
       {},
     );
-    const labels = await this.getTargetLabels([report]);
+    const pendingCount = reports.filter(
+      (item) => item.status === ReportStatus.PENDING,
+    ).length;
+    const [targets, content, comments] = await Promise.all([
+      this.getTargets([report]),
+      this.getContent(report),
+      this.getRelatedComments(report),
+    ]);
+    const target = targets.get(report.entityId);
+    const ownerReportCount = content?.ownerId
+      ? await this.countOwnerReportedTargets(content.ownerId, report.entityId)
+      : 0;
 
     return {
       id: report.id,
       entityType: report.entityType,
       entityId: report.entityId,
-      targetLabel: labels.get(report.entityId) ?? 'Nội dung không còn tồn tại',
-      status: report.status,
+      targetLabel: target?.label ?? 'Nội dung không còn tồn tại',
+      targetHidden: target?.hidden ?? false,
+      status: pendingCount > 0 ? ReportStatus.PENDING : report.status,
       reportCount: reports.length,
+      pendingCount,
+      hideThreshold: this.moderationService.getReportHideThreshold(),
+      firstAt: reports[reports.length - 1]?.createdAt ?? report.createdAt,
+      latestAt: reports[0]?.createdAt ?? report.createdAt,
       reasonCounts,
+      ownerReportCount,
+      content,
+      comments,
       reports: reports.map((item) => ({
         id: item.id,
         reason: item.reason,
@@ -328,33 +395,216 @@ export class AdminReportsService {
     return { id: result.id, status: result.status, action: result.action };
   }
 
-  private async getTargetLabels(
+  private async getTargets(
     rows: Pick<Report, 'entityType' | 'entityId'>[],
-  ): Promise<Map<string, string>> {
-    const labels = new Map<string, string>();
+  ): Promise<Map<string, ReportTarget>> {
+    const targets = new Map<string, ReportTarget>();
     const ids = (type: ReportEntityType) =>
       rows.filter((row) => row.entityType === type).map((row) => row.entityId);
     const [listings, posts, comments, users] = await Promise.all([
-      this.dataSource
-        .getRepository(Listing)
-        .findBy({ id: In(ids(ReportEntityType.LISTING)) }),
-      this.dataSource
-        .getRepository(ForumPost)
-        .findBy({ id: In(ids(ReportEntityType.FORUM_POST)) }),
-      this.dataSource
-        .getRepository(ForumComment)
-        .findBy({ id: In(ids(ReportEntityType.FORUM_COMMENT)) }),
+      this.dataSource.getRepository(Listing).find({
+        where: { id: In(ids(ReportEntityType.LISTING)) },
+        relations: { owner: true },
+      }),
+      this.dataSource.getRepository(ForumPost).find({
+        where: { id: In(ids(ReportEntityType.FORUM_POST)) },
+        relations: { author: true },
+      }),
+      this.dataSource.getRepository(ForumComment).find({
+        where: { id: In(ids(ReportEntityType.FORUM_COMMENT)) },
+        relations: { author: true },
+      }),
       this.dataSource
         .getRepository(User)
         .findBy({ id: In(ids(ReportEntityType.USER)) }),
     ]);
 
-    listings.forEach((item) => labels.set(item.id, item.title));
-    posts.forEach((item) => labels.set(item.id, item.title));
-    comments.forEach((item) => labels.set(item.id, item.content.slice(0, 80)));
-    users.forEach((item) => labels.set(item.id, item.fullName));
+    listings.forEach((item) =>
+      targets.set(item.id, {
+        label: item.title,
+        hidden: item.status === ListingStatus.HIDDEN,
+        ownerName: item.owner?.fullName ?? null,
+      }),
+    );
+    posts.forEach((item) =>
+      targets.set(item.id, {
+        label: item.title,
+        hidden: item.status === ForumPostStatus.HIDDEN,
+        ownerName: item.author?.fullName ?? null,
+      }),
+    );
+    comments.forEach((item) =>
+      targets.set(item.id, {
+        label: item.content.slice(0, 80),
+        hidden: item.status === ForumCommentStatus.HIDDEN,
+        ownerName: item.author?.fullName ?? null,
+      }),
+    );
+    users.forEach((item) =>
+      targets.set(item.id, {
+        label: item.fullName,
+        hidden: !item.isActive,
+        ownerName: item.fullName,
+      }),
+    );
 
-    return labels;
+    return targets;
+  }
+
+  private async countByEntityType(status?: ReportStatus) {
+    const builder = this.repository
+      .createQueryBuilder('report')
+      .select('report.entityType', 'entityType')
+      .addSelect('COUNT(DISTINCT report.entityId)', 'count')
+      .groupBy('report.entityType');
+
+    if (status) builder.where('report.status = :status', { status });
+
+    const rows = await builder.getRawMany<{
+      entityType: ReportEntityType;
+      count: string;
+    }>();
+    const counts = Object.fromEntries(
+      Object.values(ReportEntityType).map((type) => [type, 0]),
+    ) as Record<ReportEntityType, number>;
+
+    rows.forEach((row) => {
+      counts[row.entityType] = Number(row.count);
+    });
+
+    return {
+      all: Object.values(counts).reduce((sum, value) => sum + value, 0),
+      ...counts,
+    };
+  }
+
+  private async getContent(report: Report): Promise<ReportContent | null> {
+    if (report.entityType === ReportEntityType.LISTING) {
+      const listing = await this.dataSource.getRepository(Listing).findOne({
+        where: { id: report.entityId },
+        relations: { owner: true },
+      });
+
+      return listing
+        ? {
+            title: listing.title,
+            body: listing.description,
+            ownerId: listing.ownerId,
+            ownerName: listing.owner.fullName,
+            createdAt: listing.createdAt,
+            viewCount: listing.viewCount,
+            commentCount: null,
+            category: null,
+            status: listing.status,
+            price: listing.price,
+            address: listing.fullAddress,
+          }
+        : null;
+    }
+
+    if (report.entityType === ReportEntityType.FORUM_POST) {
+      const post = await this.dataSource.getRepository(ForumPost).findOne({
+        where: { id: report.entityId },
+        relations: { author: true },
+      });
+
+      return post
+        ? {
+            title: post.title,
+            body: post.content,
+            ownerId: post.authorId,
+            ownerName: post.author.fullName,
+            createdAt: post.publishedAt ?? post.createdAt,
+            viewCount: post.viewCount,
+            commentCount: post.commentCount,
+            category: post.category,
+            status: post.status,
+            price: null,
+            address: null,
+          }
+        : null;
+    }
+
+    if (report.entityType === ReportEntityType.FORUM_COMMENT) {
+      const comment = await this.dataSource
+        .getRepository(ForumComment)
+        .findOne({
+          where: { id: report.entityId },
+          relations: { author: true, post: true },
+        });
+
+      return comment
+        ? {
+            title: comment.post?.title ?? null,
+            body: comment.content,
+            ownerId: comment.authorId,
+            ownerName: comment.author.fullName,
+            createdAt: comment.createdAt,
+            viewCount: null,
+            commentCount: null,
+            category: comment.post?.category ?? null,
+            status: comment.status,
+            price: null,
+            address: null,
+          }
+        : null;
+    }
+
+    const user = await this.dataSource
+      .getRepository(User)
+      .findOneBy({ id: report.entityId });
+
+    return user
+      ? {
+          title: user.fullName,
+          body: null,
+          ownerId: user.id,
+          ownerName: user.fullName,
+          createdAt: user.createdAt,
+          viewCount: null,
+          commentCount: null,
+          category: null,
+          status: user.isActive ? 'active' : 'locked',
+          price: null,
+          address: null,
+        }
+      : null;
+  }
+
+  private async getRelatedComments(report: Report) {
+    if (report.entityType !== ReportEntityType.FORUM_POST) return [];
+
+    const comments = await this.dataSource.getRepository(ForumComment).find({
+      where: {
+        postId: report.entityId,
+        status: ForumCommentStatus.PUBLISHED,
+      },
+      relations: { author: true },
+      order: { createdAt: 'DESC' },
+      take: 5,
+    });
+
+    return comments.map((comment) => ({
+      id: comment.id,
+      authorName: comment.author.fullName,
+      content: comment.content,
+      createdAt: comment.createdAt,
+    }));
+  }
+
+  private async countOwnerReportedTargets(ownerId: string, excludeId: string) {
+    const [row] = await this.dataSource.query<{ count: string }[]>(
+      `SELECT COUNT(DISTINCT (report.entity_type, report.entity_id)) AS count
+      FROM reports report
+      LEFT JOIN listings listing ON report.entity_type = 'listing' AND listing.id = report.entity_id
+      LEFT JOIN forum_posts post ON report.entity_type = 'forum_post' AND post.id = report.entity_id
+      LEFT JOIN forum_comments comment ON report.entity_type = 'forum_comment' AND comment.id = report.entity_id
+      WHERE report.entity_id <> $2
+        AND (listing.owner_id = $1 OR post.author_id = $1 OR comment.author_id = $1 OR (report.entity_type = 'user' AND report.entity_id = $1))`,
+      [ownerId, excludeId],
+    );
+
+    return Number(row?.count ?? 0);
   }
 
   private async getTargetOwnerId(

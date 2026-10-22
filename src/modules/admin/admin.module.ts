@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ForumModule } from '@modules/forum/forum.module';
 import { ListingsModule } from '@modules/listings/listings.module';
 import { Listing } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
@@ -15,6 +16,7 @@ import { AdminUsersService } from './services/admin-users.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([AuditLog, Report, Listing, User]),
+    ForumModule,
     ListingsModule,
   ],
   controllers: [AdminController, UserReportController],

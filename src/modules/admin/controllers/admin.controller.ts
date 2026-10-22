@@ -52,6 +52,12 @@ export class AdminController {
     return this.listingsService.list(query);
   }
 
+  @Get('listings/provinces')
+  @ApiOperation({ summary: 'Lấy danh sách tỉnh/thành có tin đăng' })
+  getListingProvinces() {
+    return this.listingsService.listProvinces();
+  }
+
   @Get('listings/:id')
   @ApiOperation({ summary: 'Lấy chi tiết tin đăng để kiểm duyệt' })
   getListing(
@@ -78,6 +84,16 @@ export class AdminController {
     @Body() dto: AdminReasonDto,
   ) {
     return this.listingsService.reject(actorId, id, dto.reason);
+  }
+
+  @Patch('listings/:id/hide')
+  @ApiOperation({ summary: 'Ẩn tin đang hiển thị kèm lý do' })
+  hideListing(
+    @CurrentUser('userId') actorId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AdminReasonDto,
+  ) {
+    return this.listingsService.hide(actorId, id, dto.reason);
   }
 
   @Get('reports')
