@@ -318,14 +318,14 @@ expired, cancelled, rejected → (kết thúc)
 **Quy tắc bắt buộc**
 - **Nơi duy nhất dùng Redis + BullMQ**: queue `notifications`. Listener `@OnEvent` nhận sự kiện có sẵn (`message.created`, `booking.created`, `booking.status_changed`, `listing.activated`…) → lưu bản ghi `notifications` và enqueue gửi push qua Expo Push Service đến FCM/APNs. Khi Redis không hoạt động, bản ghi vẫn được lưu và gửi trực tiếp theo cơ chế dự phòng.
 - Module khác chỉ cần **phát thêm sự kiện**, không sửa kiến trúc Thông báo.
-- Loại thông báo bật/tắt riêng: **tin mới, tin nhắn, nhắc lịch, hệ thống**. Thông báo **giao dịch và đặt lịch không tắt hoàn toàn được**.
+- Loại thông báo bật/tắt riêng: **tin mới, tin nhắn, nhắc lịch, hệ thống**. Thông báo **đặt lịch không tắt hoàn toàn được** (không còn loại giao dịch vì đã bỏ đặt cọc; enum `payment` được gỡ bằng migration `1700000000015-RemovePaymentNotifications`).
 - Thiết bị offline → vẫn lưu, hiện lại trong danh sách.
 - Push đến thiết bị ≤ **10 giây**. Danh sách đúng thứ tự thời gian, đúng đã đọc/chưa đọc; nhấn vào mở đúng màn liên quan.
 - **Bộ lọc đã lưu** (`saved_searches`: user_id, tiêu chí, bật/tắt): lưu từ màn bộ lọc S-06; khi tin chuyển `active` (`listing.activated`) đối chiếu và tạo thông báo tin mới phù hợp.
 - App đăng ký push token khi mở app lần đầu và khi được cấp quyền; badge số chưa đọc.
 - Nhắc lịch hẹn cho cả hai bên trước giờ xem.
 - **Kết quả duyệt tin** (duyệt / từ chối / bị quản trị viên ẩn) và **cảnh báo từ quản trị viên** luôn được gửi, không bị chặn bởi công tắc "Hệ thống".
-- App: Sinh viên có 4 tab Tất cả / Lịch hẹn (`booking` + `reminder`) / Tin mới / Cộng đồng; Chủ trọ có chip Tất cả / Chưa đọc (`unread=true`) / Giao dịch / Lịch hẹn. Cài đặt hiện rõ mục "luôn bật" (giao dịch, đặt lịch).
+- App: Sinh viên có 4 tab Tất cả / Lịch hẹn (`booking` + `reminder`) / Tin mới / Cộng đồng; Chủ trọ có chip Tất cả / Chưa đọc (`unread=true`) / Lịch hẹn / Hệ thống. Cài đặt hiện rõ mục "luôn bật" (đặt lịch, kết quả duyệt tin và cảnh báo).
 
 **API:** `GET /notifications` (lọc `type`, `unread`), `GET /notifications/unread-count`, `GET|PATCH /notifications/preferences`, `PATCH /notifications/:id/read`, `PATCH /notifications/:id/unread`, `PATCH /notifications/read-all`, `POST|DELETE /notifications/devices`; `GET|POST /saved-searches`, `PATCH|DELETE /saved-searches/:id`.
 
