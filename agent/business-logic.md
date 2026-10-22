@@ -332,7 +332,7 @@ expired, cancelled, rejected → (kết thúc)
 **Task:** TSK-S3-07 (job tổng hợp, P2), TSK-S3-08 (biểu đồ, P2). **Màn hình:** S-13.
 
 **Quy tắc bắt buộc**
-- Cron nội bộ chạy **tối thiểu mỗi ngày 1 lần**, tính giá trung bình + khoảng giá phổ biến theo **tỉnh/phường và loại phòng**, từ tin `active` và tin hết hạn gần đây. Lưu bảng `price_aggregates` (area, room_type, avg_price, sample_count, computed_at). **Không dùng Redis.**
+- Cron nội bộ chạy **tối thiểu mỗi ngày 1 lần**, tính giá trung bình + khoảng giá phổ biến theo **tỉnh/phường và loại phòng**, **chỉ từ tin `active`** (đã chốt: hệ thống không có trạng thái "hết hạn" cho tin đăng nên bỏ phần "tin đã hết hạn gần đây" trong SRS). Lưu bảng `price_aggregates` (area, room_type, avg_price, sample_count, computed_at). **Không dùng Redis.**
 - Khu vực **< 5 tin hợp lệ** → trả cảnh báo "Dữ liệu chưa đủ để tham chiếu", không trả con số.
 - Đơn vị **VNĐ/tháng**, có chú thích số tin dùng để tính và thời điểm cập nhật; đánh dấu các tin sinh viên đang quan tâm trên biểu đồ.
 - `GET /price-comparison` đọc thẳng bảng tổng hợp, tải ≤ 2 giây.
