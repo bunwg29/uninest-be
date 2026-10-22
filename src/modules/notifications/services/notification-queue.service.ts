@@ -29,10 +29,6 @@ import {
 } from '@modules/listings/constants';
 import { ListingStatus } from '@modules/listings/entities';
 import {
-  PAYMENT_EVENTS,
-  type PaymentCompletedPayload,
-} from '@modules/payment/constants';
-import {
   Notification,
   NotificationDelivery,
   NotificationDeliveryStatus,
@@ -238,24 +234,6 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  @OnEvent(PAYMENT_EVENTS.COMPLETED)
-  onPaymentCompleted(event: PaymentCompletedPayload): void {
-    for (const userId of [event.payerId, event.landlordId]) {
-      this.schedule({
-        userId,
-        eventKey: `payment:${event.transactionId}:${userId}`,
-        type: NotificationType.PAYMENT,
-        title: 'Thanh toán đã được xác nhận',
-        body: `Tiền cọc ${event.amount.toLocaleString('vi-VN')} đ đã được thanh toán thành công. Mã giao dịch: ${event.transactionId}`,
-        payload: {
-          screen: 'BookingDetail',
-          bookingId: event.bookingId,
-          transactionId: event.transactionId,
-        },
-      });
-    }
-  }
-
   @OnEvent('forum.comment_created')
   onForumComment(event: {
     commentId: string;
@@ -279,7 +257,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
     const end = new Date(now + 60 * 60_000);
     const bookings = await this.bookings.find({
       where: {
-        status: In([BookingStatus.CONFIRMED, BookingStatus.HOLDING]),
+        status: BookingStatus.CONFIRMED,
         startTime: Between(start, end),
       },
       relations: { listing: true },
@@ -724,15 +702,14 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
   }
 
   private bookingStatusLabel(status: BookingStatus): string {
-    const labels: Record<BookingStatus, string> = {
+    const labels: Partial<Record<BookingStatus, string>> = {
       [BookingStatus.PENDING]: 'Chờ xác nhận',
       [BookingStatus.CONFIRMED]: 'Đã xác nhận',
-      [BookingStatus.HOLDING]: 'Đang giữ chỗ',
       [BookingStatus.EXPIRED]: 'Đã hết hạn',
       [BookingStatus.CANCELLED]: 'Đã huỷ',
       [BookingStatus.REJECTED]: 'Đã từ chối',
     };
 
-    return labels[status];
+    return labels[status] ?? 'Đã cập nhật';
   }
 }

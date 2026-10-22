@@ -13,7 +13,6 @@ export enum NotificationType {
   REMINDER = 'reminder',
   SYSTEM = 'system',
   BOOKING = 'booking',
-  PAYMENT = 'payment',
   FORUM = 'forum',
 }
 
