@@ -50,6 +50,13 @@ interface NotificationJob {
   payload: Record<string, string>;
 }
 
+const LISTING_REVIEW_TITLES: Record<ListingReviewedPayload['status'], string> =
+  {
+    [ListingStatus.ACTIVE]: 'Tin đăng đã được duyệt',
+    [ListingStatus.REJECTED]: 'Tin đăng bị từ chối',
+    [ListingStatus.HIDDEN]: 'Tin đăng bị quản trị viên ẩn',
+  };
+
 @Injectable()
 export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationQueueService.name);
@@ -159,14 +166,13 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
       userId: event.ownerId,
       eventKey: `listing-reviewed:${event.auditId}`,
       type: NotificationType.SYSTEM,
-      title:
-        event.status === ListingStatus.ACTIVE
-          ? 'Tin đăng đã được duyệt'
-          : 'Tin đăng bị từ chối',
+      title: LISTING_REVIEW_TITLES[event.status],
       body:
         event.status === ListingStatus.ACTIVE
           ? 'Tin đăng của bạn đã được duyệt và đang hiển thị.'
-          : `Tin đăng của bạn chưa được duyệt. Lý do: ${event.reason ?? 'Không có lý do'}`,
+          : event.status === ListingStatus.HIDDEN
+            ? `Tin đăng của bạn đã bị quản trị viên ẩn. Lý do: ${event.reason ?? 'Không có lý do'}. Hãy chỉnh sửa và gửi duyệt lại.`
+            : `Tin đăng của bạn chưa được duyệt. Lý do: ${event.reason ?? 'Không có lý do'}`,
       payload: { screen: 'ListingDetail', listingId: event.listingId },
     });
   }
