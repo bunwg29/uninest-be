@@ -329,7 +329,7 @@ expired, cancelled, rejected → (kết thúc)
 
 **API:** `GET /notifications` (lọc `type`, `unread`), `GET /notifications/unread-count`, `GET|PATCH /notifications/preferences`, `PATCH /notifications/:id/read`, `PATCH /notifications/:id/unread`, `PATCH /notifications/read-all`, `POST|DELETE /notifications/devices`; `GET|POST /saved-searches`, `PATCH|DELETE /saved-searches/:id`.
 
-### 4.12. FR-PRICECOMPARE — So sánh giá theo khu vực (Sprint 3 · Chưa làm)
+### 4.12. FR-PRICECOMPARE — So sánh giá theo khu vực (Sprint 3 · TSK-S3-07 đã triển khai trên nhánh task, chờ review; TSK-S3-08 chưa làm)
 
 **Task:** TSK-S3-07 (job tổng hợp, P2), TSK-S3-08 (biểu đồ, P2). **Màn hình:** S-13.
 
@@ -337,7 +337,8 @@ expired, cancelled, rejected → (kết thúc)
 - Cron nội bộ chạy **tối thiểu mỗi ngày 1 lần**, tính giá trung bình + khoảng giá phổ biến theo **tỉnh/phường và loại phòng**, **chỉ từ tin `active`** (đã chốt: hệ thống không có trạng thái "hết hạn" cho tin đăng nên bỏ phần "tin đã hết hạn gần đây" trong SRS). Lưu bảng `price_aggregates` (area, room_type, avg_price, sample_count, computed_at). **Không dùng Redis.**
 - Khu vực **< 5 tin hợp lệ** → trả cảnh báo "Dữ liệu chưa đủ để tham chiếu", không trả con số.
 - Đơn vị **VNĐ/tháng**, có chú thích số tin dùng để tính và thời điểm cập nhật; đánh dấu các tin sinh viên đang quan tâm trên biểu đồ.
-- `GET /price-comparison` đọc thẳng bảng tổng hợp, tải ≤ 2 giây.
+- `GET /price-comparison` (lọc `areaLevel=province|ward`, `provinceCode`, `wardCode`, `roomType`) đọc thẳng bảng tổng hợp, tải ≤ 2 giây. Mỗi dòng có `avgPrice`, `popularPriceMin/Max` (tứ phân vị 25–75%), `sampleCount`, `unit`, `computedAt`, `warning`.
+- Cron `0 2 * * *` giờ Việt Nam (tắt bằng `PRICE_AGGREGATION_ENABLED=false`), khoá advisory chống chạy trùng; chạy tay: `npm run price-aggregation:run`.
 
 ### 4.13. FR-PAYMENT — Đặt cọc & thanh toán sandbox (Sprint 3 · Chưa làm)
 
