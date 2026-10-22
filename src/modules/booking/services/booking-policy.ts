@@ -10,6 +10,3 @@ export const isCancellationReasonRequired = (
   now: Date,
   cancelFreeHours: number,
 ) => (startTime.getTime() - now.getTime()) / 3_600_000 < cancelFreeHours;
-
-export const canHoldAfterViewing = (startTime: Date, now: Date) =>
-  now.getTime() >= startTime.getTime();

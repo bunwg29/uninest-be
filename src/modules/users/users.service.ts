@@ -4,8 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
-import { ACTIVE_BOOKING_STATUSES, Booking } from '@modules/booking';
+import { DataSource, Repository } from 'typeorm';
+import { activeBookingWhere, Booking } from '@modules/booking';
 import { Favorite, ListingStatus } from '@modules/listings/entities';
 import { UserRoleType } from '@common/constants';
 import { LocationsService } from '../locations/locations.service';
@@ -47,7 +47,7 @@ export class UsersService {
         .andWhere('listing.deletedAt IS NULL')
         .getCount(),
       this.dataSource.getRepository(Booking).count({
-        where: { userId, status: In(ACTIVE_BOOKING_STATUSES) },
+        where: activeBookingWhere({ userId }),
       }),
     ]);
 

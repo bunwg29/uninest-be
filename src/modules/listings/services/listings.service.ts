@@ -16,15 +16,13 @@ import {
   Repository,
 } from 'typeorm';
 import {
-  ACTIVE_BOOKING_STATUSES,
+  activeBookingWhere,
   Booking,
   BOOKING_ACTORS,
   BOOKING_EVENTS,
   BookingEvent,
   BookingStatus,
   type BookingStatusChangedPayload,
-  findActiveHolds,
-  type ListingHoldInfo,
 } from '@modules/booking';
 import { UniversitiesService } from '@modules/universities/universities.service';
 import { LISTING_EVENTS } from '../constants';
@@ -299,16 +297,14 @@ export class ListingsService {
   }
 
   async getListingDetail(userId: string, roleId: UserRoleType, id: string) {
-    const [listing, isFavorite, myBooking, holds, universities] =
-      await Promise.all([
-        this.createDetailQuery(id).getOne(),
-        this.favoriteRepository.existsBy({ userId, listingId: id }),
-        roleId === UserRoleType.STUDENT
-          ? this.findMyActiveBooking(userId, id)
-          : Promise.resolve(null),
-        findActiveHolds(this.dataSource, [id]),
-        this.loadListingUniversities([id]),
-      ]);
+    const [listing, isFavorite, myBooking, universities] = await Promise.all([
+      this.createDetailQuery(id).getOne(),
+      this.favoriteRepository.existsBy({ userId, listingId: id }),
+      roleId === UserRoleType.STUDENT
+        ? this.findMyActiveBooking(userId, id)
+        : Promise.resolve(null),
+      this.loadListingUniversities([id]),
+    ]);
 
     if (listing) listing.listingUniversities = universities.get(id) ?? [];
 
@@ -318,13 +314,7 @@ export class ListingsService {
       roleId === UserRoleType.STUDENT &&
       (await this.hasListingHistory(userId, listing.id))
     ) {
-      return this.toListingDetail(
-        listing,
-        isFavorite,
-        undefined,
-        false,
-        myBooking,
-      );
+      return this.toListingDetail(listing, isFavorite, false, myBooking);
     }
 
     this.assertCanAccessListing(listing, userId, roleId);
@@ -332,13 +322,7 @@ export class ListingsService {
     const canSeeStats =
       listing.ownerId === userId || roleId === UserRoleType.ADMIN;
 
-    return this.toListingDetail(
-      listing,
-      isFavorite,
-      holds.get(listing.id),
-      canSeeStats,
-      myBooking,
-    );
+    return this.toListingDetail(listing, isFavorite, canSeeStats, myBooking);
   }
 
   async recordView(userId: string, roleId: UserRoleType, id: string) {
@@ -847,7 +831,7 @@ export class ListingsService {
     const activeBookingCount = await this.dataSource
       .getRepository(Booking)
       .count({
-        where: { listingId: id, status: In(ACTIVE_BOOKING_STATUSES) },
+        where: activeBookingWhere({ listingId: id }),
       });
 
     if (activeBookingCount > 0) {
@@ -888,13 +872,12 @@ export class ListingsService {
       );
     }
 
-    const [listings, favorites, holds] = await Promise.all([
+    const [listings, favorites] = await Promise.all([
       query.getMany(),
       this.favoriteRepository.find({
         where: { userId, listingId: In(uniqueIds) },
         select: { listingId: true },
       }),
-      findActiveHolds(this.dataSource, uniqueIds),
     ]);
     const favoriteIds = new Set(favorites.map((item) => item.listingId));
 
@@ -912,7 +895,6 @@ export class ListingsService {
             this.toListingDetail(
               listing,
               favoriteIds.has(listing.id),
-              holds.get(listing.id),
               listing.ownerId === userId || roleId === UserRoleType.ADMIN,
             ),
           ]
@@ -1073,11 +1055,7 @@ export class ListingsService {
   private async findMyActiveBooking(userId: string, listingId: string) {
     const booking = await this.dataSource.getRepository(Booking).findOne({
       select: { id: true, status: true, startTime: true, expiresAt: true },
-      where: {
-        listingId,
-        userId,
-        status: In(ACTIVE_BOOKING_STATUSES),
-      },
+      where: activeBookingWhere({ listingId, userId }),
       order: { createdAt: 'DESC' },
     });
 
@@ -1131,7 +1109,6 @@ export class ListingsService {
   private toListingDetail(
     listing: Listing,
     isFavorite: boolean,
-    hold: ListingHoldInfo | undefined,
     canSeeStats: boolean,
     myBooking: {
       id: string;
@@ -1200,10 +1177,7 @@ export class ListingsService {
       viewingSchedule: listing.viewingSchedule,
       averageRating: null,
       viewCount: canSeeStats ? listing.viewCount : null,
-      availability: this.getAvailability(listing, hold),
-      hold: hold
-        ? { expiresAt: hold.expiresAt, daysLeft: hold.daysLeft }
-        : null,
+      availability: this.getAvailability(listing),
       isFavorite,
       myBooking,
       createdAt: listing.createdAt,
@@ -1312,7 +1286,6 @@ export class ListingsService {
       viewCount: listing.viewCount,
       contactCount: engagement?.contactCount ?? 0,
       saveCount: engagement?.saveCount ?? 0,
-      holdingStatus: false,
       roomType: listing.roomType,
       maxOccupants: listing.maxOccupants,
       description: listing.description ?? undefined,
@@ -1334,12 +1307,12 @@ export class ListingsService {
     };
   }
 
-  private getAvailability(listing: Listing, hold?: ListingHoldInfo) {
+  private getAvailability(listing: Listing) {
     if (listing.status === ListingStatus.RENTED) return 'rented';
 
     if (listing.status === ListingStatus.PAUSED) return 'paused';
 
-    return hold ? 'holding' : 'available';
+    return 'available';
   }
 
   private async assertImagesValid(keys: string[] | undefined): Promise<void> {

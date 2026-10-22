@@ -101,10 +101,6 @@ export class EnvironmentVariables {
 
   @IsNumber()
   @IsOptional()
-  HOLDING_DAYS: number = 7;
-
-  @IsNumber()
-  @IsOptional()
   CANCEL_FREE_HOURS: number = 24;
 }
 

@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository, SelectQueryBuilder } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { R2StorageService } from '@core/storage';
-import {
-  findActiveHolds,
-  type ListingHoldInfo,
-} from '@modules/booking/booking-availability';
 import { Favorite, Listing, ListingStatus } from '@modules/listings/entities';
 import {
   SearchListingItemDto,
@@ -33,7 +29,6 @@ export class ListingsSearchRepository {
     @InjectRepository(Listing)
     private readonly listingRepository: Repository<Listing>,
     private readonly storageService: R2StorageService,
-    private readonly dataSource: DataSource,
   ) {}
 
   async search(
@@ -148,14 +143,11 @@ export class ListingsSearchRepository {
     const listingsById = new Map(
       listings.map((listing) => [listing.id, listing]),
     );
-    const holds = await findActiveHolds(this.dataSource, listingIds);
 
     return rows.flatMap((row) => {
       const listing = listingsById.get(row.id);
 
-      return listing
-        ? [this.toSearchListing(listing, row, holds.get(listing.id))]
-        : [];
+      return listing ? [this.toSearchListing(listing, row)] : [];
     });
   }
 
@@ -346,7 +338,6 @@ export class ListingsSearchRepository {
   private toSearchListing(
     listing: Listing,
     row: SearchListingRow,
-    hold?: ListingHoldInfo,
   ): SearchListingItemDto {
     const images = [...(listing.images ?? [])].sort(
       (first, second) => first.sortOrder - second.sortOrder,
@@ -383,9 +374,7 @@ export class ListingsSearchRepository {
       },
       distanceMeters,
       isHighlighted: false,
-      isReserved: hold !== undefined,
-      availability: this.getAvailability(listing, hold),
-      holdExpiresAt: hold?.expiresAt.toISOString() ?? null,
+      availability: this.getAvailability(listing),
       capacity: listing.maxOccupants,
       description: listing.description ?? undefined,
       status: 'active',
@@ -395,10 +384,9 @@ export class ListingsSearchRepository {
 
   private getAvailability(
     listing: Listing,
-    hold?: ListingHoldInfo,
   ): SearchListingItemDto['availability'] {
     if (listing.status === ListingStatus.RENTED) return 'rented';
 
-    return hold ? 'holding' : 'available';
+    return 'available';
   }
 }

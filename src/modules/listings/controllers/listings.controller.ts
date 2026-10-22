@@ -219,7 +219,7 @@ export class ListingsController {
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      'Xoá mềm tin đăng; tin đã có lịch hẹn/giữ chỗ chuyển sang "Ngừng nhận yêu cầu"',
+      'Xoá mềm tin đăng; tin đang có lịch hẹn chuyển sang "Ngừng nhận yêu cầu"',
   })
   async remove(
     @CurrentUser('userId') userId: string,
