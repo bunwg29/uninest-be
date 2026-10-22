@@ -19,6 +19,7 @@ import { escapeLikePattern } from '@common/utils';
 import { R2StorageService } from '@core/storage';
 import { LISTING_EVENTS } from '@modules/listings/constants';
 import { Listing, ListingStatus } from '@modules/listings/entities';
+import { User } from '@modules/users/entities';
 import { ListingsService } from '@modules/listings/services/listings.service';
 import {
   AdminListingFlag,
@@ -117,6 +118,8 @@ export class AdminListingsService {
           landlordVerifiedAt: listing.owner.landlordVerifiedAt,
         },
         coverUrl: cover ? this.storageService.getPublicUrl(cover.url) : null,
+        moderationHidden: listing.moderationHiddenAt !== null,
+        moderationReason: listing.moderationReason,
         reportCount,
         warnings,
       };
@@ -171,7 +174,12 @@ export class AdminListingsService {
       const updated = await manager.update(
         Listing,
         { id, status: ListingStatus.PENDING },
-        { status: ListingStatus.ACTIVE, rejectionReason: null },
+        {
+          status: ListingStatus.ACTIVE,
+          rejectionReason: null,
+          moderationHiddenAt: null,
+          moderationReason: null,
+        },
       );
 
       if (!updated.affected) {
@@ -265,11 +273,15 @@ export class AdminListingsService {
       throw new BadRequestException('Vui lòng nhập lý do ẩn tin');
     }
 
-    await this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const updated = await manager.update(
         Listing,
         { id, status: ListingStatus.ACTIVE },
-        { status: ListingStatus.HIDDEN },
+        {
+          status: ListingStatus.HIDDEN,
+          moderationHiddenAt: new Date(),
+          moderationReason: normalizedReason,
+        },
       );
 
       if (!updated.affected) {
@@ -277,7 +289,8 @@ export class AdminListingsService {
         throw new ConflictException('Chỉ ẩn được tin đang hiển thị');
       }
 
-      await this.auditService.record(
+      const listing = await manager.findOneByOrFail(Listing, { id });
+      const audit = await this.auditService.record(
         manager,
         actorId,
         'listing.hide',
@@ -285,13 +298,94 @@ export class AdminListingsService {
         id,
         normalizedReason,
       );
+
+      return { ownerId: listing.ownerId, auditId: audit.id };
     });
 
     this.eventEmitter.emit(LISTING_EVENTS.AVAILABILITY_CHANGED, {
       listingId: id,
     });
+    this.eventEmitter.emit(LISTING_EVENTS.REVIEWED, {
+      listingId: id,
+      ownerId: result.ownerId,
+      status: ListingStatus.HIDDEN,
+      reason: normalizedReason,
+      auditId: result.auditId,
+    });
 
     return { id, status: ListingStatus.HIDDEN };
+  }
+
+  async restore(actorId: string, id: string, reason: string) {
+    const normalizedReason = reason.trim();
+
+    if (!normalizedReason) {
+      throw new BadRequestException('Vui lòng nhập lý do hiện lại tin');
+    }
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const listing = await manager.findOne(Listing, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!listing) {
+        throw new NotFoundException('Không tìm thấy tin đăng');
+      }
+
+      const owner = await manager.findOneByOrFail(User, {
+        id: listing.ownerId,
+      });
+
+      if (
+        listing.status !== ListingStatus.HIDDEN ||
+        listing.moderationHiddenAt === null
+      ) {
+        throw new ConflictException(
+          'Chỉ hiện lại được tin do quản trị viên ẩn',
+        );
+      }
+
+      if (!owner.isActive) {
+        throw new BadRequestException(
+          'Tài khoản chủ trọ đang bị khoá, không thể hiện lại tin',
+        );
+      }
+
+      await manager.update(
+        Listing,
+        { id },
+        {
+          status: ListingStatus.ACTIVE,
+          moderationHiddenAt: null,
+          moderationReason: null,
+        },
+      );
+
+      const audit = await this.auditService.record(
+        manager,
+        actorId,
+        'listing.restore',
+        'listing',
+        id,
+        normalizedReason,
+      );
+
+      return { ownerId: listing.ownerId, auditId: audit.id };
+    });
+
+    this.eventEmitter.emit(LISTING_EVENTS.ACTIVATED, { listingId: id });
+    this.eventEmitter.emit(LISTING_EVENTS.AVAILABILITY_CHANGED, {
+      listingId: id,
+    });
+    this.eventEmitter.emit(LISTING_EVENTS.REVIEWED, {
+      listingId: id,
+      ownerId: result.ownerId,
+      status: ListingStatus.ACTIVE,
+      auditId: result.auditId,
+    });
+
+    return { id, status: ListingStatus.ACTIVE };
   }
 
   private async getCounts() {

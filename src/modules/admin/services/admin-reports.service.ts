@@ -18,6 +18,7 @@ import {
   ForumReport,
   ForumReportTargetType,
 } from '@modules/forum/entities';
+import { LISTING_EVENTS } from '@modules/listings/constants';
 import { Listing, ListingStatus } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
 import { ForumModerationService } from '@modules/forum/services/forum-moderation.service';
@@ -304,7 +305,7 @@ export class AdminReportsService {
           normalizedReason,
         );
       } else if (action === ReportResolutionAction.REMOVE) {
-        await this.removeTarget(manager, report);
+        await this.removeTarget(manager, report, normalizedReason);
       } else if (
         action === ReportResolutionAction.DISMISS ||
         action === ReportResolutionAction.WARN
@@ -375,10 +376,17 @@ export class AdminReportsService {
         normalizedReason,
       );
 
+      const hiddenListingOwnerId =
+        action === ReportResolutionAction.REMOVE &&
+        report.entityType === ReportEntityType.LISTING
+          ? await this.getTargetOwnerId(manager, report)
+          : null;
+
       return {
         id: report.id,
         status,
         action,
+        hiddenListingOwnerId,
         warningRecipientId,
         warningPostId,
         auditId: audit.id,
@@ -395,6 +403,19 @@ export class AdminReportsService {
         entityId: result.entityId,
         postId: result.warningPostId ?? undefined,
         reason: normalizedReason,
+      });
+    }
+
+    if (result.hiddenListingOwnerId) {
+      this.eventEmitter.emit(LISTING_EVENTS.AVAILABILITY_CHANGED, {
+        listingId: result.entityId,
+      });
+      this.eventEmitter.emit(LISTING_EVENTS.REVIEWED, {
+        listingId: result.entityId,
+        ownerId: result.hiddenListingOwnerId,
+        status: ListingStatus.HIDDEN,
+        reason: normalizedReason,
+        auditId: result.auditId,
       });
     }
 
@@ -640,12 +661,20 @@ export class AdminReportsService {
     return comment?.authorId ?? null;
   }
 
-  private async removeTarget(manager: DataSource['manager'], report: Report) {
+  private async removeTarget(
+    manager: DataSource['manager'],
+    report: Report,
+    reason: string,
+  ) {
     if (report.entityType === ReportEntityType.LISTING) {
       await manager.update(
         Listing,
         { id: report.entityId },
-        { status: ListingStatus.HIDDEN },
+        {
+          status: ListingStatus.HIDDEN,
+          moderationHiddenAt: new Date(),
+          moderationReason: reason,
+        },
       );
     } else if (report.entityType === ReportEntityType.FORUM_POST) {
       await manager.softDelete(ForumPost, { id: report.entityId });

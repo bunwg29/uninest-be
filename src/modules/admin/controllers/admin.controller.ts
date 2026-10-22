@@ -96,6 +96,16 @@ export class AdminController {
     return this.listingsService.hide(actorId, id, dto.reason);
   }
 
+  @Patch('listings/:id/restore')
+  @ApiOperation({ summary: 'Hiện lại tin do quản trị viên ẩn' })
+  restoreListing(
+    @CurrentUser('userId') actorId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AdminReasonDto,
+  ) {
+    return this.listingsService.restore(actorId, id, dto.reason);
+  }
+
   @Get('reports')
   @ApiOperation({ summary: 'Lấy danh sách báo cáo vi phạm tập trung' })
   getReports(@Query() query: AdminReportsQueryDto) {
