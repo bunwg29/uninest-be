@@ -20,7 +20,6 @@ import { R2StorageService } from '@core/storage';
 import { LISTING_EVENTS } from '@modules/listings/constants';
 import { Listing, ListingStatus } from '@modules/listings/entities';
 import { ListingsService } from '@modules/listings/services/listings.service';
-import { ADMIN_REVIEW_SLA_HOURS } from '../constants';
 import {
   AdminListingFlag,
   AdminListingsQueryDto,
@@ -29,7 +28,7 @@ import {
 import { Report, ReportEntityType, ReportStatus } from '../entities';
 import { AdminAuditService } from './admin-audit.service';
 
-export type AdminListingWarning = 'overdue' | 'owner_unverified' | 'reported';
+export type AdminListingWarning = 'owner_unverified' | 'reported';
 
 @Injectable()
 export class AdminListingsService {
@@ -62,9 +61,7 @@ export class AdminListingsService {
       builder.andWhere('listing.status = :status', { status: query.status });
     }
 
-    if (query.flag === AdminListingFlag.OVERDUE) {
-      this.whereOverdue(builder);
-    } else if (query.flag === AdminListingFlag.WARNING) {
+    if (query.flag === AdminListingFlag.WARNING) {
       this.whereWarning(builder);
     }
 
@@ -93,18 +90,10 @@ export class AdminListingsService {
     const reportCounts = await this.countPendingReports(
       listings.map((listing) => listing.id),
     );
-    const cutoff = this.slaCutoff();
     const items = listings.map((listing) => {
       const reportCount = reportCounts.get(listing.id) ?? 0;
       const warnings: AdminListingWarning[] = [];
       const cover = listing.images?.[0];
-
-      if (
-        listing.status === ListingStatus.PENDING &&
-        listing.createdAt < cutoff
-      ) {
-        warnings.push('overdue');
-      }
 
       if (!listing.owner.landlordVerifiedAt) warnings.push('owner_unverified');
 
@@ -300,14 +289,13 @@ export class AdminListingsService {
         .createQueryBuilder('listing')
         .leftJoin('listing.owner', 'owner')
         .where('listing.status = :pending', { pending: ListingStatus.PENDING });
-    const [rows, overdue, warning] = await Promise.all([
+    const [rows, warning] = await Promise.all([
       this.repository
         .createQueryBuilder('listing')
         .select('listing.status', 'status')
         .addSelect('COUNT(listing.id)', 'count')
         .groupBy('listing.status')
         .getRawMany<{ status: ListingStatus; count: string }>(),
-      this.whereOverdue(pending()).getCount(),
       this.whereWarning(pending()).getCount(),
     ]);
     const byStatus = Object.fromEntries(
@@ -318,17 +306,7 @@ export class AdminListingsService {
       byStatus[row.status] = Number(row.count);
     });
 
-    return { ...byStatus, overdue, warning };
-  }
-
-  private whereOverdue(builder: SelectQueryBuilder<Listing>) {
-    return builder
-      .andWhere('listing.status = :overdueStatus', {
-        overdueStatus: ListingStatus.PENDING,
-      })
-      .andWhere('listing.createdAt < :slaCutoff', {
-        slaCutoff: this.slaCutoff(),
-      });
+    return { ...byStatus, warning };
   }
 
   private whereWarning(builder: SelectQueryBuilder<Listing>) {
@@ -363,10 +341,6 @@ export class AdminListingsService {
       .getRawMany<{ entityId: string; count: string }>();
 
     return new Map(rows.map((row) => [row.entityId, Number(row.count)]));
-  }
-
-  private slaCutoff() {
-    return new Date(Date.now() - ADMIN_REVIEW_SLA_HOURS * 60 * 60 * 1000);
   }
 
   private async assertExists(repository: Repository<Listing>, id: string) {

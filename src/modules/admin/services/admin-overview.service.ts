@@ -1,13 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource, LessThan } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { Listing, ListingStatus } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
-import {
-  ADMIN_OVERVIEW_SERIES_DAYS,
-  ADMIN_REVIEW_SLA_HOURS,
-  ADMIN_TIMEZONE,
-} from '../constants';
+import { ADMIN_OVERVIEW_SERIES_DAYS, ADMIN_TIMEZONE } from '../constants';
 import { Report, ReportStatus } from '../entities';
 
 interface SeriesRow {
@@ -25,7 +21,6 @@ export class AdminOverviewService {
     const listings = this.dataSource.getRepository(Listing);
     const [
       pendingListings,
-      overdueListings,
       pendingReports,
       activeListings,
       users,
@@ -33,14 +28,6 @@ export class AdminOverviewService {
       series,
     ] = await Promise.all([
       listings.count({ where: { status: ListingStatus.PENDING } }),
-      listings.count({
-        where: {
-          status: ListingStatus.PENDING,
-          createdAt: LessThan(
-            new Date(Date.now() - ADMIN_REVIEW_SLA_HOURS * 60 * 60 * 1000),
-          ),
-        },
-      }),
       this.dataSource.getRepository(Report).count({
         where: { status: ReportStatus.PENDING },
       }),
@@ -52,13 +39,11 @@ export class AdminOverviewService {
 
     return {
       pendingListings,
-      overdueListings,
       pendingReports,
       activeListings,
       users,
       newUsersToday: signups.today,
       newUsersYesterday: signups.yesterday,
-      slaHours: ADMIN_REVIEW_SLA_HOURS,
       series,
     };
   }

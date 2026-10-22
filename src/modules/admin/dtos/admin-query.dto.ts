@@ -19,7 +19,6 @@ export enum AdminSortOrder {
 }
 
 export enum AdminListingFlag {
-  OVERDUE = 'overdue',
   WARNING = 'warning',
 }
 
@@ -45,7 +44,7 @@ export class AdminListingsQueryDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({
     enum: AdminListingFlag,
-    description: 'Lọc tin quá hạn duyệt hoặc có cảnh báo tự động',
+    description: 'Lọc tin có cảnh báo tự động',
   })
   @IsOptional()
   @IsEnum(AdminListingFlag, { message: 'Bộ lọc tin đăng không hợp lệ' })
