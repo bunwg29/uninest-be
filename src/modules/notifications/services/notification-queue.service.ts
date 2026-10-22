@@ -48,6 +48,7 @@ interface NotificationJob {
   title: string;
   body: string;
   payload: Record<string, string>;
+  mandatory?: boolean;
 }
 
 const LISTING_REVIEW_TITLES: Record<ListingReviewedPayload['status'], string> =
@@ -166,6 +167,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
       userId: event.ownerId,
       eventKey: `listing-reviewed:${event.auditId}`,
       type: NotificationType.SYSTEM,
+      mandatory: true,
       title: LISTING_REVIEW_TITLES[event.status],
       body:
         event.status === ListingStatus.ACTIVE
@@ -196,6 +198,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
       userId: event.userId,
       eventKey: `report-warning:${event.auditId}`,
       type: NotificationType.SYSTEM,
+      mandatory: true,
       title: 'Cảnh báo từ quản trị viên',
       body: event.reason,
       payload,
@@ -301,7 +304,7 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
       userId: data.userId,
     });
 
-    if (!this.isEnabled(data.type, preferences)) {
+    if (!data.mandatory && !this.isEnabled(data.type, preferences)) {
       return;
     }
 
@@ -311,7 +314,15 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
           .getRepository(Notification)
           .createQueryBuilder()
           .insert()
-          .values({ ...data, readAt: null })
+          .values({
+            userId: data.userId,
+            eventKey: data.eventKey,
+            type: data.type,
+            title: data.title,
+            body: data.body,
+            payload: data.payload,
+            readAt: null,
+          })
           .orIgnore()
           .returning('id')
           .execute();

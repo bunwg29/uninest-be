@@ -28,6 +28,7 @@ export class NotificationsService {
   async list(userId: string, query: NotificationQueryDto) {
     const where = {
       userId,
+      ...(query.unread ? { readAt: IsNull() } : {}),
       ...(query.type
         ? {
             type:
