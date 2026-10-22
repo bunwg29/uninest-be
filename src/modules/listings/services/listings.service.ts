@@ -565,6 +565,12 @@ export class ListingsService {
       throw new NotFoundException('Không tìm thấy tin đăng của bạn');
     }
 
+    if (listing.moderationHiddenAt && status === ListingStatus.ACTIVE) {
+      throw new BadRequestException(
+        'Tin đã bị quản trị viên ẩn. Vui lòng chỉnh sửa và gửi duyệt lại',
+      );
+    }
+
     const canHide =
       status === ListingStatus.HIDDEN &&
       (listing.status === ListingStatus.ACTIVE ||
@@ -762,6 +768,7 @@ export class ListingsService {
         const nextStatus =
           listing.status === ListingStatus.PENDING ||
           listing.status === ListingStatus.REJECTED ||
+          listing.moderationHiddenAt !== null ||
           isKeyFieldChanged
             ? ListingStatus.PENDING
             : listing.status;
@@ -1216,6 +1223,7 @@ export class ListingsService {
       },
       status: listing.status,
       rejectionReason: listing.rejectionReason,
+      moderationReason: canSeeStats ? listing.moderationReason : null,
       viewingSchedule: listing.viewingSchedule,
       averageRating: null,
       viewCount: canSeeStats ? listing.viewCount : null,
@@ -1328,6 +1336,8 @@ export class ListingsService {
         : undefined,
       status: listing.deletedAt ? 'deleted' : listing.status,
       rejectionReason: listing.rejectionReason ?? undefined,
+      moderationHidden: listing.moderationHiddenAt !== null,
+      moderationReason: listing.moderationReason ?? undefined,
       isFeatured: false,
       viewCount: listing.viewCount,
       contactCount: engagement?.contactCount ?? 0,

@@ -17,7 +17,7 @@ export interface ListingActivatedPayload {
 export interface ListingReviewedPayload {
   listingId: string;
   ownerId: string;
-  status: ListingStatus.ACTIVE | ListingStatus.REJECTED;
+  status: ListingStatus.ACTIVE | ListingStatus.REJECTED | ListingStatus.HIDDEN;
   reason?: string;
   auditId: string;
 }
