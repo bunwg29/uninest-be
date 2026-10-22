@@ -21,7 +21,7 @@ Tên nhánh task theo Sprint Plan, ví dụ:
 | Quản trị | `feat/sp3-admin-api` | `feat/sp3-admin-ui` |
 | Thông báo | `feat/sp3-notification-pipeline` | `feat/sp3-notification-ui` |
 | So sánh giá | `feat/sp3-price-aggregation` | `feat/sp3-price-chart-ui` |
-| Thanh toán | `feat/sp3-payment-sandbox` | `feat/sp3-payment-ui` |
+| Thanh toán (đã bỏ khỏi Sprint 3) | `feat/sp3-payment-sandbox` | `feat/sp3-payment-ui` |
 | Chatbot AI | `feat/sp4-ai-chatbot-backend` | `feat/sp4-ai-chatbot-ui` |
 | Gợi ý | `feat/sp4-recommendation-backend` | `feat/sp4-recommendation-ui` |
 | Premium | `feat/sp4-premium-backend` | `feat/sp4-premium-ui` |
@@ -89,10 +89,10 @@ git checkout -b feat/spN-<task>
 
 ### Ví dụ đúng
 ```
-feat(booking): let landlords release a hold with a required reason (TSK-S2-05)
+feat(booking): require a reason when landlords reject a request (TSK-S2-05)
 fix(search): keep filters when returning from listing detail (TSK-S2-02)
 refactor(ui): share BottomSheet across all sheets (TSK-SP1-05)
-feat(reviews): add multi-criteria review form for held bookings (TSK-S3-02)
+feat(reviews): add multi-criteria review form for viewed bookings (TSK-S3-02)
 docs(agent): update business rules for sprint 3 notifications (TSK-S3-05)
 ```
 
@@ -101,7 +101,7 @@ docs(agent): update business rules for sprint 3 notifications (TSK-S3-05)
 update code                              ← không type, không scope, không TASK-ID
 feat: add review                         ← thiếu scope, thiếu TASK-ID
 fix(booking): Fixed bug.                 ← viết hoa, quá khứ, có dấu chấm, thiếu TASK-ID
-feat(booking): thêm giữ chỗ (TSK-S2-05)  ← dòng đầu phải tiếng Anh
+feat(booking): thêm lý do từ chối (TSK-S2-05)  ← dòng đầu phải tiếng Anh
 ```
 
 ---

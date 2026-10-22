@@ -24,27 +24,28 @@ UniNest là ứng dụng di động (Android 8+, iOS 14+) kết nối **Sinh vi�
 
 | Vai trò | Mã backend (`UserRoleType`) | Mã app (`USER_ROLES`) | Làm được gì |
 | --- | --- | --- | --- |
-| Sinh viên | `0` STUDENT | `'student'` | Tìm, lọc, xem chi tiết, lưu, so sánh, đặt lịch, giữ chỗ, đặt cọc, chat, forum, đánh giá, chatbot AI |
+| Sinh viên | `0` STUDENT | `'student'` | Tìm, lọc, xem chi tiết, lưu, so sánh, đặt lịch xem phòng, chat, forum, đánh giá, chatbot AI |
 | Chủ trọ | `1` LANDLORD | `'landlord'` | Đăng tin, quản lý tin, xử lý lịch hẹn, chat, forum, phản hồi đánh giá, mua Premium |
 | Quản trị viên | `2` ADMIN | `'admin'` | Duyệt tin, xử lý báo cáo, khoá/mở tài khoản, xem nhật ký quản trị. **Không đăng ký công khai**, được cấp sẵn |
 
 ### 1.2. Ràng buộc kỹ thuật toàn dự án (không được vi phạm)
 
 - Giao diện, thông báo lỗi, validation: **100% tiếng Việt**. Không làm đa ngôn ngữ.
-- Log nội bộ server: **tiếng Anh**. Mã lỗi máy đọc: tiếng Anh viết hoa (`LISTING_HELD`).
+- Log nội bộ server: **tiếng Anh**. Mã lỗi máy đọc: tiếng Anh viết hoa (`BOOKING_ALREADY_EXISTS`).
 - **Redis + BullMQ chỉ dùng cho pipeline Thông báo (Sprint 3).** Mọi tác vụ định kỳ khác dùng cron nội bộ `@nestjs/schedule` và lưu vào PostgreSQL.
 - OTP lưu trong **PostgreSQL** dạng băm SHA-256, không dùng Redis.
 - Ảnh/video tải **trực tiếp từ app lên Cloudflare R2** bằng presigned URL. Database chỉ lưu **object key**, backend ghép URL công khai khi trả về.
 - Khoá R2, JWT secret, khoá dịch vụ ngoài: chỉ nằm trong biến môi trường backend, không hard-code, không gửi xuống app.
-- Thanh toán **chỉ sandbox** (VNPay/MoMo). Không lưu số thẻ, CVV, tài khoản ngân hàng.
+- **Không có giữ chỗ và đặt cọc trong app** (đã gỡ ở Sprint 3 theo quyết định của nhóm: thực tế không ai giữ phòng hay đặt cọc qua app). Sinh viên chỉ đặt lịch xem phòng; cọc và thuê do hai bên tự thoả thuận ngoài app.
+- Thanh toán trong app **chỉ dùng cho gói Premium của Chủ trọ (Sprint 4)**. Không lưu số thẻ, CVV, tài khoản ngân hàng.
 
 ### 1.3. Lịch sprint
 
 | Sprint | Thời gian | Nội dung | Trạng thái |
 | --- | --- | --- | --- |
 | 1 | 07/09 – 27/09/2026 | Hạ tầng, xác thực, hồ sơ, khung app, component chung, R2, đăng tin, seed, quản lý tin | **Đã xong** |
-| 2 | 28/09 – 09/10/2026 | Tìm kiếm + bản đồ, chi tiết + so sánh, đặt lịch + giữ chỗ, chat, forum | **Đã xong, đang review** |
-| 3 | 12/10 – 23/10/2026 | Đánh giá, quản trị + audit log, thông báo, so sánh giá khu vực, thanh toán sandbox | Chưa làm |
+| 2 | 28/09 – 09/10/2026 | Tìm kiếm + bản đồ, chi tiết + so sánh, đặt lịch xem phòng (giữ chỗ đã gỡ ở Sprint 3), chat, forum | **Đã xong, đang review** |
+| 3 | 12/10 – 23/10/2026 | Đánh giá, quản trị + audit log, thông báo, so sánh giá khu vực (thanh toán đặt cọc đã bỏ) | Chưa làm |
 | 4 | 26/10 – 06/11/2026 | Chatbot AI (RAG), gợi ý cá nhân hoá, Premium, tối ưu hiệu năng, tối ưu media | Chưa làm |
 | 5 | 09/11 – 21/11/2026 | Docker + CI/CD, triển khai + backup, EAS build, E2E + quét bảo mật, rà soát RTM | Chưa làm |
 
@@ -153,14 +154,14 @@ Sprint sau chỉ phụ thuộc sprint trước. Trong một sprint, mỗi nhóm 
 | `active` | Đang hiển thị | Admin duyệt | Chỉ trạng thái này hiện với Sinh viên |
 | `rejected` | Bị từ chối | Admin | Hiện lý do, Chủ trọ sửa rồi gửi lại |
 | `hidden` | Đã ẩn | Chủ trọ (công tắc) / hệ thống khi Chủ trọ bị khoá | Chỉ tin đã duyệt mới ẩn/hiện được |
-| `paused` | Ngừng nhận yêu cầu | Hệ thống khi Chủ trọ xoá tin đang có lịch hẹn/giữ chỗ | Thay cho xoá |
+| `paused` | Ngừng nhận yêu cầu | Hệ thống khi Chủ trọ xoá tin đang có lịch hẹn | Thay cho xoá |
 | `rented` | Đã cho thuê | Chủ trọ | Bật/tắt qua `rental-status` |
 
 **Quy tắc bắt buộc**
 - Chủ trọ chỉ xem/sửa/ẩn/xoá tin **của chính mình** (kiểm tra ở service, trả 403/404).
 - Sửa **giá hoặc diện tích** của tin đã duyệt → về `pending`. Sửa trường khác giữ nguyên trạng thái.
 - Xoá = **xoá mềm** (`deleted_at`), giữ tối thiểu **90 ngày**.
-- Tin đang có lịch hẹn hoặc giữ chỗ **không được xoá** → chuyển `paused`.
+- Tin đang có lịch hẹn còn hiệu lực (chờ xác nhận, hoặc đã xác nhận mà chưa qua giờ xem) **không được xoá** → chuyển `paused`.
 - Thống kê lượt xem / liên hệ / lưu **chỉ chủ tin và Admin thấy**, không công khai.
 - Chủ trọ bị khoá → toàn bộ tin `active` chuyển `hidden` (làm ở Sprint 3 cùng FR-ADMIN).
 - App: tab theo trạng thái, xoá phải qua hộp thoại xác nhận, có trạng thái rỗng, kéo để làm mới; nút sửa mở lại form đăng tin ở chế độ sửa. Chủ trọ có thể "Xem như sinh viên" (màn xem trước, ẩn nút hành động của sinh viên).
@@ -180,7 +181,7 @@ Sprint sau chỉ phụ thuộc sprint trước. Trong một sprint, mỗi nhóm 
 - Sắp xếp: `relevance` (mặc định: khớp tiêu đề → khoảng cách → mới nhất), `newest`, `price_asc`, `price_desc`, `area_asc`, `area_desc`, `nearest`.
 - Không có kết quả → `hasResults=false` + `suggestion` (mở rộng bán kính, nới bộ lọc), **không trả lỗi**.
 - Phân trang mặc định 10, tối đa 50; app cuộn vô hạn.
-- Mỗi tin trả `availability` (`available` | `holding` | `rented` | `paused`) và `holdExpiresAt`.
+- Mỗi tin trả `availability` (`available` | `rented` | `paused`).
 - App: bộ lọc **giữ nguyên khi quay lại từ trang chi tiết**; debounce ô tìm kiếm 400ms; lịch sử tìm kiếm lưu trên máy (8 mục); bản đồ chạm marker mở bottom sheet tóm tắt; nút "gần trường nhất"/vị trí hiện tại phải xin quyền vị trí trước.
 - **Sprint 4 (FR-PREMIUM):** tin Premium được đẩy lên **chỉ trong tập đã khớp bộ lọc**.
 - **Sprint 3 (FR-NOTIFY):** cho phép lưu bộ lọc để nhận thông báo tin mới phù hợp.
@@ -192,7 +193,7 @@ Sprint sau chỉ phụ thuộc sprint trước. Trong một sprint, mỗi nhóm 
 ### 4.5. FR-COMPARE — Chi tiết, lưu, so sánh (Sprint 2 · Đã làm)
 
 **Task:** TSK-S2-03 (API), TSK-S2-04 (màn chi tiết + so sánh).
-**Màn hình:** D-01 Chi tiết, D-02 Gallery, D-03 Bản đồ mở rộng, D-04 Tiện ích, D-05 Đánh giá, D-06 Hồ sơ Chủ trọ, D-07 Đang được giữ chỗ, D-08 Skeleton, D-09 Báo cáo tin, C-01→C-05 So sánh, S-12 Phòng đã lưu.
+**Màn hình:** D-01 Chi tiết, D-02 Gallery, D-03 Bản đồ mở rộng, D-04 Tiện ích, D-05 Đánh giá, D-06 Hồ sơ Chủ trọ, D-08 Skeleton, D-09 Báo cáo tin, C-01→C-05 So sánh, S-12 Phòng đã lưu.
 
 **Quy tắc bắt buộc**
 - Người dùng thường chỉ xem tin `active`; chủ tin và Admin xem mọi trạng thái.
@@ -200,42 +201,40 @@ Sprint sau chỉ phụ thuộc sprint trước. Trong một sprint, mỗi nhóm 
 - Lưu phòng (favorite): quan hệ user–listing, **không giới hạn**, bật/tắt idempotent. Là dữ liệu đầu vào cho gợi ý Sprint 4.
 - So sánh: **tối đa 4 tin**, thêm tin thứ 5 → chặn và báo đã đạt giới hạn (C-05). Tiêu chí: giá, diện tích, số người, khoảng cách tới trường đã chọn, tiện ích, điểm đánh giá.
 - Báo cáo tin: mỗi người **1 lần / tin**, không tự báo cáo tin của mình.
-- Tin đang được người khác giữ chỗ → hiện trạng thái D-07 kèm ngày hết hạn, ẩn nút Giữ chỗ.
 - `viewCount` chỉ trả cho chủ tin/Admin.
-- Trang chi tiết: thanh hành động Nhắn tin / Đặt lịch xem / Giữ chỗ, lưu, chia sẻ, báo cáo, xem toàn bộ tiện ích, ảnh toàn màn hình.
+- Trang chi tiết: thanh hành động Nhắn tin / Đặt lịch xem, lưu, chia sẻ, báo cáo, xem toàn bộ tiện ích, ảnh toàn màn hình.
 
 **API:** `GET /listings/:id`, `PATCH /listings/:id/view`, `POST|DELETE /listings/:id/favorite`, `GET /listings/favorites`, `GET /listings/favorites/ids`, `GET /listings/batch?ids=`, `POST /listings/:id/reports`, `GET /landlords/:id` (hồ sơ công khai Chủ trọ).
 
 **Hiệu năng:** trang chi tiết tải ≤ 2 giây trên 4G (NFR-PERF-02).
 
-### 4.6. FR-BOOKING — Đặt lịch xem phòng & giữ chỗ (Sprint 2 · Đã làm)
+### 4.6. FR-BOOKING — Đặt lịch xem phòng (Sprint 2 · Đã làm; giữ chỗ đã gỡ ở Sprint 3)
 
 **Task:** TSK-S2-05 (API + cron), TSK-S2-06 (luồng mobile).
-**Màn hình:** B-01 Chọn ngày, B-02 Chọn giờ, B-03 Xác nhận + ghi chú, B-04 Gửi thành công, B-05 Lịch hẹn của tôi (4 tab), B-06 Chi tiết lịch hẹn, B-07 Hết hạn, B-08 Giữ chỗ, D-07. Chủ trọ: tab Lịch hẹn.
+**Màn hình:** B-01 Chọn ngày, B-02 Chọn giờ, B-03 Xác nhận + ghi chú, B-04 Gửi thành công, B-05 Lịch hẹn của tôi (4 tab), B-06 Chi tiết lịch hẹn, B-07 Hết hạn. Chủ trọ: tab Lịch hẹn.
 
 **Trạng thái (`BookingStatus`) và chuyển trạng thái hợp lệ**
 
 ```
 pending   → confirmed | rejected | expired | cancelled
-confirmed → holding | cancelled | expired
-holding   → expired | cancelled
-expired, cancelled, rejected → (kết thúc)
+confirmed → cancelled
+confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 ```
 
 **Quy tắc bắt buộc**
-- Chỉ Sinh viên tạo yêu cầu. Mỗi sinh viên chỉ có **1 lịch đang xử lý cho 1 phòng**; khung giờ của một sinh viên không được chồng nhau.
+- Chỉ Sinh viên tạo yêu cầu. Mỗi sinh viên chỉ có **1 lịch còn hiệu lực cho 1 phòng** (đang chờ, hoặc đã xác nhận mà chưa qua giờ xem); khung giờ của một sinh viên không được chồng nhau.
 - Khung giờ: `08:00, 09:00, 10:00` (sáng), `13:00, 14:00, 15:00, 16:00` (chiều), `18:00, 19:00, 20:00` (tối), mỗi slot 60 phút, múi giờ `Asia/Ho_Chi_Minh`. Chỉ nhận slot thuộc buổi Chủ trọ đã mở trong lịch xem phòng.
 - Chủ trọ **không phản hồi trong 24 giờ** → `expired`. Yêu cầu quá giờ hẹn mà chưa xác nhận cũng `expired`.
-- Chủ trọ: Xác nhận, **Từ chối (bắt buộc lý do)**, **Huỷ giữ chỗ (bắt buộc lý do)**.
+- Chủ trọ: Xác nhận, **Từ chối (bắt buộc lý do)**.
 - Sinh viên huỷ khi còn **dưới 24 giờ** trước giờ xem → **bắt buộc lý do**.
-- **Giữ chỗ** chỉ từ lịch `confirmed` **và đã tới giờ hẹn xem**. Mỗi phòng tối đa **1 sinh viên giữ chỗ** — bảo đảm bằng khoá dòng + unique index `uq_bookings_one_holding_per_listing`, tranh chấp trả **409 `LISTING_HELD`**.
-- Giữ chỗ kéo dài `HOLDING_DAYS` (mặc định **7 ngày**). Hết hạn → phòng trở về còn trống, báo hai bên.
+- Lịch `confirmed` đã qua giờ xem được coi là **đã xem phòng**: giữ nguyên `confirmed`, không tự hết hạn, không còn tính là lịch còn hiệu lực (sinh viên đặt lại được phòng đó). Đây là bằng chứng cho Đánh giá.
+- **Không có giữ chỗ / đặt cọc** (đã gỡ ở Sprint 3): bỏ `holding`, `PATCH /bookings/:id/hold`, `PATCH /bookings/:id/release`, `HOLDING_DAYS`, `deposit_amount` trên booking. Migration `1700000000014-RemoveBookingHold` chuyển lịch `holding` cũ về `confirmed` và xoá bảng thanh toán nếu có.
 - Mọi lần đổi trạng thái ghi vào `booking_events` (ai, lúc nào, lý do) — làm bằng chứng cho Đánh giá Sprint 3.
 - Cron nội bộ `@nestjs/schedule` chạy **mỗi 5 phút**, cập nhật có điều kiện. **Không dùng Redis/BullMQ.**
 - Phát sự kiện `booking.created`, `booking.status_changed` (cho Thông báo Sprint 3) và đẩy socket `booking.updated`, `listing.availability_changed` để app cập nhật ngay.
-- App: thẻ lịch hẹn có đếm ngược, nút Nhắn tin / Huỷ; trạng thái phòng (còn trống / đang giữ chỗ / đã cho thuê) đồng bộ trên mọi màn đang mở trong ≤ 5 giây.
+- App: thẻ lịch hẹn có đếm ngược, nút Nhắn tin / Huỷ; trạng thái phòng (còn trống / đã cho thuê / ngừng nhận) đồng bộ trên mọi màn đang mở trong ≤ 5 giây.
 
-**API:** `GET /bookings/slots` (công khai), `POST /bookings`, `GET /bookings`, `GET /bookings/:id`, `DELETE /bookings/:id` (sinh viên huỷ), `PATCH /bookings/:id/hold`, `GET /bookings/landlord`, `PATCH /bookings/:id/confirm|reject|release`.
+**API:** `GET /bookings/slots` (công khai), `POST /bookings`, `GET /bookings`, `GET /bookings/:id`, `DELETE /bookings/:id` (sinh viên huỷ), `GET /bookings/landlord`, `PATCH /bookings/:id/confirm|reject`.
 
 ### 4.7. FR-CHAT — Chat trực tiếp (Sprint 2 · Đã làm)
 
@@ -286,12 +285,12 @@ expired, cancelled, rejected → (kết thúc)
 **Task:** TSK-S3-01 (API, P1), TSK-S3-02 (giao diện, P1). **Màn hình:** B-15 Form đánh giá, D-05 Danh sách đánh giá, D-06 Hồ sơ Chủ trọ.
 
 **Quy tắc bắt buộc**
-- Chỉ Sinh viên có **booking hợp lệ (đã giữ chỗ hoặc hoàn tất) với đúng tin đó** mới được đánh giá. App ẩn nút đánh giá nếu không đủ điều kiện; server vẫn phải chặn.
+- Chỉ Sinh viên có **lịch xem phòng đã xác nhận và đã qua giờ xem với đúng tin đó** mới được đánh giá. App ẩn nút đánh giá nếu không đủ điều kiện; server vẫn phải chặn.
 - Mỗi sinh viên đánh giá **1 tin 1 lần**, được sửa trong **7 ngày** sau khi gửi.
 - 4 tiêu chí 1–5 sao: **vị trí, giá trị so với giá tiền, thái độ Chủ trọ, tiện ích** + nhận xét.
 - Điểm trung bình tính lại **ngay** khi có đánh giá mới hoặc bị gỡ, hiển thị trong ≤ 5 giây trên tin và hồ sơ Chủ trọ.
 - Chủ trọ phản hồi công khai **1 lần** dưới đánh giá về tin của mình; có thể báo cáo đánh giá sai sự thật lên Admin.
-- Lời mời đánh giá gửi sau một thời gian kể từ khi giữ chỗ hoặc khi sinh viên tự xác nhận đã ở.
+- Lời mời đánh giá gửi sau một thời gian kể từ giờ xem phòng đã xác nhận hoặc khi sinh viên tự xác nhận đã ở.
 - D-05 lọc theo số sao, phân trang.
 
 **Gợi ý kỹ thuật:** bảng `reviews` (booking_id FK, điểm từng tiêu chí, comment, edited_until), service tính lại `avg_rating` trên listing; dùng module `reviews` đã có khung.
@@ -333,21 +332,11 @@ expired, cancelled, rejected → (kết thúc)
 - Đơn vị **VNĐ/tháng**, có chú thích số tin dùng để tính và thời điểm cập nhật; đánh dấu các tin sinh viên đang quan tâm trên biểu đồ.
 - `GET /price-comparison` đọc thẳng bảng tổng hợp, tải ≤ 2 giây.
 
-### 4.13. FR-PAYMENT — Đặt cọc & thanh toán sandbox (Sprint 3 · Chưa làm)
+### 4.13. FR-PAYMENT — Đặt cọc & thanh toán (Đã bỏ khỏi Sprint 3)
 
-**Task:** TSK-S3-09 (API + webhook, P1), TSK-S3-10 (giao diện + lịch sử, P1). **Màn hình:** B-09 Chọn phương thức, B-10 WebView cổng, B-11 Thành công + biên nhận, B-12 Thất bại/huỷ, B-13 Đang đối soát, B-14 Lịch sử giao dịch.
-
-**Quy tắc bắt buộc**
-- Điều kiện: sinh viên đang có **giữ chỗ hợp lệ**. Số tiền cọc do Chủ trọ quy định trong tin.
-- Chỉ VNPay/MoMo **sandbox**. App không hiển thị/lưu bất kỳ ô nhập thẻ nào.
-- Mỗi giao dịch có **mã tham chiếu duy nhất**. Chỉ coi là **Thành công khi cổng thanh toán xác nhận** (webhook đã xác thực chữ ký hoặc API tra cứu) — **app không tự suy đoán thành công**.
-- Webhook trễ → trạng thái "đang đối soát", cron nội bộ gọi API tra cứu của cổng. **Không dùng Redis.**
-- Thất bại/huỷ → giữ nguyên trạng thái giữ chỗ trước đó, cho thử lại.
-- Thành công → cập nhật booking + gửi biên nhận cho cả hai bên trong ≤ 30 giây.
-- Lịch sử giao dịch tra cứu được theo Sinh viên và theo Chủ trọ, lưu ≥ 12 tháng.
-- Thanh toán tiền phòng dùng cùng quy trình. Mua gói Premium (Sprint 4) cũng đi qua module này.
-
-**Gợi ý kỹ thuật:** bảng `transactions` (booking_id, amount, provider, provider_ref, status, created_at); dùng module `payment` đã có khung.
+- **Đã bỏ** theo quyết định của nhóm: không có giữ chỗ, đặt cọc hay thanh toán tiền phòng trong app. Task TSK-S3-09, TSK-S3-10 bị xoá khỏi Jira; màn B-08 → B-14, L-26, L-27 không còn dùng.
+- Thanh toán chỉ quay lại ở **Sprint 4** cho việc Chủ trọ mua gói Premium (FR-PREMIUM). Cổng thanh toán chọn khi làm Sprint 4 (ưu tiên cổng có môi trường test miễn phí và tài khoản cá nhân dùng được, ví dụ SePay hoặc payOS).
+- Khi làm lại: chỉ coi là thành công khi cổng xác nhận (webhook đã xác thực chữ ký hoặc API tra cứu), mỗi giao dịch có mã tham chiếu duy nhất, đối soát bằng cron nội bộ, không lưu thông tin thẻ.
 
 ### 4.14. FR-AICHAT — Chatbot tư vấn (RAG) (Sprint 4 · Chưa làm)
 
@@ -385,7 +374,7 @@ expired, cancelled, rejected → (kết thúc)
 **Task:** TSK-S4-05 (logic, P2), TSK-S4-06 (trang nâng cấp + thống kê nâng cao, P2).
 
 **Quy tắc bắt buộc**
-- Kích hoạt sau khi thanh toán gói thành công (qua FR-PAYMENT), lưu ngày hết hạn (`is_premium`, `premium_expires_at`).
+- Kích hoạt sau khi thanh toán gói thành công (module thanh toán làm mới ở Sprint 4), lưu ngày hết hạn (`is_premium`, `premium_expires_at`).
 - Tin Premium được ưu tiên **chỉ trong tập kết quả đã khớp bộ lọc**; tin không khớp **không bao giờ** được đẩy lên.
 - Gắn nhãn **"Nổi bật"** trên thẻ tin phía sinh viên.
 - Hết hạn → tự hạ về miễn phí, gỡ ưu tiên; nhắc gia hạn trước khi hết hạn. Kiểm tra bằng **cron nội bộ hằng ngày**.
@@ -401,7 +390,7 @@ expired, cancelled, rejected → (kết thúc)
 - **TSK-S5-01:** Dockerfile multi-stage, docker-compose (backend, PostgreSQL + PostGIS + pgvector, Redis chỉ cho Thông báo), GitHub Actions lint + test khi mở PR, build image khi merge.
 - **TSK-S5-02:** triển khai VPS/Render/Railway, biến môi trường tách khỏi code, backup PostgreSQL **mỗi 24 giờ** lưu tách máy chủ, khôi phục thử thành công.
 - **TSK-S5-03:** EAS Build Android + iOS bản nội bộ.
-- **TSK-S5-04:** E2E cho luồng cốt lõi (đăng ký/đăng nhập, đăng tin, tìm kiếm, đặt lịch/giữ chỗ, chat, thanh toán, đánh giá), quét bảo mật (OWASP ZAP), 100% endpoint nhạy cảm từ chối trái quyền.
+- **TSK-S5-04:** E2E cho luồng cốt lõi (đăng ký/đăng nhập, đăng tin, tìm kiếm, đặt lịch xem phòng, chat, thanh toán Premium, đánh giá), quét bảo mật (OWASP ZAP), 100% endpoint nhạy cảm từ chối trái quyền.
 - **TSK-S5-05:** đối chiếu RTM với test case, tài liệu bàn giao, kịch bản demo.
 
 ---
