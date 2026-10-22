@@ -313,7 +313,7 @@ expired, cancelled, rejected → (kết thúc)
 - Admin ẩn được tin `active` → `hidden` kèm lý do (ghi `listing.hide`), hoặc gỡ tin qua xử lý báo cáo. Tin bị **quản trị viên ẩn** được gắn `moderation_hidden_at` + `moderation_reason`: Chủ trọ **không tự hiện lại** được (`PATCH /landlord/listings/:id/visibility` trả 400); Chủ trọ sửa tin → tin về `pending` để duyệt lại; Admin duyệt hoặc `PATCH /admin/listings/:id/restore` (ghi `listing.restore`) mới gỡ cờ. Chủ trọ nhận thông báo khi tin bị ẩn và khi được hiện lại. Tin bị ẩn do **khoá tài khoản** không gắn cờ này.
 - Không duyệt được tin của Chủ trọ đang bị khoá. Duyệt hàng loạt = gọi duyệt từng tin.
 - Danh sách người dùng/báo cáo trả kèm `counts` cho từng tab; nhật ký lọc được theo hành động, người thực hiện, khoảng thời gian, từ khoá.
-- Chưa có dữ liệu thật (giao dịch, tác vụ định kỳ, Premium, IP): web-admin hiển thị dữ liệu mẫu, tích hợp sau.
+- Chưa có dữ liệu thật (tác vụ định kỳ, Premium, IP): web-admin hiển thị dữ liệu mẫu, tích hợp sau. Không còn mục giao dịch vì đã bỏ đặt cọc.
 
 **API:** `GET /admin/overview`, `GET /admin/listings` (lọc `status`, `flag=warning`, `provinceCode`, `sort=newest|oldest`, `keyword`; trả kèm `counts`), `GET /admin/listings/provinces`, `GET /admin/listings/:id`, `PATCH /admin/listings/:id/approve`, `PATCH /admin/listings/:id/reject`, `PATCH /admin/listings/:id/hide`, `PATCH /admin/listings/:id/restore`, `GET /admin/reports`, `GET /admin/reports/:id`, `PATCH /admin/reports/:id/resolve`, `GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/lock`, `PATCH /admin/users/:id/unlock`, `GET /admin/audit-logs`, `POST /users/:id/reports`.
 
