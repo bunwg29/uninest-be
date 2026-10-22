@@ -308,6 +308,12 @@ expired, cancelled, rejected → (kết thúc)
 - Khoá Chủ trọ → mọi tin `active` của họ chuyển `hidden`. Chỉ Admin được khoá tài khoản người khác.
 - **Mọi** hành động duyệt/từ chối/khoá/gỡ ghi `audit_logs`: người làm, thời điểm, hành động, đối tượng, lý do. Tra cứu lại được.
 - Dữ liệu nhạy cảm (mật khẩu, token) không bao giờ trả về, kể cả API admin.
+- Tin `pending` quá **8 giờ** (`ADMIN_REVIEW_SLA_HOURS`) là **quá hạn duyệt**. Tin **có cảnh báo** = chủ trọ chưa xác minh hoặc đang có báo cáo chờ xử lý.
+- Admin ẩn được tin `active` → `hidden` kèm lý do (ghi `listing.hide`). Duyệt hàng loạt = gọi duyệt từng tin.
+- Danh sách người dùng/báo cáo trả kèm `counts` cho từng tab; nhật ký lọc được theo hành động, người thực hiện, khoảng thời gian, từ khoá.
+- Chưa có dữ liệu thật (giao dịch, tác vụ định kỳ, Premium, hồ sơ xác minh chủ trọ, IP): web-admin hiển thị dữ liệu mẫu, tích hợp sau.
+
+**API:** `GET /admin/overview`, `GET /admin/listings` (lọc `status`, `flag=overdue|warning`, `provinceCode`, `sort=newest|oldest`, `keyword`; trả kèm `counts`), `GET /admin/listings/provinces`, `GET /admin/listings/:id`, `PATCH /admin/listings/:id/approve`, `PATCH /admin/listings/:id/reject`, `PATCH /admin/listings/:id/hide`, `GET /admin/reports`, `GET /admin/reports/:id`, `PATCH /admin/reports/:id/resolve`, `GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/lock`, `PATCH /admin/users/:id/unlock`, `GET /admin/audit-logs`, `POST /users/:id/reports`.
 
 ### 4.11. FR-NOTIFY — Thông báo (Sprint 3 · Chưa làm)
 
