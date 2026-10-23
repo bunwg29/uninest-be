@@ -90,10 +90,10 @@ git checkout -b feat/UNINEST-<n>-spN-<task>
 
 ### Ví dụ đúng
 ```
-feat(booking): let landlords release a hold with a required reason (TSK-S2-05)
+feat(booking): require a reason when landlords reject a request (TSK-S2-05)
 fix(search): keep filters when returning from listing detail (TSK-S2-02)
 refactor(ui): share BottomSheet across all sheets (TSK-SP1-05)
-feat(reviews): add multi-criteria review form for held bookings (TSK-S3-02)
+feat(reviews): add multi-criteria review form for viewed bookings (TSK-S3-02)
 docs(agent): update business rules for sprint 3 notifications (TSK-S3-05)
 ```
 
@@ -102,7 +102,7 @@ docs(agent): update business rules for sprint 3 notifications (TSK-S3-05)
 update code                              ← không type, không scope, không TASK-ID
 feat: add review                         ← thiếu scope, thiếu TASK-ID
 fix(booking): Fixed bug.                 ← viết hoa, quá khứ, có dấu chấm, thiếu TASK-ID
-feat(booking): thêm giữ chỗ (TSK-S2-05)  ← dòng đầu phải tiếng Anh
+feat(booking): thêm lý do từ chối (TSK-S2-05)  ← dòng đầu phải tiếng Anh
 ```
 
 ---

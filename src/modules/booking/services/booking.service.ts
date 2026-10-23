@@ -8,7 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository, SelectQueryBuilder } from 'typeorm';
+import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
 import { R2StorageService } from '@core/storage';
 import { Listing, ListingStatus } from '@modules/listings/entities';
 import {
@@ -20,6 +20,7 @@ import {
 } from '../dto';
 import {
   ACTIVE_BOOKING_STATUSES,
+  activeBookingWhere,
   BOOKING_ACTORS,
   BOOKING_DEFAULTS,
   BOOKING_EVENTS,
@@ -34,12 +35,10 @@ import {
   BookingStatus,
 } from '../entities';
 import {
-  canHoldAfterViewing,
   doTimeRangesOverlap,
   isCancellationReasonRequired,
 } from './booking-policy';
 
-const POSTGRES_UNIQUE_VIOLATION = '23505';
 const SLOT_TIMES = [
   '08:00',
   '09:00',
@@ -54,7 +53,6 @@ const SLOT_TIMES = [
 ];
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 const HOUR_IN_MS = 3_600_000;
-const DAY_IN_MS = 24 * HOUR_IN_MS;
 
 @Injectable()
 export class BookingService {
@@ -173,11 +171,7 @@ export class BookingService {
       this.assertSlotAllowed(listing, startTime);
 
       const duplicateCount = await queryRunner.manager.count(Booking, {
-        where: {
-          listingId: listing.id,
-          userId,
-          status: In(ACTIVE_BOOKING_STATUSES),
-        },
+        where: activeBookingWhere({ listingId: listing.id, userId }),
       });
 
       if (duplicateCount > 0) {
@@ -353,133 +347,6 @@ export class BookingService {
     return this.findOne(landlordId, booking.id);
   }
 
-  async hold(userId: string, id: string) {
-    const queryRunner = this.dataSource.createQueryRunner();
-
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const booking = await queryRunner.manager.findOne(Booking, {
-        where: { id },
-        relations: { listing: true },
-      });
-
-      if (!booking) {
-        throw new NotFoundException('Không tìm thấy lịch hẹn');
-      }
-
-      if (booking.userId !== userId) {
-        throw new ForbiddenException(
-          'Bạn không có quyền giữ chỗ cho lịch hẹn này',
-        );
-      }
-
-      this.assertStatus(
-        booking,
-        [BookingStatus.CONFIRMED],
-        'Chỉ lịch hẹn đã được Chủ trọ xác nhận mới có thể giữ chỗ',
-      );
-
-      if (!canHoldAfterViewing(booking.startTime, new Date())) {
-        throw new BadRequestException(
-          'Bạn chỉ có thể giữ chỗ sau khi đã đến xem phòng',
-        );
-      }
-
-      const listing = await queryRunner.manager.findOne(Listing, {
-        where: { id: booking.listingId },
-        lock: { mode: 'pessimistic_write' },
-      });
-
-      if (!listing || listing.status !== ListingStatus.ACTIVE) {
-        throw new ConflictException('Phòng hiện không còn nhận giữ chỗ');
-      }
-
-      const holdingCount = await queryRunner.manager.count(Booking, {
-        where: { listingId: listing.id, status: BookingStatus.HOLDING },
-      });
-
-      if (holdingCount > 0) {
-        throw new ConflictException({
-          error: 'LISTING_HELD',
-          message: 'Phòng đã được sinh viên khác giữ chỗ',
-        });
-      }
-
-      const holdingDays = this.configService.get<number>(
-        'HOLDING_DAYS',
-        BOOKING_DEFAULTS.HOLDING_DAYS,
-      );
-      const previousStatus = booking.status;
-
-      booking.status = BookingStatus.HOLDING;
-      booking.expiresAt = new Date(Date.now() + holdingDays * DAY_IN_MS);
-      booking.depositAmount = listing.deposit;
-
-      await queryRunner.manager.save(booking);
-      await queryRunner.manager.save(
-        queryRunner.manager.create(BookingEvent, {
-          bookingId: booking.id,
-          eventType: BookingStatus.HOLDING,
-          actor: BOOKING_ACTORS.STUDENT,
-          metadata: null,
-        }),
-      );
-      await queryRunner.commitTransaction();
-
-      this.emitStatusChanged(
-        booking,
-        listing.ownerId,
-        previousStatus,
-        BOOKING_ACTORS.STUDENT,
-      );
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-
-      if ((error as { code?: string }).code === POSTGRES_UNIQUE_VIOLATION) {
-        throw new ConflictException({
-          error: 'LISTING_HELD',
-          message: 'Phòng đã được sinh viên khác giữ chỗ',
-        });
-      }
-
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
-
-    return this.findOne(userId, id);
-  }
-
-  async release(landlordId: string, id: string, dto: BookingReasonDto) {
-    const booking = await this.getOwnedBooking(landlordId, id);
-
-    this.assertStatus(
-      booking,
-      [BookingStatus.HOLDING],
-      'Chỉ có thể hủy giữ chỗ của lịch hẹn đang giữ chỗ',
-    );
-
-    const previousStatus = booking.status;
-    const reason = dto.reason.trim();
-
-    booking.status = BookingStatus.CANCELLED;
-    booking.cancelReason = reason;
-    booking.cancelledAt = new Date();
-    booking.expiresAt = null;
-
-    await this.bookingRepository.save(booking);
-    await this.recordTransition(
-      booking,
-      previousStatus,
-      BOOKING_ACTORS.LANDLORD,
-      reason,
-    );
-
-    return this.findOne(landlordId, booking.id);
-  }
-
   async cancel(userId: string, id: string, dto: CancelBookingDto) {
     const booking = await this.getBookingWithListing(id);
 
@@ -489,7 +356,7 @@ export class BookingService {
 
     this.assertStatus(
       booking,
-      [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.HOLDING],
+      [BookingStatus.PENDING, BookingStatus.CONFIRMED],
       'Lịch hẹn đã kết thúc nên không thể hủy',
     );
 
@@ -730,9 +597,6 @@ export class BookingService {
       status: booking.status,
       expiresAt: booking.expiresAt,
       cancelReason: booking.cancelReason,
-      depositAmount: booking.depositAmount
-        ? Number(booking.depositAmount)
-        : null,
       confirmedAt: booking.confirmedAt,
       expiredAt: booking.expiredAt,
       cancelledAt: booking.cancelledAt,
