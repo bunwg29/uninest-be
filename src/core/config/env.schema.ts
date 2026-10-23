@@ -114,6 +114,9 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   EXPO_PUSH_ACCESS_TOKEN?: string;
+
+  @IsOptional()
+  PRICE_AGGREGATION_ENABLED?: boolean | string = true;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
