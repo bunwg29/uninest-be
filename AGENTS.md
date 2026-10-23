@@ -1,6 +1,6 @@
 # UniNest Backend — Hướng dẫn cho AI
 
-API NestJS cho ứng dụng UniNest (Sinh viên thuê trọ, Chủ trọ cho thuê, Quản trị viên). App di động ở repo `../uninest-app`.
+API NestJS cho ứng dụng UniNest (Sinh viên thuê trọ, Chủ trọ cho thuê, Quản trị viên). App di động ở repo `../uninest-app`, giao diện quản trị web ở repo `../uninest-web`.
 
 **AI phải đọc file này trước khi làm bất cứ việc gì trong repo.** Sau đó đọc các file trong `agent/` theo bảng dưới.
 

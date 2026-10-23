@@ -22,7 +22,9 @@
 | Danh mục cố định (vai trò, tiện ích, địa giới, trường, từ khoá cấm forum) | `src/core/database/seeders/catalog.seeder.ts` + `seeders/data/*.json` |
 | Dữ liệu mẫu (tài khoản, tin, chat) | `src/core/database/seeders/demo.seeder.ts` |
 
-Module hiện có: `auth`, `users`, `listings`, `search`, `booking`, `chat`, `forum`, `universities`, `locations`, `health`, và khung rỗng chờ làm: `reviews`, `notifications`, `payment`, `ai-chat`, `recommendations`. **Viết tiếp vào khung đã có**, không tạo module trùng nghĩa. Module mới (vd `admin`, `price-comparison`, `premium`) chỉ tạo khi được giao, theo cấu trúc ở `rules.md`.
+Module hiện có: `auth`, `users`, `listings`, `search`, `booking`, `chat`, `forum`, `admin`, `universities`, `locations`, `health`, và khung rỗng chờ làm: `reviews`, `notifications`, `payment`, `ai-chat`, `recommendations`. **Viết tiếp vào khung đã có**, không tạo module trùng nghĩa. Module mới (vd `price-comparison`, `premium`) chỉ tạo khi được giao, theo cấu trúc ở `rules.md`.
+
+`admin` có `AdminListingsService` (duyệt/từ chối tin), `AdminReportsService` (báo cáo tập trung), `AdminUsersService` (khoá/mở khoá), `AdminAuditService` (ghi và tra cứu nhật ký). Các API quản trị nằm dưới `/admin/*`; báo cáo tài khoản dùng `POST /users/:id/reports`. Dùng lại các service này khi mở rộng nghiệp vụ kiểm duyệt.
 
 Module A cần dữ liệu của module B → import **service đã export** của B (B khai báo trong `exports` của module), không truy vấn thẳng bảng của B từ A trừ khi chỉ đọc đơn giản qua `DataSource`/repository có sẵn.
 
@@ -66,7 +68,9 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 
 | Thứ | Ở đâu | Dùng khi |
 | --- | --- | --- |
-| `EventEmitter2` + hằng số sự kiện | `BOOKING_EVENTS`, `CHAT_EVENTS`, `LISTING_EVENTS` trong `constants/` của module | Phát sự kiện cho module khác (Thông báo S3…). Lắng nghe bằng `@OnEvent(TÊN_HẰNG_SỐ)` |
+| `EventEmitter2` + hằng số sự kiện | `BOOKING_EVENTS`, `CHAT_EVENTS`, `LISTING_EVENTS`, `ADMIN_EVENTS` trong `constants/` của module | Phát sự kiện cho module khác (Thông báo S3…). Lắng nghe bằng `@OnEvent(TÊN_HẰNG_SỐ)` |
+| `NotificationQueueService` | `modules/notifications/services/notification-queue.service.ts` | Nhận sự kiện, lưu thông báo chống trùng bằng `eventKey`, gửi push và dự phòng khi Redis mất kết nối; module khác chỉ phát sự kiện |
+| `AdminAuditService` | `modules/admin/services/admin-audit.service.ts` | Ghi audit trong cùng transaction với thao tác quản trị |
 | `ChatGateway` + `CHAT_SOCKET_EVENTS` | `modules/chat/gateways` | Đẩy realtime tới app (phòng `user:<id>`). **Không tạo gateway Socket.IO thứ hai** — thêm sự kiện vào đây |
 | `@Cron(...)` (`@nestjs/schedule`) | vd `booking-expiration.service.ts` | Mọi tác vụ định kỳ (hết hạn, tổng hợp giá, embedding, đối soát, Premium). **Không dùng Redis/BullMQ** (trừ Thông báo) |
 | `findActiveHolds()` | `modules/booking/booking-availability.ts` | Lấy thông tin giữ chỗ của nhiều tin |
