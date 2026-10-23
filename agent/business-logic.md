@@ -341,7 +341,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 
 ### 4.13. FR-PAYMENT — Đặt cọc & thanh toán (Đã bỏ khỏi Sprint 3)
 
-- **Đã bỏ** theo quyết định của nhóm: không có giữ chỗ, đặt cọc hay thanh toán tiền phòng trong app. Task TSK-S3-09, TSK-S3-10 bị xoá khỏi Jira; màn B-08 → B-14, L-26, L-27 không còn dùng.
+- **Đã bỏ** theo quyết định của nhóm: không có giữ chỗ, đặt cọc hay thanh toán tiền phòng trong app. Hai task thanh toán sandbox ban đầu (API và giao diện) bị xoá khỏi Jira; mã TSK-S3-09 nay là task gỡ giữ chỗ và đặt cọc (UNINEST-13). Màn B-08 → B-14, D-07, L-26, L-27 không còn dùng.
 - Thanh toán chỉ quay lại ở **Sprint 4** cho việc Chủ trọ mua gói Premium (FR-PREMIUM). Cổng thanh toán chọn khi làm Sprint 4 (ưu tiên cổng có môi trường test miễn phí và tài khoản cá nhân dùng được, ví dụ SePay hoặc payOS).
 - Khi làm lại: chỉ coi là thành công khi cổng xác nhận (webhook đã xác thực chữ ký hoặc API tra cứu), mỗi giao dịch có mã tham chiếu duy nhất, đối soát bằng cron nội bộ, không lưu thông tin thẻ.
 
