@@ -14,3 +14,4 @@ export * from './ai-chat';
 export * from './locations';
 export * from './universities';
 export * from './admin';
+export * from './price-comparison';
