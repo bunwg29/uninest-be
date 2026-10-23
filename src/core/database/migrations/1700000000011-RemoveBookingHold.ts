@@ -1,36 +1,18 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class RemoveBookingHold1700000000014 implements MigrationInterface {
-  name = 'RemoveBookingHold1700000000014';
+export class RemoveBookingHold1700000000011 implements MigrationInterface {
+  name = 'RemoveBookingHold1700000000011';
 
   async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP TABLE IF EXISTS "payment_transactions"`);
-    await queryRunner.query(
-      `DROP TYPE IF EXISTS "payment_transactions_provider_enum"`,
-    );
-    await queryRunner.query(
-      `DROP TYPE IF EXISTS "payment_transactions_purpose_enum"`,
-    );
-    await queryRunner.query(
-      `DROP TYPE IF EXISTS "payment_transactions_status_enum"`,
-    );
     await queryRunner.query(
       `UPDATE "bookings" SET "status" = 'confirmed', "expires_at" = NULL WHERE "status" = 'holding'`,
     );
     await queryRunner.query(
       `DELETE FROM "booking_events" WHERE "event_type" = 'holding'`,
     );
+    await queryRunner.query(`DROP INDEX "uq_bookings_one_holding_per_listing"`);
     await queryRunner.query(
-      `DROP INDEX IF EXISTS "uq_bookings_one_holding_per_listing"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "bookings" DROP COLUMN IF EXISTS "deposit_amount"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "bookings" DROP COLUMN IF EXISTS "deposit_paid_at"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "bookings" DROP COLUMN IF EXISTS "last_rent_paid_at"`,
+      `ALTER TABLE "bookings" DROP COLUMN "deposit_amount"`,
     );
     await this.replaceEnum(
       queryRunner,
