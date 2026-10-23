@@ -18,6 +18,7 @@ import {
   AiChatModule,
   LocationsModule,
   UniversitiesModule,
+  AdminModule,
   PriceComparisonModule,
 } from '@modules';
 
@@ -43,6 +44,7 @@ import {
     AiChatModule,
     LocationsModule,
     UniversitiesModule,
+    AdminModule,
     PriceComparisonModule,
   ],
 })

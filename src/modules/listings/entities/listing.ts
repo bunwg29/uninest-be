@@ -116,6 +116,14 @@ export class Listing {
   })
   status!: ListingStatus;
 
+  @Column({
+    type: 'varchar',
+    length: 500,
+    name: 'rejection_reason',
+    nullable: true,
+  })
+  rejectionReason!: string | null;
+
   @Column({ type: 'integer', name: 'view_count', default: 0 })
   viewCount!: number;
 

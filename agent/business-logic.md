@@ -45,7 +45,7 @@ UniNest là ứng dụng di động (Android 8+, iOS 14+) kết nối **Sinh vi�
 | --- | --- | --- | --- |
 | 1 | 07/09 – 27/09/2026 | Hạ tầng, xác thực, hồ sơ, khung app, component chung, R2, đăng tin, seed, quản lý tin | **Đã xong** |
 | 2 | 28/09 – 09/10/2026 | Tìm kiếm + bản đồ, chi tiết + so sánh, đặt lịch xem phòng (giữ chỗ đã gỡ ở Sprint 3), chat, forum | **Đã xong, đang review** |
-| 3 | 12/10 – 23/10/2026 | Đánh giá, quản trị + audit log, thông báo, so sánh giá khu vực (thanh toán đặt cọc đã bỏ) | Chưa làm |
+| 3 | 12/10 – 23/10/2026 | Đánh giá, quản trị + audit log, thông báo, so sánh giá khu vực (thanh toán đặt cọc đã bỏ) | Đang triển khai |
 | 4 | 26/10 – 06/11/2026 | Chatbot AI (RAG), gợi ý cá nhân hoá, Premium, tối ưu hiệu năng, tối ưu media | Chưa làm |
 | 5 | 09/11 – 21/11/2026 | Docker + CI/CD, triển khai + backup, EAS build, E2E + quét bảo mật, rà soát RTM | Chưa làm |
 
@@ -295,7 +295,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 
 **Gợi ý kỹ thuật:** bảng `reviews` (booking_id FK, điểm từng tiêu chí, comment, edited_until), service tính lại `avg_rating` trên listing; dùng module `reviews` đã có khung.
 
-### 4.10. FR-ADMIN — Kiểm duyệt & quản trị (Sprint 3 · Chưa làm)
+### 4.10. FR-ADMIN — Kiểm duyệt & quản trị (Sprint 3 · Đã triển khai trên nhánh task, chờ review)
 
 **Task:** TSK-S3-03 (API, P0), TSK-S3-04 (giao diện quản trị, P0 — khuyến nghị web-admin riêng).
 
@@ -308,29 +308,36 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - **Mọi** hành động duyệt/từ chối/khoá/gỡ ghi `audit_logs`: người làm, thời điểm, hành động, đối tượng, lý do. Tra cứu lại được.
 - Dữ liệu nhạy cảm (mật khẩu, token) không bao giờ trả về, kể cả API admin.
 
-### 4.11. FR-NOTIFY — Thông báo (Sprint 3 · Chưa làm)
+**API:** `GET /admin/overview`, `GET /admin/listings`, `GET /admin/listings/:id`, `PATCH /admin/listings/:id/approve`, `PATCH /admin/listings/:id/reject`, `GET /admin/reports`, `GET /admin/reports/:id`, `PATCH /admin/reports/:id/resolve`, `GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/lock`, `PATCH /admin/users/:id/unlock`, `GET /admin/audit-logs`, `POST /users/:id/reports`.
+
+### 4.11. FR-NOTIFY — Thông báo (Sprint 3 · Đã triển khai trên nhánh task, chờ review)
 
 **Task:** TSK-S3-05 (pipeline, P0), TSK-S3-06 (trung tâm thông báo + cài đặt, P0). **Màn hình:** N-01 Danh sách (4 tab), N-02 Rỗng, N-03 Cài đặt thông báo.
 
 **Quy tắc bắt buộc**
-- **Nơi duy nhất dùng Redis + BullMQ**: queue `notifications`. Listener `@OnEvent` nhận sự kiện có sẵn (`message.created`, `booking.created`, `booking.status_changed`, `listing.activated`…) → enqueue → consumer tạo bản ghi `notifications` + gửi push FCM/APNs.
+- **Nơi duy nhất dùng Redis + BullMQ**: queue `notifications`. Listener `@OnEvent` nhận sự kiện có sẵn (`message.created`, `booking.created`, `booking.status_changed`, `listing.activated`…) → lưu bản ghi `notifications` và enqueue gửi push qua Expo Push Service đến FCM/APNs. Khi Redis không hoạt động, bản ghi vẫn được lưu và gửi trực tiếp theo cơ chế dự phòng.
 - Module khác chỉ cần **phát thêm sự kiện**, không sửa kiến trúc Thông báo.
-- Loại thông báo bật/tắt riêng: **tin mới, tin nhắn, nhắc lịch, hệ thống**. Thông báo **giao dịch và đặt lịch không tắt hoàn toàn được**.
+- Loại thông báo bật/tắt riêng: **tin mới, tin nhắn, nhắc lịch, hệ thống**. Thông báo **đặt lịch không tắt hoàn toàn được** (không còn loại giao dịch vì đã bỏ đặt cọc; enum `payment` được gỡ bằng migration `1700000000015-RemovePaymentNotifications`).
 - Thiết bị offline → vẫn lưu, hiện lại trong danh sách.
 - Push đến thiết bị ≤ **10 giây**. Danh sách đúng thứ tự thời gian, đúng đã đọc/chưa đọc; nhấn vào mở đúng màn liên quan.
 - **Bộ lọc đã lưu** (`saved_searches`: user_id, tiêu chí, bật/tắt): lưu từ màn bộ lọc S-06; khi tin chuyển `active` (`listing.activated`) đối chiếu và tạo thông báo tin mới phù hợp.
 - App đăng ký push token khi mở app lần đầu và khi được cấp quyền; badge số chưa đọc.
 - Nhắc lịch hẹn cho cả hai bên trước giờ xem.
+- **Kết quả duyệt tin** (duyệt / từ chối / bị quản trị viên ẩn) và **cảnh báo từ quản trị viên** luôn được gửi, không bị chặn bởi công tắc "Hệ thống".
+- App: Sinh viên có 4 tab Tất cả / Lịch hẹn (`booking` + `reminder`) / Tin mới / Cộng đồng; Chủ trọ có chip Tất cả / Chưa đọc (`unread=true`) / Lịch hẹn / Hệ thống. Cài đặt hiện rõ mục "luôn bật" (đặt lịch, kết quả duyệt tin và cảnh báo).
 
-### 4.12. FR-PRICECOMPARE — So sánh giá theo khu vực (Sprint 3 · Chưa làm)
+**API:** `GET /notifications` (lọc `type`, `unread`), `GET /notifications/unread-count`, `GET|PATCH /notifications/preferences`, `PATCH /notifications/:id/read`, `PATCH /notifications/:id/unread`, `PATCH /notifications/read-all`, `POST|DELETE /notifications/devices`; `GET|POST /saved-searches`, `PATCH|DELETE /saved-searches/:id`.
+
+### 4.12. FR-PRICECOMPARE — So sánh giá theo khu vực (Sprint 3 · TSK-S3-07 đã triển khai trên nhánh task, chờ review; TSK-S3-08 chưa làm)
 
 **Task:** TSK-S3-07 (job tổng hợp, P2), TSK-S3-08 (biểu đồ, P2). **Màn hình:** S-13.
 
 **Quy tắc bắt buộc**
-- Cron nội bộ chạy **tối thiểu mỗi ngày 1 lần**, tính giá trung bình + khoảng giá phổ biến theo **tỉnh/phường và loại phòng**, từ tin `active` và tin hết hạn gần đây. Lưu bảng `price_aggregates` (area, room_type, avg_price, sample_count, computed_at). **Không dùng Redis.**
+- Cron nội bộ chạy **tối thiểu mỗi ngày 1 lần**, tính giá trung bình + khoảng giá phổ biến theo **tỉnh/phường và loại phòng**, **chỉ từ tin `active`** (đã chốt: hệ thống không có trạng thái "hết hạn" cho tin đăng nên bỏ phần "tin đã hết hạn gần đây" trong SRS). Lưu bảng `price_aggregates` (area, room_type, avg_price, sample_count, computed_at). **Không dùng Redis.**
 - Khu vực **< 5 tin hợp lệ** → trả cảnh báo "Dữ liệu chưa đủ để tham chiếu", không trả con số.
 - Đơn vị **VNĐ/tháng**, có chú thích số tin dùng để tính và thời điểm cập nhật; đánh dấu các tin sinh viên đang quan tâm trên biểu đồ.
-- `GET /price-comparison` đọc thẳng bảng tổng hợp, tải ≤ 2 giây.
+- `GET /price-comparison` (lọc `areaLevel=province|ward`, `provinceCode`, `wardCode`, `roomType`) đọc thẳng bảng tổng hợp, tải ≤ 2 giây. Mỗi dòng có `avgPrice`, `popularPriceMin/Max` (tứ phân vị 25–75%), `sampleCount`, `unit`, `computedAt`, `warning`.
+- Cron `0 2 * * *` giờ Việt Nam (tắt bằng `PRICE_AGGREGATION_ENABLED=false`), khoá advisory chống chạy trùng; chạy tay: `npm run price-aggregation:run`.
 
 ### 4.13. FR-PAYMENT — Đặt cọc & thanh toán (Đã bỏ khỏi Sprint 3)
 
