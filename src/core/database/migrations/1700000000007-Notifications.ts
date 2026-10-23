@@ -1,11 +1,11 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class Notifications1700000000006 implements MigrationInterface {
-  name = 'Notifications1700000000006';
+export class Notifications1700000000007 implements MigrationInterface {
+  name = 'Notifications1700000000007';
 
   async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `CREATE TYPE "notifications_type_enum" AS ENUM ('listing', 'message', 'reminder', 'system', 'booking', 'payment', 'forum')`,
+      `CREATE TYPE "notifications_type_enum" AS ENUM ('listing', 'message', 'reminder', 'system', 'booking', 'forum')`,
     );
     await queryRunner.query(
       `CREATE TYPE "push_devices_platform_enum" AS ENUM ('android', 'ios')`,
