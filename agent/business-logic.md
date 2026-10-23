@@ -101,6 +101,7 @@ Sprint sau chỉ phụ thuộc sprint trước. Trong một sprint, mỗi nhóm 
 - App: lưu token bằng `expo-secure-store`. Gặp 401 → làm mới token **đúng 1 lần** (có hàng đợi, không gọi refresh trùng) rồi gửi lại request. Refresh hỏng → xoá phiên, về màn Đăng nhập.
 - Đăng nhập xong điều hướng theo vai trò: Sinh viên → tab Sinh viên, Chủ trọ → tab Chủ trọ.
 - Chủ trọ mới ở trạng thái **"Chờ xác minh"** (`landlord_verified_at` rỗng) → **không được tạo tin** (`LANDLORD_NOT_VERIFIED`) cho tới khi gửi xác minh: số CCCD/CMND 9 hoặc 12 chữ số, địa chỉ liên hệ tuỳ chọn.
+- Xác minh Chủ trọ là **tự động**: gửi số CCCD/CMND hợp lệ → `landlord_verified_at` được ghi ngay, đăng tin được luôn. **Không có** luồng nộp ảnh giấy tờ hay Admin duyệt/từ chối/yêu cầu bổ sung hồ sơ (đã chốt; các màn L-21→L-23 và ADW-12 đã gỡ khỏi Figma).
 - Đổi mật khẩu: phải nhập đúng mật khẩu hiện tại, mật khẩu mới khác mật khẩu cũ.
 - Đổi email/số điện thoại: xác thực OTP gửi tới **giá trị mới**, không trùng tài khoản khác.
 - Chỉ chính chủ xem/sửa hồ sơ của mình. Admin không sửa hồ sơ thay người dùng.
@@ -308,6 +309,13 @@ expired, cancelled, rejected → (kết thúc)
 - Khoá Chủ trọ → mọi tin `active` của họ chuyển `hidden`. Chỉ Admin được khoá tài khoản người khác.
 - **Mọi** hành động duyệt/từ chối/khoá/gỡ ghi `audit_logs`: người làm, thời điểm, hành động, đối tượng, lý do. Tra cứu lại được.
 - Dữ liệu nhạy cảm (mật khẩu, token) không bao giờ trả về, kể cả API admin.
+- **Không có** quy định thời hạn/SLA duyệt tin: hàng đợi chỉ hiện thời gian chờ, không đánh dấu "quá hạn". Tin **có cảnh báo** = chủ trọ chưa xác minh hoặc đang có báo cáo chờ xử lý.
+- Admin ẩn được tin `active` → `hidden` kèm lý do (ghi `listing.hide`), hoặc gỡ tin qua xử lý báo cáo. Tin bị **quản trị viên ẩn** được gắn `moderation_hidden_at` + `moderation_reason`: Chủ trọ **không tự hiện lại** được (`PATCH /landlord/listings/:id/visibility` trả 400); Chủ trọ sửa tin → tin về `pending` để duyệt lại; Admin duyệt hoặc `PATCH /admin/listings/:id/restore` (ghi `listing.restore`) mới gỡ cờ. Chủ trọ nhận thông báo khi tin bị ẩn và khi được hiện lại. Tin bị ẩn do **khoá tài khoản** không gắn cờ này.
+- Không duyệt được tin của Chủ trọ đang bị khoá. Duyệt hàng loạt = gọi duyệt từng tin.
+- Danh sách người dùng/báo cáo trả kèm `counts` cho từng tab; nhật ký lọc được theo hành động, người thực hiện, khoảng thời gian, từ khoá.
+- Chưa có dữ liệu thật (tác vụ định kỳ, Premium, IP): web-admin hiển thị dữ liệu mẫu, tích hợp sau. Không còn mục giao dịch vì đã bỏ đặt cọc.
+
+**API:** `GET /admin/overview`, `GET /admin/listings` (lọc `status`, `flag=warning`, `provinceCode`, `sort=newest|oldest`, `keyword`; trả kèm `counts`), `GET /admin/listings/provinces`, `GET /admin/listings/:id`, `PATCH /admin/listings/:id/approve`, `PATCH /admin/listings/:id/reject`, `PATCH /admin/listings/:id/hide`, `PATCH /admin/listings/:id/restore`, `GET /admin/reports`, `GET /admin/reports/:id`, `PATCH /admin/reports/:id/resolve`, `GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/lock`, `PATCH /admin/users/:id/unlock`, `GET /admin/audit-logs`, `POST /users/:id/reports`.
 
 **API:** `GET /admin/overview`, `GET /admin/listings`, `GET /admin/listings/:id`, `PATCH /admin/listings/:id/approve`, `PATCH /admin/listings/:id/reject`, `GET /admin/reports`, `GET /admin/reports/:id`, `PATCH /admin/reports/:id/resolve`, `GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/lock`, `PATCH /admin/users/:id/unlock`, `GET /admin/audit-logs`, `POST /users/:id/reports`.
 

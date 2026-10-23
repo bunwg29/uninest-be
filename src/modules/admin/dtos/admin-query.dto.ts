@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsDateString,
   IsEnum,
   IsOptional,
   IsString,
@@ -12,6 +13,26 @@ import { UserRoleType } from '@common/constants';
 import { ListingStatus } from '@modules/listings/entities';
 import { ReportEntityType, ReportStatus } from '../entities';
 
+export enum AdminSortOrder {
+  NEWEST = 'newest',
+  OLDEST = 'oldest',
+}
+
+export enum AdminListingFlag {
+  WARNING = 'warning',
+}
+
+export enum AdminUserStatus {
+  ACTIVE = 'active',
+  LOCKED = 'locked',
+}
+
+export enum AdminUserSort {
+  NEWEST = 'newest',
+  OLDEST = 'oldest',
+  NAME = 'name',
+}
+
 export class AdminListingsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
     enum: ListingStatus,
@@ -21,7 +42,29 @@ export class AdminListingsQueryDto extends PaginationQueryDto {
   @IsEnum(ListingStatus, { message: 'Trạng thái tin đăng không hợp lệ' })
   status?: ListingStatus;
 
-  @ApiPropertyOptional({ description: 'Tìm theo tiêu đề hoặc mã tin' })
+  @ApiPropertyOptional({
+    enum: AdminListingFlag,
+    description: 'Lọc tin có cảnh báo tự động',
+  })
+  @IsOptional()
+  @IsEnum(AdminListingFlag, { message: 'Bộ lọc tin đăng không hợp lệ' })
+  flag?: AdminListingFlag;
+
+  @ApiPropertyOptional({ description: 'Mã tỉnh/thành phố' })
+  @IsOptional()
+  @IsString({ message: 'Mã tỉnh/thành phố phải là chuỗi' })
+  @MaxLength(20, { message: 'Mã tỉnh/thành phố tối đa 20 ký tự' })
+  provinceCode?: string;
+
+  @ApiPropertyOptional({
+    enum: AdminSortOrder,
+    description: 'Thứ tự theo thời gian gửi',
+  })
+  @IsOptional()
+  @IsEnum(AdminSortOrder, { message: 'Thứ tự sắp xếp không hợp lệ' })
+  sort?: AdminSortOrder;
+
+  @ApiPropertyOptional({ description: 'Tìm theo tiêu đề, mã tin hoặc chủ trọ' })
   @IsOptional()
   @IsString({ message: 'Từ khoá tìm kiếm phải là chuỗi' })
   @MaxLength(150, { message: 'Từ khoá tối đa 150 ký tự' })
@@ -54,6 +97,19 @@ export class AdminUsersQueryDto extends PaginationQueryDto {
   roleId?: UserRoleType;
 
   @ApiPropertyOptional({
+    enum: AdminUserStatus,
+    description: 'Trạng thái tài khoản',
+  })
+  @IsOptional()
+  @IsEnum(AdminUserStatus, { message: 'Trạng thái tài khoản không hợp lệ' })
+  status?: AdminUserStatus;
+
+  @ApiPropertyOptional({ enum: AdminUserSort, description: 'Cách sắp xếp' })
+  @IsOptional()
+  @IsEnum(AdminUserSort, { message: 'Cách sắp xếp không hợp lệ' })
+  sort?: AdminUserSort;
+
+  @ApiPropertyOptional({
     description: 'Tìm theo tên, email hoặc số điện thoại',
   })
   @IsOptional()
@@ -73,4 +129,20 @@ export class AdminAuditQueryDto extends PaginationQueryDto {
   @IsString({ message: 'Loại hành động phải là chuỗi' })
   @MaxLength(80, { message: 'Loại hành động tối đa 80 ký tự' })
   action?: string;
+
+  @ApiPropertyOptional({ description: 'Tìm theo mã đối tượng hoặc chi tiết' })
+  @IsOptional()
+  @IsString({ message: 'Từ khoá tìm kiếm phải là chuỗi' })
+  @MaxLength(150, { message: 'Từ khoá tối đa 150 ký tự' })
+  keyword?: string;
+
+  @ApiPropertyOptional({ description: 'Từ thời điểm (ISO 8601)' })
+  @IsOptional()
+  @IsDateString({}, { message: 'Thời điểm bắt đầu không hợp lệ' })
+  from?: string;
+
+  @ApiPropertyOptional({ description: 'Đến thời điểm (ISO 8601)' })
+  @IsOptional()
+  @IsDateString({}, { message: 'Thời điểm kết thúc không hợp lệ' })
+  to?: string;
 }

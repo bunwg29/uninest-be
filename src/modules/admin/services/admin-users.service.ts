@@ -5,16 +5,43 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, Repository } from 'typeorm';
+import { Brackets, DataSource, In, Repository } from 'typeorm';
 import { UserRoleType } from '@common/constants';
 import { createPaginatedResult } from '@common/dtos';
 import { escapeLikePattern } from '@common/utils';
+import { R2StorageService } from '@core/storage';
 import { RefreshToken } from '@modules/auth/entities/refresh-token';
 import { Listing, ListingStatus } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
-import { AdminUsersQueryDto } from '../dtos';
-import { Report, ReportEntityType } from '../entities';
+import { AdminUserSort, AdminUserStatus, AdminUsersQueryDto } from '../dtos';
+import { AuditLog } from '../entities';
 import { AdminAuditService } from './admin-audit.service';
+
+interface ActivityRow {
+  id: string;
+  listing_count: string;
+  active_count: string;
+  rejected_count: string;
+  report_count: string;
+  booking_count: string;
+}
+
+interface RelatedReportRow {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  reason: string;
+  status: string;
+  created_at: Date;
+}
+
+const ownedReportsSql = (ownerRef: string) => `
+  FROM reports report
+  LEFT JOIN listings listing ON report.entity_type = 'listing' AND listing.id = report.entity_id
+  LEFT JOIN forum_posts post ON report.entity_type = 'forum_post' AND post.id = report.entity_id
+  LEFT JOIN forum_comments comment ON report.entity_type = 'forum_comment' AND comment.id = report.entity_id
+  WHERE report.status <> 'dismissed'
+    AND (listing.owner_id = ${ownerRef} OR post.author_id = ${ownerRef} OR comment.author_id = ${ownerRef} OR (report.entity_type = 'user' AND report.entity_id = ${ownerRef}))`;
 
 @Injectable()
 export class AdminUsersService {
@@ -24,18 +51,34 @@ export class AdminUsersService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly auditService: AdminAuditService,
+    private readonly storageService: R2StorageService,
   ) {}
 
   async list(query: AdminUsersQueryDto) {
     const builder = this.repository
       .createQueryBuilder('user')
-      .orderBy('user.createdAt', 'DESC')
-      .addOrderBy('user.id', 'DESC')
       .skip((query.page - 1) * query.limit)
       .take(query.limit);
 
+    if (query.sort === AdminUserSort.NAME) {
+      builder.orderBy('user.fullName', 'ASC');
+    } else {
+      builder.orderBy(
+        'user.createdAt',
+        query.sort === AdminUserSort.OLDEST ? 'ASC' : 'DESC',
+      );
+    }
+
+    builder.addOrderBy('user.id', 'DESC');
+
     if (query.roleId !== undefined) {
       builder.andWhere('user.roleId = :roleId', { roleId: query.roleId });
+    }
+
+    if (query.status) {
+      builder.andWhere('user.isActive = :isActive', {
+        isActive: query.status === AdminUserStatus.ACTIVE,
+      });
     }
 
     if (query.keyword?.trim()) {
@@ -50,14 +93,24 @@ export class AdminUsersService {
       );
     }
 
-    const [users, total] = await builder.getManyAndCount();
+    const [[users, total], counts] = await Promise.all([
+      builder.getManyAndCount(),
+      this.getCounts(),
+    ]);
+    const activity = await this.getActivity(users.map((user) => user.id));
 
-    return createPaginatedResult(
-      users.map((user) => this.toSafeUser(user)),
-      total,
-      query.page,
-      query.limit,
-    );
+    return {
+      ...createPaginatedResult(
+        users.map((user) => ({
+          ...this.toSafeUser(user),
+          ...this.toActivity(activity.get(user.id)),
+        })),
+        total,
+        query.page,
+        query.limit,
+      ),
+      counts,
+    };
   }
 
   async getDetail(id: string) {
@@ -67,14 +120,70 @@ export class AdminUsersService {
       throw new NotFoundException('Không tìm thấy tài khoản');
     }
 
-    const [listingCount, reportCount] = await Promise.all([
-      this.dataSource.getRepository(Listing).count({ where: { ownerId: id } }),
-      this.dataSource
-        .getRepository(Report)
-        .count({ where: { entityType: ReportEntityType.USER, entityId: id } }),
+    const [activity, listings, reports, lastLogin] = await Promise.all([
+      this.getActivity([id]),
+      this.dataSource.getRepository(Listing).find({
+        where: { ownerId: id },
+        relations: { images: true },
+        order: { createdAt: 'DESC' },
+        take: 5,
+      }),
+      this.dataSource.query<RelatedReportRow[]>(
+        `SELECT report.id, report.entity_type, report.entity_id, report.reason, report.status, report.created_at
+        ${ownedReportsSql('$1')}
+        ORDER BY report.created_at DESC
+        LIMIT 5`,
+        [id],
+      ),
+      this.dataSource.getRepository(RefreshToken).findOne({
+        where: { userId: id },
+        order: { createdAt: 'DESC' },
+      }),
     ]);
+    const listingIds = listings.map((listing) => listing.id);
+    const history = await this.dataSource.getRepository(AuditLog).find({
+      where: listingIds.length
+        ? [{ entityId: id }, { entityId: In(listingIds) }]
+        : { entityId: id },
+      order: { createdAt: 'DESC' },
+      take: 8,
+    });
 
-    return { ...this.toSafeUser(user), listingCount, reportCount };
+    return {
+      ...this.toSafeUser(user),
+      ...this.toActivity(activity.get(id)),
+      phoneVerified: user.phoneVerified,
+      identitySubmitted: user.identityNumber !== null,
+      lastLoginAt: lastLogin?.createdAt ?? null,
+      listings: listings.map((listing) => {
+        const cover =
+          listing.images?.find((image) => image.isCover) ?? listing.images?.[0];
+
+        return {
+          id: listing.id,
+          title: listing.title,
+          status: listing.status,
+          createdAt: listing.createdAt,
+          coverUrl: cover ? this.storageService.getPublicUrl(cover.url) : null,
+        };
+      }),
+      reports: reports.map((report) => ({
+        id: report.id,
+        entityType: report.entity_type,
+        entityId: report.entity_id,
+        reason: report.reason,
+        status: report.status,
+        createdAt: report.created_at,
+      })),
+      history: history.map((entry) => ({
+        id: entry.id,
+        action: entry.action,
+        entityType: entry.entityType,
+        entityId: entry.entityId,
+        reason: entry.reason,
+        createdAt: entry.createdAt,
+      })),
+    };
   }
 
   async setLocked(
@@ -142,6 +251,63 @@ export class AdminUsersService {
 
       return { id, isActive: !locked };
     });
+  }
+
+  private async getCounts() {
+    const [row] = await this.dataSource.query<
+      {
+        all: string;
+        students: string;
+        landlords: string;
+        admins: string;
+        locked: string;
+      }[]
+    >(
+      `SELECT
+        COUNT(*) AS all,
+        COUNT(*) FILTER (WHERE role_id = $1) AS students,
+        COUNT(*) FILTER (WHERE role_id = $2) AS landlords,
+        COUNT(*) FILTER (WHERE role_id = $3) AS admins,
+        COUNT(*) FILTER (WHERE is_active = false) AS locked
+      FROM users`,
+      [UserRoleType.STUDENT, UserRoleType.LANDLORD, UserRoleType.ADMIN],
+    );
+
+    return {
+      all: Number(row?.all ?? 0),
+      students: Number(row?.students ?? 0),
+      landlords: Number(row?.landlords ?? 0),
+      admins: Number(row?.admins ?? 0),
+      locked: Number(row?.locked ?? 0),
+    };
+  }
+
+  private async getActivity(ids: string[]) {
+    if (ids.length === 0) return new Map<string, ActivityRow>();
+
+    const rows = await this.dataSource.query<ActivityRow[]>(
+      `SELECT owner.id,
+        (SELECT COUNT(*) FROM listings item WHERE item.owner_id = owner.id AND item.deleted_at IS NULL) AS listing_count,
+        (SELECT COUNT(*) FROM listings item WHERE item.owner_id = owner.id AND item.deleted_at IS NULL AND item.status = $2) AS active_count,
+        (SELECT COUNT(*) FROM listings item WHERE item.owner_id = owner.id AND item.deleted_at IS NULL AND item.status = $3) AS rejected_count,
+        (SELECT COUNT(DISTINCT (report.entity_type, report.entity_id)) ${ownedReportsSql('owner.id')}) AS report_count,
+        (SELECT COUNT(*) FROM bookings booking WHERE booking.user_id = owner.id) AS booking_count
+      FROM users owner
+      WHERE owner.id = ANY($1)`,
+      [ids, ListingStatus.ACTIVE, ListingStatus.REJECTED],
+    );
+
+    return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  private toActivity(row?: ActivityRow) {
+    return {
+      listingCount: Number(row?.listing_count ?? 0),
+      activeListingCount: Number(row?.active_count ?? 0),
+      rejectedListingCount: Number(row?.rejected_count ?? 0),
+      reportCount: Number(row?.report_count ?? 0),
+      bookingCount: Number(row?.booking_count ?? 0),
+    };
   }
 
   private toSafeUser(user: User) {

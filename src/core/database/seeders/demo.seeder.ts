@@ -15,6 +15,7 @@ import { Ward } from '@modules/locations/entities';
 import { University } from '@modules/universities/entities';
 import { User } from '@modules/users/entities';
 import { DEMO_ASSETS } from './demo-assets';
+import { seedModeration } from './demo-moderation.seeder';
 
 export const DEMO_PASSWORD = 'UniNest@123';
 
@@ -905,4 +906,6 @@ export async function seedDemo(
     requireUser(users, '0900000001'),
     requireUser(users, '0900000201'),
   );
+
+  await seedModeration(dataSource, users);
 }
