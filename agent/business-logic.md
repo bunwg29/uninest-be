@@ -297,7 +297,7 @@ expired, cancelled, rejected → (kết thúc)
 
 **Gợi ý kỹ thuật:** bảng `reviews` (booking_id FK, điểm từng tiêu chí, comment, edited_until), service tính lại `avg_rating` trên listing; dùng module `reviews` đã có khung.
 
-### 4.10. FR-ADMIN — Kiểm duyệt & quản trị (Sprint 3 · Chưa làm)
+### 4.10. FR-ADMIN — Kiểm duyệt & quản trị (Sprint 3 · Đã triển khai trên nhánh task, chờ review)
 
 **Task:** TSK-S3-03 (API, P0), TSK-S3-04 (giao diện quản trị, P0 — khuyến nghị web-admin riêng).
 
