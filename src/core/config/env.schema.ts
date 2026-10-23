@@ -102,6 +102,9 @@ export class EnvironmentVariables {
   @IsNumber()
   @IsOptional()
   CANCEL_FREE_HOURS: number = 24;
+
+  @IsOptional()
+  PRICE_AGGREGATION_ENABLED?: boolean | string = true;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
