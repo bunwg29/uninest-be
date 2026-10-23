@@ -228,7 +228,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Chủ trọ: Xác nhận, **Từ chối (bắt buộc lý do)**.
 - Sinh viên huỷ khi còn **dưới 24 giờ** trước giờ xem → **bắt buộc lý do**.
 - Lịch `confirmed` đã qua giờ xem được coi là **đã xem phòng**: giữ nguyên `confirmed`, không tự hết hạn, không còn tính là lịch còn hiệu lực (sinh viên đặt lại được phòng đó). Đây là bằng chứng cho Đánh giá.
-- **Không có giữ chỗ / đặt cọc** (đã gỡ ở Sprint 3): bỏ `holding`, `PATCH /bookings/:id/hold`, `PATCH /bookings/:id/release`, `HOLDING_DAYS`, `deposit_amount` trên booking. Migration `1700000000014-RemoveBookingHold` chuyển lịch `holding` cũ về `confirmed` và xoá bảng thanh toán nếu có.
+- **Không có giữ chỗ / đặt cọc** (đã gỡ ở Sprint 3): bỏ `holding`, `PATCH /bookings/:id/hold`, `PATCH /bookings/:id/release`, `HOLDING_DAYS`, `deposit_amount` trên booking. Migration `1700000000011-RemoveBookingHold` chuyển lịch `holding` cũ về `confirmed`, xoá index một-người-giữ-chỗ và cột `deposit_amount`.
 - Mọi lần đổi trạng thái ghi vào `booking_events` (ai, lúc nào, lý do) — làm bằng chứng cho Đánh giá Sprint 3.
 - Cron nội bộ `@nestjs/schedule` chạy **mỗi 5 phút**, cập nhật có điều kiện. **Không dùng Redis/BullMQ.**
 - Phát sự kiện `booking.created`, `booking.status_changed` (cho Thông báo Sprint 3) và đẩy socket `booking.updated`, `listing.availability_changed` để app cập nhật ngay.

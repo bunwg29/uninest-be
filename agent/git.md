@@ -9,22 +9,23 @@
 
 ```
 main                      ← bản ổn định, chỉ nhận merge từ nhánh sprint sau buổi review
-└── sprint-0N             ← nhánh tích hợp của sprint (Sprint 1–2 hiện dùng chung: sprint-01-02)
-    └── feat/spN-<task>   ← nhánh của từng task, tên lấy đúng theo Sprint Plan
+└── sprint-0N             ← nhánh tích hợp của sprint (Sprint 1–2 dùng chung: sprint-01-02)
+    └── feat/UNINEST-<n>-spN-<task>   ← nhánh của từng task, <n> là mã task trên Jira
 ```
 
-Tên nhánh task theo Sprint Plan, ví dụ:
+Repo web quản trị (`uninest-web`) chưa có nhánh sprint: Pull Request vào `main`.
 
-| Task | Nhánh backend | Nhánh mobile |
+Tên nhánh task, ví dụ:
+
+| Task | Nhánh backend | Nhánh mobile / web |
 | --- | --- | --- |
-| Đánh giá | `feat/sp3-review-api` | `feat/sp3-review-ui` |
-| Quản trị | `feat/sp3-admin-api` | `feat/sp3-admin-ui` |
-| Thông báo | `feat/sp3-notification-pipeline` | `feat/sp3-notification-ui` |
-| So sánh giá | `feat/sp3-price-aggregation` | `feat/sp3-price-chart-ui` |
-| Thanh toán (đã bỏ khỏi Sprint 3) | `feat/sp3-payment-sandbox` | `feat/sp3-payment-ui` |
-| Chatbot AI | `feat/sp4-ai-chatbot-backend` | `feat/sp4-ai-chatbot-ui` |
-| Gợi ý | `feat/sp4-recommendation-backend` | `feat/sp4-recommendation-ui` |
-| Premium | `feat/sp4-premium-backend` | `feat/sp4-premium-ui` |
+| Đánh giá | `feat/UNINEST-<n>-sp3-review-api` | `feat/UNINEST-<n>-sp3-review-ui` |
+| Quản trị | `feat/UNINEST-10-sp3-admin-api` | `feat/UNINEST-3-sp3-admin-ui` (repo `uninest-web`) |
+| Thông báo | `feat/UNINEST-4-sp3-notification-pipeline` | `feat/UNINEST-5-sp3-notification-ui` |
+| So sánh giá | `feat/UNINEST-6-sp3-price-aggregation/TSK-S3-07` | `feat/UNINEST-7-sp3-price-chart-ui/TSK-S3-08` |
+| Chatbot AI | `feat/UNINEST-<n>-sp4-ai-chatbot-backend` | `feat/UNINEST-<n>-sp4-ai-chatbot-ui` |
+| Gợi ý | `feat/UNINEST-<n>-sp4-recommendation-backend` | `feat/UNINEST-<n>-sp4-recommendation-ui` |
+| Premium | `feat/UNINEST-<n>-sp4-premium-backend` | `feat/UNINEST-<n>-sp4-premium-ui` |
 
 Sửa lỗi nhỏ không thuộc task mới: nhánh `fix/spN-<mô-tả-ngắn>` tách từ nhánh sprint.
 
@@ -32,14 +33,14 @@ Sửa lỗi nhỏ không thuộc task mới: nhánh `fix/spN-<mô-tả-ngắn>` 
 ```bash
 git fetch origin
 git checkout sprint-0N && git pull
-git checkout -b feat/spN-<task>
+git checkout -b feat/UNINEST-<n>-spN-<task>
 ```
 
 ### Kết thúc một task
 1. Chạy đủ lệnh kiểm tra ở `AGENTS.md` mục "Kiểm tra trước khi commit" — 0 lỗi.
 2. Commit theo mục 2.
-3. `git pull --rebase origin sprint-0N` để cập nhật, chạy lại kiểm tra.
-4. Push nhánh task, mở Pull Request vào `sprint-0N`, có ít nhất 1 người review.
+3. Cập nhật từ nhánh sprint: `git pull --rebase origin sprint-0N` nếu nhánh chưa push, `git merge origin/sprint-0N` nếu đã push. Giải xung đột, chạy lại kiểm tra.
+4. Push nhánh task, mở Pull Request vào `sprint-0N` (repo web: vào `main`), có ít nhất 1 người review.
 
 ---
 
@@ -111,7 +112,7 @@ feat(booking): thêm lý do từ chối (TSK-S2-05)  ← dòng đầu phải ti�
 - **Một commit = một thay đổi logic** build được và chạy được độc lập.
 - Không gộp `refactor` với `feat` trong cùng commit. Refactor trước, commit riêng, rồi mới làm tính năng.
 - Thay đổi nhiều feature không liên quan → tách nhiều commit.
-- Backend và app là 2 repo → commit riêng ở mỗi repo, cùng TASK-ID.
+- Backend, app và web quản trị là 3 repo → commit riêng ở mỗi repo, cùng TASK-ID.
 
 ---
 
@@ -129,8 +130,8 @@ feat(booking): thêm lý do từ chối (TSK-S2-05)  ← dòng đầu phải ti�
 
 ## 5. Pull Request
 
-- Tiêu đề cùng định dạng commit.
-- Mô tả gồm: **Làm gì** (gạch đầu dòng), **Màn hình/API liên quan**, **Cách kiểm tra**, ảnh chụp màn hình nếu đổi giao diện, kết quả lệnh kiểm tra.
+- Tiêu đề = tên task trên Jira, ví dụ `TSK-S3-05 — Notification Pipeline (Redis + BullMQ) & Tích hợp Push`.
+- Mô tả có thể để trống; nếu viết thì gồm: **Làm gì** (gạch đầu dòng), **Màn hình/API liên quan**, **Cách kiểm tra**, ảnh chụp màn hình nếu đổi giao diện.
 - Checklist trước khi xin review:
   - [ ] Đúng nghiệp vụ trong `agent/business-logic.md`
   - [ ] Không tạo trùng thứ đã có trong `agent/reuse-catalog.md`
