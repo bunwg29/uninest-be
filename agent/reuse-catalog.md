@@ -68,7 +68,9 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 
 | Thứ | Ở đâu | Dùng khi |
 | --- | --- | --- |
-| `EventEmitter2` + hằng số sự kiện | `BOOKING_EVENTS`, `CHAT_EVENTS`, `LISTING_EVENTS` trong `constants/` của module | Phát sự kiện cho module khác (Thông báo S3…). Lắng nghe bằng `@OnEvent(TÊN_HẰNG_SỐ)` |
+| `EventEmitter2` + hằng số sự kiện | `BOOKING_EVENTS`, `CHAT_EVENTS`, `LISTING_EVENTS`, `ADMIN_EVENTS` trong `constants/` của module | Phát sự kiện cho module khác (Thông báo S3…). Lắng nghe bằng `@OnEvent(TÊN_HẰNG_SỐ)` |
+| `NotificationQueueService` | `modules/notifications/services/notification-queue.service.ts` | Nhận sự kiện, lưu thông báo chống trùng bằng `eventKey`, gửi push và dự phòng khi Redis mất kết nối; module khác chỉ phát sự kiện |
+| `AdminAuditService` | `modules/admin/services/admin-audit.service.ts` | Ghi audit trong cùng transaction với thao tác quản trị |
 | `ChatGateway` + `CHAT_SOCKET_EVENTS` | `modules/chat/gateways` | Đẩy realtime tới app (phòng `user:<id>`). **Không tạo gateway Socket.IO thứ hai** — thêm sự kiện vào đây |
 | `@Cron(...)` (`@nestjs/schedule`) | vd `booking-expiration.service.ts` | Mọi tác vụ định kỳ (hết hạn, tổng hợp giá, embedding, đối soát, Premium). **Không dùng Redis/BullMQ** (trừ Thông báo) |
 | `findActiveHolds()` | `modules/booking/booking-availability.ts` | Lấy thông tin giữ chỗ của nhiều tin |

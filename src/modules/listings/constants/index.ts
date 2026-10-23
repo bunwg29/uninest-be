@@ -13,7 +13,6 @@ export interface ListingAvailabilityChangedPayload {
 export interface ListingActivatedPayload {
   listingId: string;
 }
-
 export interface ListingReviewedPayload {
   listingId: string;
   ownerId: string;
