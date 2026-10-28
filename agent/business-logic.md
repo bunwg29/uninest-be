@@ -353,7 +353,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Thanh toán chỉ quay lại ở **Sprint 4** cho việc Chủ trọ mua gói Premium (FR-PREMIUM). Cổng thanh toán chọn khi làm Sprint 4 (ưu tiên cổng có môi trường test miễn phí và tài khoản cá nhân dùng được, ví dụ SePay hoặc payOS).
 - Khi làm lại: chỉ coi là thành công khi cổng xác nhận (webhook đã xác thực chữ ký hoặc API tra cứu), mỗi giao dịch có mã tham chiếu duy nhất, đối soát bằng cron nội bộ, không lưu thông tin thẻ.
 
-### 4.14. FR-AICHAT — Chatbot tư vấn (RAG) (Sprint 4 · Chưa làm)
+### 4.14. FR-AICHAT — Chatbot tư vấn (RAG) (Sprint 4 · TSK-S4-01 đã triển khai trên nhánh task, chờ review)
 
 **Task:** TSK-S4-01 (embedding + RAG + LLM, P1), TSK-S4-02 (giao diện, P1). **Màn hình:** AI-01 Chào, AI-02 Trả lời dần, AI-03 Thẻ phòng, AI-04 Không có kết quả, AI-05 Lỗi dịch vụ, AI-06 Lịch sử, AI-07 Bảng tiêu chí trích xuất.
 
@@ -367,7 +367,20 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Phản hồi ≤ 5 giây; ≥ 80% câu trả lời trong bộ test chuẩn có ít nhất 1 tin phù hợp thật; 100% link hợp lệ.
 - Giới hạn chi phí: dùng mô hình nhỏ, giới hạn số request, cache kết quả tái sử dụng được.
 
-**API dự kiến:** `POST /ai/chat` trả câu trả lời + danh sách `listingId`.
+**Đã chốt khi triển khai TSK-S4-01**
+- Nhà cung cấp AI: API tương thích OpenAI (`AI_BASE_URL`, mặc định OpenAI), gọi bằng `fetch` có sẵn của Node, không thêm thư viện. Mô hình mặc định `gpt-4o-mini` (trả lời) và `text-embedding-3-small` (embedding, **768 chiều**, cột `vector(768)`). Thiếu `AI_API_KEY` → cron bỏ qua, chat trả `service_error`.
+- Bảng `listing_embeddings` (listing_id PK, embedding, content_hash, model, embedded_at), index **HNSW `vector_cosine_ops`**. Cron `*/10 * * * *` (tắt bằng `AI_EMBEDDING_ENABLED=false`), khoá advisory chống chạy trùng, mỗi lượt tối đa 10 lô × 64 tin `active` chưa có embedding hoặc `updated_at > embedded_at`; nội dung không đổi (so `content_hash`) thì không gọi API. Chạy tay: `npm run ai-embedding:run`.
+- Trích xuất tiêu chí bằng **luật tiếng Việt phía server** (nhanh, không tốn request): giá (`dưới 2 triệu 5`, `1tr5`, `800k`, `từ 3 đến 5 triệu`, `khoảng 1,2 triệu` → ±20%), diện tích tối thiểu, loại phòng, tiện ích (theo tên + từ đồng nghĩa), trường (tên trường, `BKĐN`, `gần trường` = trường của sinh viên), tỉnh/thành, phường. Tiêu chí lượt mới **gộp** với tiêu chí của cuộc trò chuyện (tiện ích cộng dồn, `rẻ hơn` = giảm 15% giá tối đa). Gửi `criteria` (AI-07) thì dùng nguyên tiêu chí đó.
+- Câu hỏi không có tiêu chí và không có từ khoá tìm phòng → trả lời chung (`general`), không gợi ý phòng.
+- Truy xuất: lọc cấu trúc (giá, diện tích, loại phòng, tiện ích bắt buộc đủ, trường liên kết, phường hoặc tỉnh) **AND** sắp xếp theo khoảng cách cosine; tin chưa có embedding xếp sau. Tối đa **5 tin**, chi tiết tin lấy qua `ListingsService.getListingsByIds` nên chỉ có tin `active` thật.
+- Không có kết quả → câu trả lời cố định trung thực + tối đa **2 gợi ý nới tiêu chí** có đếm số phòng thật (nới ngân sách +25%, bỏ tiện ích, mở rộng ra toàn tỉnh, mọi loại phòng, bỏ giới hạn trường, bỏ diện tích).
+- Dịch vụ AI lỗi/hết giờ (`AI_REQUEST_TIMEOUT_MS`, mặc định 4000ms) → HTTP 200 `type: service_error`, `errorCode: AI-503`, vẫn trả `criteriaDisplay` để app điền sẵn bộ lọc tìm kiếm thường; lượt lỗi **không lưu**.
+- Giới hạn: **30 câu hỏi/giờ/sinh viên** (429 `AI_RATE_LIMITED`), nội dung ≤ 1000 ký tự, ngữ cảnh gửi LLM 6 tin gần nhất, cache embedding câu hỏi trong bộ nhớ (500 mục).
+- Lịch sử lưu ở `ai_conversations` (tiêu chí hiện tại, số tin nhắn, số phòng đã gợi ý, xoá mềm) và `ai_messages`.
+
+**API (chỉ Sinh viên):**
+- `POST /ai/chat` body `{ message, conversationId?, criteria? }` → `{ conversationId, type: results|no_results|general|service_error, errorCode, answer, criteria, criteriaDisplay { labels, university, province, ward, amenities, roomTypes }, matchedCount, totalActiveCount, listingIds, listings, suggestions[{ title, description, criteria, matchedCount }], userMessage, assistantMessage }`.
+- `GET /ai/conversations?page=&limit=`, `GET /ai/conversations/:id` (kèm `messages`, `listings` còn hiển thị), `DELETE /ai/conversations/:id`, `DELETE /ai/conversations` (xoá hết).
 
 ### 4.15. FR-AIRECOMM — Gợi ý cá nhân hoá (Sprint 4 · Chưa làm)
 

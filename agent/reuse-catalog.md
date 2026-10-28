@@ -47,6 +47,7 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 | `LoggingInterceptor` (đã bật) | Log request |
 | `createGlobalValidationPipe()` (đã bật) | Validate DTO toàn cục, `whitelist` |
 | `escapeLikePattern(text)` | Mọi truy vấn `LIKE`/`ILIKE` từ khoá người dùng nhập |
+| `normalizeVietnameseText(text)` | Bỏ dấu, `đ`→`d`, chữ thường, gộp khoảng trắng — so khớp tiếng Việt không dấu phía server |
 
 ---
 
@@ -69,6 +70,8 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 | Thứ | Ở đâu | Dùng khi |
 | --- | --- | --- |
 | `EventEmitter2` + hằng số sự kiện | `BOOKING_EVENTS`, `CHAT_EVENTS`, `LISTING_EVENTS`, `ADMIN_EVENTS` trong `constants/` của module | Phát sự kiện cho module khác (Thông báo S3…). Lắng nghe bằng `@OnEvent(TÊN_HẰNG_SỐ)` |
+| `AiProviderService`, `AiProviderError` | `modules/ai-chat/services/ai-provider.service.ts` | Gọi LLM/embedding (API tương thích OpenAI, có timeout). **Không tự gọi `fetch` tới nhà cung cấp AI ở module khác** |
+| `ListingEmbedding` (`listing_embeddings`, `vector(768)`), `AI_EMBEDDING_DIMENSIONS` | `modules/ai-chat/entities` | Vector đặc trưng tin đăng, dùng lại cho gợi ý cá nhân hoá |
 | `NotificationQueueService` | `modules/notifications/services/notification-queue.service.ts` | Nhận sự kiện, lưu thông báo chống trùng bằng `eventKey`, gửi push và dự phòng khi Redis mất kết nối; module khác chỉ phát sự kiện |
 | `AdminAuditService` | `modules/admin/services/admin-audit.service.ts` | Ghi audit trong cùng transaction với thao tác quản trị |
 | `ChatGateway` + `CHAT_SOCKET_EVENTS` | `modules/chat/gateways` | Đẩy realtime tới app (phòng `user:<id>`). **Không tạo gateway Socket.IO thứ hai** — thêm sự kiện vào đây |
