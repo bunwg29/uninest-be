@@ -22,7 +22,8 @@
     "migration:run:prod": "node ./node_modules/typeorm/cli.js migration:run -d dist/core/database/data-source.js",
     "seed": "ts-node -r tsconfig-paths/register src/core/database/seeders/run-seeder.ts",
     "seed:assets": "ts-node -r tsconfig-paths/register src/core/database/seeders/seed-assets.ts",
-    "price-aggregation:run": "ts-node -r tsconfig-paths/register src/cli/run-price-aggregation.ts"
+    "price-aggregation:run": "ts-node -r tsconfig-paths/register src/cli/run-price-aggregation.ts",
+    "ai-embedding:run": "ts-node -r tsconfig-paths/register src/cli/run-listing-embedding.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",
