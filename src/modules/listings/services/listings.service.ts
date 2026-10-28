@@ -357,6 +357,10 @@ export class ListingsService {
       return true;
     });
 
+    if (incremented && roleId === UserRoleType.STUDENT) {
+      this.eventEmitter.emit(LISTING_EVENTS.VIEWED, { listingId: id, userId });
+    }
+
     return { viewCount: null, incremented };
   }
 
@@ -468,6 +472,8 @@ export class ListingsService {
       listingId: id,
     });
 
+    this.eventEmitter.emit(LISTING_EVENTS.FAVORITED, { listingId: id, userId });
+
     return {
       listingId: id,
       isFavorite: true,
@@ -533,6 +539,10 @@ export class ListingsService {
 
   async removeFavorite(userId: string, id: string): Promise<void> {
     await this.favoriteRepository.delete({ userId, listingId: id });
+    this.eventEmitter.emit(LISTING_EVENTS.UNFAVORITED, {
+      listingId: id,
+      userId,
+    });
   }
 
   async updateListingStatus(
