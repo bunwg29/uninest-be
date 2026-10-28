@@ -134,6 +134,10 @@ export class EnvironmentVariables {
   @IsOptional()
   AI_REQUEST_TIMEOUT_MS: number = 4000;
 
+  @IsString()
+  @IsOptional()
+  AI_REASONING_EFFORT?: string;
+
   @IsOptional()
   AI_EMBEDDING_ENABLED?: boolean | string = true;
 }
