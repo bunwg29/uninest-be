@@ -79,6 +79,7 @@ export class AiProviderService {
         messages,
         temperature: 0.3,
         max_tokens: maxTokens,
+        ...this.getReasoningOptions(),
       },
       this.getRequestTimeout(),
     );
@@ -92,6 +93,14 @@ export class AiProviderService {
     }
 
     return content.trim();
+  }
+
+  private getReasoningOptions(): { reasoning_effort?: string } {
+    const reasoningEffort = this.configService.get<string>(
+      'AI_REASONING_EFFORT',
+    );
+
+    return reasoningEffort ? { reasoning_effort: reasoningEffort } : {};
   }
 
   private getRequestTimeout(): number {
