@@ -382,7 +382,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - `POST /ai/chat` body `{ message, conversationId?, criteria? }` → `{ conversationId, type: results|no_results|general|service_error, errorCode, answer, criteria, criteriaDisplay { labels, university, province, ward, amenities, roomTypes }, matchedCount, totalActiveCount, listingIds, listings, suggestions[{ title, description, criteria, matchedCount }], userMessage, assistantMessage }`.
 - `GET /ai/conversations?page=&limit=`, `GET /ai/conversations/:id` (kèm `messages`, `listings` còn hiển thị), `DELETE /ai/conversations/:id`, `DELETE /ai/conversations` (xoá hết).
 
-### 4.15. FR-AIRECOMM — Gợi ý cá nhân hoá (Sprint 4 · Chưa làm)
+### 4.15. FR-AIRECOMM — Gợi ý cá nhân hoá (Sprint 4 · TSK-S4-03 đã triển khai trên nhánh task, chờ review)
 
 **Task:** TSK-S4-03 (theo dõi hành vi + engine, P2), TSK-S4-04 (khu vực "Gợi ý dành cho bạn", P2). **Màn hình:** H-01, H-03, SH-05.
 
@@ -395,7 +395,18 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Với tài khoản ≥ 10 lượt xem/lưu: ≥ 50% tin gợi ý thuộc đúng khu vực/khoảng giá quan tâm nhiều nhất.
 - Hiện tại trang chủ đã có "Đã xem gần đây" lưu trên máy — giữ nguyên, khu vực gợi ý là phần riêng.
 
-**API dự kiến:** `GET /recommendations`, `DELETE /users/me/behaviors`.
+**Đã chốt khi triển khai TSK-S4-03**
+- `user_behaviors` (user_id, event_type `view` | `favorite` | `search`, listing_id hoặc keyword + filters, created_at). Lượt xem ghi khi sinh viên mở chi tiết và lượt xem được cộng (cùng giới hạn 30 phút); lưu/bỏ lưu ghi qua sự kiện `listing.favorited` / `listing.unfavorited` (bỏ lưu thì xoá hành vi lưu). Tìm kiếm do app gửi `POST /users/me/behaviors/search` (vì `/listings/search` công khai). Migration chép sẵn lượt xem và phòng đã lưu cũ của sinh viên.
+- Cửa sổ hành vi **90 ngày**, trọng số xem 1 / lưu 3. Từ **3 lượt xem/lưu** trở lên mới cá nhân hoá; ít hơn → fallback tin phổ biến nhất (lượt xem, rồi mới nhất) trong tỉnh của sinh viên, thiếu thì lấy toàn quốc.
+- Vector hành vi = trung bình có trọng số embedding (`listing_embeddings`, `vector(768)` của TSK-S4-01) các tin đã xem/lưu, lưu ở `user_recommendation_profiles` cùng khu vực (tỉnh/phường xuất hiện nhiều nhất) và khoảng giá quan tâm (tứ phân vị 25–75%, nới ±15%; chưa có thì lấy giá từ bộ lọc đã tìm gần nhất).
+- Điểm = 0,5 × độ giống cosine + 0,25 × khu vực (trùng phường 1, trùng tỉnh 0,6) + 0,25 × giá; không có embedding thì 0,5 khu vực + 0,5 giá. Ứng viên: tin `active` trong tỉnh quan tâm, chưa xem/lưu, không phải tin của chính mình. Lưu 20 tin xếp hạng ở `user_recommendations`, thiếu thì bù bằng tin phổ biến.
+- Làm mới: cron `0 3 * * *` (khoá advisory) cho mọi sinh viên có hành vi trong 90 ngày; `GET /recommendations` tự tính lại khi chưa có, đã quá **24 giờ**, hoặc đang fallback mà đã đủ hành vi.
+
+**API (chỉ Sinh viên):**
+- `GET /recommendations?limit=` (mặc định 10, tối đa 20) → `{ items: [ListingDetail + matchPercentage | null], isFallback, basedOnListingCount, computedAt, nextRefreshAt }`.
+- `GET /users/me/behaviors/summary` → `{ viewedCount, savedCount, searchCount }` (SH-05).
+- `POST /users/me/behaviors/search` body `{ keyword?, minPrice?, maxPrice?, roomTypes?, amenities?, universityCodes? }`.
+- `DELETE /users/me/behaviors` → xoá hành vi, hồ sơ và danh sách gợi ý; **không** xoá phòng đã lưu, lịch hẹn, tin nhắn.
 
 ### 4.16. FR-PREMIUM — Gói Chủ trọ Premium (Sprint 4 · Chưa làm)
 
@@ -431,6 +442,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 | `booking.created`, `booking.status_changed` | booking | Thông báo (S3), Đánh giá (S3) |
 | `listing.availability_changed` | listings/booking | Socket cập nhật app |
 | `listing.activated` *(thêm ở S3)* | listings/admin | Đối chiếu bộ lọc đã lưu (S3), embedding (S4) |
+| `listing.viewed`, `listing.favorited`, `listing.unfavorited` *(thêm ở S4)* | listings | Ghi hành vi cho gợi ý cá nhân hoá (S4) |
 
 Thêm sự kiện mới: khai báo hằng số trong `constants/` của module phát, payload có interface.
 
