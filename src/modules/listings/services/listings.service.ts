@@ -1206,7 +1206,9 @@ export class ListingsService {
       rejectionReason: listing.rejectionReason,
       moderationReason: canSeeStats ? listing.moderationReason : null,
       viewingSchedule: listing.viewingSchedule,
-      averageRating: null,
+      averageRating:
+        listing.reviewCount > 0 ? Number(listing.averageRating) : null,
+      reviewCount: listing.reviewCount,
       viewCount: canSeeStats ? listing.viewCount : null,
       availability: this.getAvailability(listing),
       isFavorite,

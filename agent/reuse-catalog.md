@@ -78,6 +78,7 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 | `ListingStatus`, `BookingStatus`, `RoomType`, `OtpType`, `LISTING_REPORT_REASONS`, `BOOKING_EVENT_TYPES`, `BOOKING_ACTORS`, enum forum | `entities/*` của module, `forum-enums.ts` | Cột trạng thái/loại lưu bằng enum PostgreSQL — **không viết chuỗi `'active'` trần**, thêm giá trị mới phải kèm migration `ALTER TYPE` |
 | `SEARCH_DEFAULTS`, `SEARCH_SORT_VALUES` | `modules/search/search.constants.ts` | Sắp xếp, giới hạn tìm kiếm (loại phòng dùng `RoomType`) |
 | `FORUM_CONSTANTS`, `ForumModerationService`, `ForumContentModerationInterceptor` | `modules/forum` | Kiểm duyệt nội dung (từ cấm, số điện thoại, số tài khoản) — dùng lại cho nội dung người dùng khác (vd đánh giá S3) |
+| `ReviewsService`, `REVIEW_LIMITS` | `modules/reviews` | Xác thực lịch sử xem phòng, đánh giá 4 tiêu chí, sửa trong 7 ngày, phản hồi và báo cáo đánh giá |
 | `CHAT_LIMITS` | `modules/chat/constants` | Giới hạn tin nhắn |
 | `UniversitiesService`, `LocationsService` | `modules/universities`, `modules/locations` | Danh mục trường, tỉnh/phường |
 | `RolesService`, `UsersService` | `modules/users` | Vai trò, thông tin người dùng |
