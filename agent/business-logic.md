@@ -281,7 +281,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 
 **API:** `GET /forum/metadata`, `POST /forum/moderation/check`, `GET|POST /forum/posts`, `GET /forum/posts/me`, `GET|PATCH|DELETE /forum/posts/:id`, `POST|DELETE /forum/posts/:id/like`, `POST /forum/posts/:id/reports`, `GET|POST /forum/posts/:id/comments`, `GET /forum/comments/:id/replies`, `PATCH|DELETE /forum/comments/:id`, `POST /forum/comments/:id/reports`. Admin: `/admin/forum/*`.
 
-### 4.9. FR-REVIEW — Đánh giá & xếp hạng (Sprint 3 · TSK-S3-01 đã triển khai, TSK-S3-02 chưa làm)
+### 4.9. FR-REVIEW — Đánh giá & xếp hạng (Sprint 3 · Đã triển khai)
 
 **Task:** TSK-S3-01 (API, P1), TSK-S3-02 (giao diện, P1). **Màn hình:** B-15 Form đánh giá, D-05 Danh sách đánh giá, D-06 Hồ sơ Chủ trọ.
 
@@ -296,7 +296,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 
 **Gợi ý kỹ thuật:** bảng `reviews` (booking_id FK, điểm từng tiêu chí, comment, edited_until), service tính lại `avg_rating` trên listing; dùng module `reviews` đã có khung.
 
-**API:** `GET|POST /listings/:listingId/reviews`, `GET /listings/:listingId/reviews/eligibility`, `PATCH /reviews/:id`, `POST /reviews/:id/reply`, `POST /reviews/:id/reports`.
+**API:** `GET|POST /listings/:listingId/reviews`, `GET /listings/:listingId/reviews/eligibility`, `GET /reviews/me`, `PATCH /reviews/:id`, `POST /reviews/:id/reply`, `POST /reviews/:id/reports`.
 
 ### 4.10. FR-ADMIN — Kiểm duyệt & quản trị (Sprint 3 · Đã triển khai trên nhánh task, chờ review)
 

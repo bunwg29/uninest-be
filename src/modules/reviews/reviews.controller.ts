@@ -14,6 +14,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRoleType } from '@common/constants';
 import { CurrentUser, Public, Roles } from '@common/decorators';
+import { PaginationQueryDto } from '@common/dtos';
 import { JwtAuthGuard, RolesGuard } from '@common/guards';
 import {
   CreateReviewDto,
@@ -28,6 +29,18 @@ import { ReviewsService } from './services';
 @Controller()
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
+
+  @Get('reviews/me')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRoleType.STUDENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lấy danh sách đánh giá của sinh viên hiện tại' })
+  listMine(
+    @CurrentUser('userId') studentId: string,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.reviewsService.listMine(studentId, query);
+  }
 
   @Get('listings/:listingId/reviews')
   @Public()

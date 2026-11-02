@@ -11,7 +11,7 @@ import {
   QueryFailedError,
   Repository,
 } from 'typeorm';
-import { createPaginatedResult } from '@common/dtos';
+import { createPaginatedResult, PaginationQueryDto } from '@common/dtos';
 import { R2StorageService } from '@core/storage';
 import { Report, ReportEntityType } from '@modules/admin/entities';
 import { Booking, BookingStatus } from '@modules/booking/entities';
@@ -198,6 +198,31 @@ export class ReviewsService {
       ),
       summary,
     };
+  }
+
+  async listMine(studentId: string, query: PaginationQueryDto) {
+    const [reviews, total] = await this.reviewRepository
+      .createQueryBuilder('review')
+      .innerJoinAndSelect('review.listing', 'listing')
+      .where('review.studentId = :studentId', { studentId })
+      .orderBy('review.createdAt', 'DESC')
+      .offset((query.page - 1) * query.limit)
+      .limit(query.limit)
+      .getManyAndCount();
+
+    return createPaginatedResult(
+      reviews.map((review) => ({
+        ...this.present(review),
+        listing: {
+          id: review.listing.id,
+          title: review.listing.title,
+          address: review.listing.fullAddress,
+        },
+      })),
+      total,
+      query.page,
+      query.limit,
+    );
   }
 
   async reply(landlordId: string, reviewId: string, dto: ReplyReviewDto) {
