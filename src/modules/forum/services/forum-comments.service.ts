@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Brackets, DataSource, In, Repository } from 'typeorm';
 import { createPaginatedResult, PaginationQueryDto } from '@common/dtos';
 import { CreateForumCommentDto, UpdateForumCommentDto } from '../dtos';
@@ -24,6 +25,7 @@ export class ForumCommentsService {
     private readonly postsService: ForumPostsService,
     private readonly moderationService: ForumModerationService,
     private readonly presenter: ForumPresenterService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async getComments(
@@ -185,7 +187,7 @@ export class ForumCommentsService {
     postId: string,
     dto: CreateForumCommentDto,
   ) {
-    await this.postsService.findPublishedPost(postId);
+    const post = await this.postsService.findPublishedPost(postId);
 
     const parentId = dto.parentId
       ? await this.resolveRootParentId(postId, dto.parentId)
@@ -209,6 +211,14 @@ export class ForumCommentsService {
 
       return comment;
     });
+
+    if (post.authorId !== viewer.userId) {
+      this.events.emit('forum.comment_created', {
+        commentId: savedComment.id,
+        postId,
+        recipientId: post.authorId,
+      });
+    }
 
     return this.getCommentDetail(viewer, savedComment.id);
   }

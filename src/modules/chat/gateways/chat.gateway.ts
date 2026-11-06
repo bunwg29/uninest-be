@@ -19,7 +19,6 @@ import {
   BOOKING_EVENTS,
   type BookingStatusChangedPayload,
 } from '@modules/booking/constants';
-import { BookingStatus } from '@modules/booking/entities/booking-status';
 import {
   LISTING_EVENTS,
   type ListingAvailabilityChangedPayload,
@@ -212,14 +211,6 @@ export class ChatGateway
         actor: event.actor,
       },
     );
-
-    const affectsAvailability =
-      event.from === BookingStatus.HOLDING ||
-      event.to === BookingStatus.HOLDING;
-
-    if (affectsAvailability) {
-      this.broadcastListingAvailability({ listingId: event.listingId });
-    }
   }
 
   @OnEvent(LISTING_EVENTS.AVAILABILITY_CHANGED)

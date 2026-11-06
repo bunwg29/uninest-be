@@ -116,8 +116,43 @@ export class Listing {
   })
   status!: ListingStatus;
 
+  @Column({
+    type: 'varchar',
+    length: 500,
+    name: 'rejection_reason',
+    nullable: true,
+  })
+  rejectionReason!: string | null;
+
+  @Column({
+    type: 'timestamptz',
+    name: 'moderation_hidden_at',
+    nullable: true,
+  })
+  moderationHiddenAt!: Date | null;
+
+  @Column({
+    type: 'varchar',
+    length: 500,
+    name: 'moderation_reason',
+    nullable: true,
+  })
+  moderationReason!: string | null;
+
   @Column({ type: 'integer', name: 'view_count', default: 0 })
   viewCount!: number;
+
+  @Column({
+    type: 'numeric',
+    precision: 3,
+    scale: 2,
+    name: 'average_rating',
+    default: 0,
+  })
+  averageRating!: string;
+
+  @Column({ type: 'integer', name: 'review_count', default: 0 })
+  reviewCount!: number;
 
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;

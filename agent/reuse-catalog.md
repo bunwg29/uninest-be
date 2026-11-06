@@ -22,7 +22,9 @@
 | Danh mục cố định (vai trò, tiện ích, địa giới, trường, từ khoá cấm forum) | `src/core/database/seeders/catalog.seeder.ts` + `seeders/data/*.json` |
 | Dữ liệu mẫu (tài khoản, tin, chat) | `src/core/database/seeders/demo.seeder.ts` |
 
-Module hiện có: `auth`, `users`, `listings`, `search`, `booking`, `chat`, `forum`, `universities`, `locations`, `health`, và khung rỗng chờ làm: `reviews`, `notifications`, `payment`, `ai-chat`, `recommendations`. **Viết tiếp vào khung đã có**, không tạo module trùng nghĩa. Module mới (vd `admin`, `price-comparison`, `premium`) chỉ tạo khi được giao, theo cấu trúc ở `rules.md`.
+Module hiện có: `auth`, `users`, `listings`, `search`, `booking`, `chat`, `forum`, `admin`, `universities`, `locations`, `health`, và khung rỗng chờ làm: `reviews`, `notifications`, `payment`, `ai-chat`, `recommendations`. **Viết tiếp vào khung đã có**, không tạo module trùng nghĩa. Module mới (vd `price-comparison`, `premium`) chỉ tạo khi được giao, theo cấu trúc ở `rules.md`.
+
+`admin` có `AdminListingsService` (duyệt/từ chối tin), `AdminReportsService` (báo cáo tập trung), `AdminUsersService` (khoá/mở khoá), `AdminAuditService` (ghi và tra cứu nhật ký). Các API quản trị nằm dưới `/admin/*`; báo cáo tài khoản dùng `POST /users/:id/reports`. Dùng lại các service này khi mở rộng nghiệp vụ kiểm duyệt.
 
 Module A cần dữ liệu của module B → import **service đã export** của B (B khai báo trong `exports` của module), không truy vấn thẳng bảng của B từ A trừ khi chỉ đọc đơn giản qua `DataSource`/repository có sẵn.
 
@@ -66,15 +68,17 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 
 | Thứ | Ở đâu | Dùng khi |
 | --- | --- | --- |
-| `EventEmitter2` + hằng số sự kiện | `BOOKING_EVENTS`, `CHAT_EVENTS`, `LISTING_EVENTS` trong `constants/` của module | Phát sự kiện cho module khác (Thông báo S3…). Lắng nghe bằng `@OnEvent(TÊN_HẰNG_SỐ)` |
+| `EventEmitter2` + hằng số sự kiện | `BOOKING_EVENTS`, `CHAT_EVENTS`, `LISTING_EVENTS`, `ADMIN_EVENTS` trong `constants/` của module | Phát sự kiện cho module khác (Thông báo S3…). Lắng nghe bằng `@OnEvent(TÊN_HẰNG_SỐ)` |
+| `NotificationQueueService` | `modules/notifications/services/notification-queue.service.ts` | Nhận sự kiện, lưu thông báo chống trùng bằng `eventKey`, gửi push và dự phòng khi Redis mất kết nối; module khác chỉ phát sự kiện |
+| `AdminAuditService` | `modules/admin/services/admin-audit.service.ts` | Ghi audit trong cùng transaction với thao tác quản trị |
 | `ChatGateway` + `CHAT_SOCKET_EVENTS` | `modules/chat/gateways` | Đẩy realtime tới app (phòng `user:<id>`). **Không tạo gateway Socket.IO thứ hai** — thêm sự kiện vào đây |
 | `@Cron(...)` (`@nestjs/schedule`) | vd `booking-expiration.service.ts` | Mọi tác vụ định kỳ (hết hạn, tổng hợp giá, embedding, đối soát, Premium). **Không dùng Redis/BullMQ** (trừ Thông báo) |
-| `findActiveHolds()` | `modules/booking/booking-availability.ts` | Lấy thông tin giữ chỗ của nhiều tin |
-| `doTimeRangesOverlap()`, `isCancellationReasonRequired()`, `canHoldAfterViewing()` | `modules/booking/services/booking-policy.ts` | Kiểm tra trùng giờ, bắt buộc lý do huỷ, điều kiện giữ chỗ |
-| `BOOKING_DEFAULTS`, `ACTIVE_BOOKING_STATUSES` | `modules/booking/constants` | Thời hạn phản hồi, giữ chỗ, huỷ miễn lý do |
+| `doTimeRangesOverlap()`, `isCancellationReasonRequired()` | `modules/booking/services/booking-policy.ts` | Kiểm tra trùng giờ, bắt buộc lý do huỷ |
+| `BOOKING_DEFAULTS`, `ACTIVE_BOOKING_STATUSES`, `activeBookingWhere()` | `modules/booking/constants` | Thời hạn phản hồi, huỷ miễn lý do; điều kiện lịch còn hiệu lực (chờ, hoặc đã xác nhận mà chưa qua giờ xem) |
 | `ListingStatus`, `BookingStatus`, `RoomType`, `OtpType`, `LISTING_REPORT_REASONS`, `BOOKING_EVENT_TYPES`, `BOOKING_ACTORS`, enum forum | `entities/*` của module, `forum-enums.ts` | Cột trạng thái/loại lưu bằng enum PostgreSQL — **không viết chuỗi `'active'` trần**, thêm giá trị mới phải kèm migration `ALTER TYPE` |
 | `SEARCH_DEFAULTS`, `SEARCH_SORT_VALUES` | `modules/search/search.constants.ts` | Sắp xếp, giới hạn tìm kiếm (loại phòng dùng `RoomType`) |
 | `FORUM_CONSTANTS`, `ForumModerationService`, `ForumContentModerationInterceptor` | `modules/forum` | Kiểm duyệt nội dung (từ cấm, số điện thoại, số tài khoản) — dùng lại cho nội dung người dùng khác (vd đánh giá S3) |
+| `ReviewsService`, `REVIEW_LIMITS` | `modules/reviews` | Xác thực lịch sử xem phòng, đánh giá 4 tiêu chí, sửa trong 7 ngày, phản hồi và báo cáo đánh giá |
 | `CHAT_LIMITS` | `modules/chat/constants` | Giới hạn tin nhắn |
 | `UniversitiesService`, `LocationsService` | `modules/universities`, `modules/locations` | Danh mục trường, tỉnh/phường |
 | `RolesService`, `UsersService` | `modules/users` | Vai trò, thông tin người dùng |
@@ -88,7 +92,7 @@ Module A cần dữ liệu của module B → import **service đã export** c�
 | Controller có guard, role, Swagger, `@CurrentUser` | `modules/listings/controllers/listings.controller.ts` |
 | DTO có class-validator + Swagger + message tiếng Việt | `modules/listings/dtos/create-listing.dto.ts` |
 | Chuyển trạng thái có kiểm tra + ghi lịch sử + phát sự kiện | `modules/booking/services/booking.service.ts` |
-| Chống tranh chấp (khoá dòng + unique index) | Giữ chỗ trong `booking.service.ts` |
+| Chống tranh chấp (khoá dòng + kiểm tra trong transaction) | Tạo lịch hẹn trong `booking.service.ts` |
 | Cron nội bộ cập nhật có điều kiện | `modules/booking/services/booking-expiration.service.ts` |
 | Truy vấn PostGIS + query builder có tham số | `modules/search/search.repository.ts` |
 | Gateway Socket.IO xác thực JWT | `modules/chat/gateways/chat.gateway.ts` |

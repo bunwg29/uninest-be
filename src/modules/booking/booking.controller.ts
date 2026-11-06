@@ -108,31 +108,6 @@ export class BookingController {
     return this.bookingService.reject(userId, id, dto);
   }
 
-  @Patch(':id/release')
-  @Roles(UserRoleType.LANDLORD)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Chủ trọ hủy giữ chỗ kèm lý do' })
-  release(
-    @CurrentUser('userId') userId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: BookingReasonDto,
-  ) {
-    return this.bookingService.release(userId, id, dto);
-  }
-
-  @Patch(':id/hold')
-  @Roles(UserRoleType.STUDENT)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Sinh viên giữ chỗ sau khi đã xem phòng' })
-  hold(
-    @CurrentUser('userId') userId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    return this.bookingService.hold(userId, id);
-  }
-
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @Roles(UserRoleType.STUDENT)

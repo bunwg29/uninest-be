@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppConfigModule, DatabaseModule, StorageModule } from '@core';
 import {
   HealthModule,
@@ -17,11 +18,14 @@ import {
   AiChatModule,
   LocationsModule,
   UniversitiesModule,
+  AdminModule,
+  PriceComparisonModule,
 } from '@modules';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot(),
+    ScheduleModule.forRoot(),
     AppConfigModule,
     DatabaseModule,
     StorageModule,
@@ -40,6 +44,8 @@ import {
     AiChatModule,
     LocationsModule,
     UniversitiesModule,
+    AdminModule,
+    PriceComparisonModule,
   ],
 })
 export class AppModule {}

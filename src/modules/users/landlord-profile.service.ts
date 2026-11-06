@@ -35,14 +35,16 @@ export class LandlordProfileService {
       throw new NotFoundException('Không tìm thấy chủ trọ');
     }
 
-    const [activeListingCount, canSeePhone, universities] = await Promise.all([
-      this.dataSource.getRepository(Listing).countBy({
-        ownerId: landlordId,
-        status: ListingStatus.ACTIVE,
-      }),
-      this.canSeePhone(viewerId, landlordId),
-      this.findListingUniversities(landlordId),
-    ]);
+    const [activeListingCount, canSeePhone, universities, rating] =
+      await Promise.all([
+        this.dataSource.getRepository(Listing).countBy({
+          ownerId: landlordId,
+          status: ListingStatus.ACTIVE,
+        }),
+        this.canSeePhone(viewerId, landlordId),
+        this.findListingUniversities(landlordId),
+        this.getRating(landlordId),
+      ]);
 
     return {
       id: landlord.id,
@@ -56,9 +58,28 @@ export class LandlordProfileService {
       universities,
       activeListingCount,
       phone: canSeePhone ? landlord.phone : null,
-      averageRating: null,
-      reviewCount: 0,
+      averageRating: rating.reviewCount > 0 ? rating.averageRating : null,
+      reviewCount: rating.reviewCount,
       responseMinutes: null,
+    };
+  }
+
+  private async getRating(landlordId: string) {
+    const row = await this.dataSource
+      .getRepository(Listing)
+      .createQueryBuilder('listing')
+      .select(
+        'COALESCE(SUM(listing.averageRating * listing.reviewCount) / NULLIF(SUM(listing.reviewCount), 0), 0)',
+        'averageRating',
+      )
+      .addSelect('COALESCE(SUM(listing.reviewCount), 0)', 'reviewCount')
+      .where('listing.ownerId = :landlordId', { landlordId })
+      .andWhere('listing.deletedAt IS NULL')
+      .getRawOne<{ averageRating: string; reviewCount: string }>();
+
+    return {
+      averageRating: Number(row?.averageRating ?? 0),
+      reviewCount: Number(row?.reviewCount ?? 0),
     };
   }
 

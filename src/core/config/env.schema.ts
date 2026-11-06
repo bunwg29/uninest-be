@@ -101,11 +101,18 @@ export class EnvironmentVariables {
 
   @IsNumber()
   @IsOptional()
-  HOLDING_DAYS: number = 7;
-
-  @IsNumber()
-  @IsOptional()
   CANCEL_FREE_HOURS: number = 24;
+
+  @IsString()
+  @IsOptional()
+  REDIS_URL: string = 'redis://localhost:6379';
+
+  @IsString()
+  @IsOptional()
+  EXPO_PUSH_ACCESS_TOKEN?: string;
+
+  @IsOptional()
+  PRICE_AGGREGATION_ENABLED?: boolean | string = true;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

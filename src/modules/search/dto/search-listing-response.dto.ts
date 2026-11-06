@@ -45,9 +45,6 @@ export class SearchListingItemDto {
   @ApiProperty()
   isHighlighted!: boolean;
 
-  @ApiProperty()
-  isReserved!: boolean;
-
   @ApiPropertyOptional()
   capacity?: number;
 
@@ -57,11 +54,14 @@ export class SearchListingItemDto {
   @ApiProperty({ example: 'active' })
   status!: 'active';
 
-  @ApiProperty({ enum: ['available', 'holding', 'rented', 'paused'] })
-  availability!: 'available' | 'holding' | 'rented' | 'paused';
+  @ApiProperty({ enum: ['available', 'rented', 'paused'] })
+  availability!: 'available' | 'rented' | 'paused';
 
-  @ApiPropertyOptional({ format: 'date-time', nullable: true })
-  holdExpiresAt?: string | null;
+  @ApiPropertyOptional({ nullable: true })
+  averageRating!: number | null;
+
+  @ApiProperty()
+  reviewCount!: number;
 
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;

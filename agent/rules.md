@@ -58,7 +58,7 @@ export class CreateXxxDto {
 
 ### R4. Response và lỗi
 - Controller **chỉ `return data`**; `TransformInterceptor` tự bọc envelope `{ status, data, error, messages }`.
-- Lỗi: `throw new BadRequestException('…')`, `NotFoundException`, `ForbiddenException`, `ConflictException`… với **message tiếng Việt**. Cần mã lỗi máy đọc → `throw new ConflictException({ message: '…', error: 'LISTING_HELD' })`.
+- Lỗi: `throw new BadRequestException('…')`, `NotFoundException`, `ForbiddenException`, `ConflictException`… với **message tiếng Việt**. Cần mã lỗi máy đọc → `throw new ConflictException({ message: '…', error: 'BOOKING_ALREADY_EXISTS' })`.
 - Không tự `try/catch` để trả `{ status: false }`.
 
 ### R5. Ngôn ngữ
@@ -72,7 +72,7 @@ export class CreateXxxDto {
 - **Đổi entity = phải có migration**: `npm run migration:generate -- src/core/database/migrations/<Tên>` → đọc lại file sinh ra → chạy `migration:run` và `migration:revert` thử. Không sửa migration đã merge, tạo migration mới.
 - Truy vấn: Repository hoặc QueryBuilder **có tham số** (`:id`). **Cấm ghép chuỗi vào SQL.** Từ khoá `LIKE` dùng `escapeLikePattern`.
 - PostGIS: `geography` SRID 4326, `ST_DWithin` / `ST_Distance`, có index GIST.
-- Thao tác nhiều bảng phải nhất quán → dùng transaction. Tranh chấp (giữ chỗ, thanh toán) → khoá dòng + ràng buộc unique ở DB.
+- Thao tác nhiều bảng phải nhất quán → dùng transaction. Tranh chấp (trùng khung giờ, thanh toán) → khoá dòng + ràng buộc unique ở DB.
 - Tránh N+1: lấy quan hệ bằng join/`In(...)` theo lô, không query trong vòng lặp.
 
 ### R7. Trạng thái và nghiệp vụ

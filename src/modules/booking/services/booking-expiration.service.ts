@@ -1,12 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, LessThan, Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import {
   BOOKING_ACTORS,
-  BOOKING_DEFAULTS,
   BOOKING_EVENTS,
   type BookingStatusChangedPayload,
 } from '../constants';
@@ -22,19 +20,11 @@ export class BookingExpirationService {
     @InjectRepository(BookingEvent)
     private readonly eventRepository: Repository<BookingEvent>,
     private readonly eventEmitter: EventEmitter2,
-    private readonly configService: ConfigService,
   ) {}
 
   @Cron('*/5 * * * *')
   async handleExpiredBookings(): Promise<number> {
     const now = new Date();
-    const holdingDays = this.configService.get<number>(
-      'HOLDING_DAYS',
-      BOOKING_DEFAULTS.HOLDING_DAYS,
-    );
-    const confirmedDeadline = new Date(
-      now.getTime() - holdingDays * 24 * 3_600_000,
-    );
     const expiredBookings = await this.bookingRepository.find({
       select: {
         id: true,
@@ -45,15 +35,8 @@ export class BookingExpirationService {
       },
       relations: { listing: true },
       where: [
-        {
-          status: In([BookingStatus.PENDING, BookingStatus.HOLDING]),
-          expiresAt: LessThan(now),
-        },
+        { status: BookingStatus.PENDING, expiresAt: LessThan(now) },
         { status: BookingStatus.PENDING, startTime: LessThan(now) },
-        {
-          status: BookingStatus.CONFIRMED,
-          startTime: LessThan(confirmedDeadline),
-        },
       ],
     });
 
@@ -67,13 +50,7 @@ export class BookingExpirationService {
       .update(Booking)
       .set({ status: BookingStatus.EXPIRED, expiredAt: now, expiresAt: null })
       .whereInIds(ids)
-      .andWhere('status IN (:...statuses)', {
-        statuses: [
-          BookingStatus.PENDING,
-          BookingStatus.CONFIRMED,
-          BookingStatus.HOLDING,
-        ],
-      })
+      .andWhere('status = :status', { status: BookingStatus.PENDING })
       .returning('id')
       .execute();
     const affected = result.affected ?? 0;
