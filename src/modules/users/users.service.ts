@@ -7,6 +7,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { activeBookingWhere, Booking } from '@modules/booking';
 import { Favorite, ListingStatus } from '@modules/listings/entities';
+import { Review } from '@modules/reviews/entities';
 import { UserRoleType } from '@common/constants';
 import { LocationsService } from '../locations/locations.service';
 import {
@@ -35,7 +36,7 @@ export class UsersService {
   ) {}
 
   async getProfileStats(userId: string) {
-    const [savedRooms, appointments] = await Promise.all([
+    const [savedRooms, appointments, reviews] = await Promise.all([
       this.dataSource
         .getRepository(Favorite)
         .createQueryBuilder('favorite')
@@ -49,9 +50,10 @@ export class UsersService {
       this.dataSource.getRepository(Booking).count({
         where: activeBookingWhere({ userId }),
       }),
+      this.dataSource.getRepository(Review).countBy({ studentId: userId }),
     ]);
 
-    return { savedRooms, appointments, reviews: 0 };
+    return { savedRooms, appointments, reviews };
   }
 
   async completeLandlordVerification(

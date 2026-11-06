@@ -375,6 +375,9 @@ export class ListingsSearchRepository {
       distanceMeters,
       isHighlighted: false,
       availability: this.getAvailability(listing),
+      averageRating:
+        listing.reviewCount > 0 ? Number(listing.averageRating) : null,
+      reviewCount: listing.reviewCount,
       capacity: listing.maxOccupants,
       description: listing.description ?? undefined,
       status: 'active',

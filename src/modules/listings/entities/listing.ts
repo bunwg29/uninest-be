@@ -142,6 +142,18 @@ export class Listing {
   @Column({ type: 'integer', name: 'view_count', default: 0 })
   viewCount!: number;
 
+  @Column({
+    type: 'numeric',
+    precision: 3,
+    scale: 2,
+    name: 'average_rating',
+    default: 0,
+  })
+  averageRating!: string;
+
+  @Column({ type: 'integer', name: 'review_count', default: 0 })
+  reviewCount!: number;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 
