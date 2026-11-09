@@ -21,6 +21,7 @@ import {
 import { LISTING_EVENTS } from '@modules/listings/constants';
 import { Listing, ListingStatus } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
+import { Review } from '@modules/reviews/entities';
 import { ForumModerationService } from '@modules/forum/services/forum-moderation.service';
 import { ADMIN_EVENTS } from '../constants';
 import {
@@ -428,7 +429,7 @@ export class AdminReportsService {
     const targets = new Map<string, ReportTarget>();
     const ids = (type: ReportEntityType) =>
       rows.filter((row) => row.entityType === type).map((row) => row.entityId);
-    const [listings, posts, comments, users] = await Promise.all([
+    const [listings, posts, comments, users, reviews] = await Promise.all([
       this.dataSource.getRepository(Listing).find({
         where: { id: In(ids(ReportEntityType.LISTING)) },
         relations: { owner: true },
@@ -444,6 +445,11 @@ export class AdminReportsService {
       this.dataSource
         .getRepository(User)
         .findBy({ id: In(ids(ReportEntityType.USER)) }),
+      this.dataSource.getRepository(Review).find({
+        where: { id: In(ids(ReportEntityType.REVIEW)) },
+        relations: { student: true, listing: true },
+        withDeleted: true,
+      }),
     ]);
 
     listings.forEach((item) =>
@@ -472,6 +478,14 @@ export class AdminReportsService {
         label: item.fullName,
         hidden: !item.isActive,
         ownerName: item.fullName,
+      }),
+    );
+    reviews.forEach((item) =>
+      targets.set(item.id, {
+        label:
+          item.comment?.slice(0, 80) || `Đánh giá ${item.averageRating} sao`,
+        hidden: item.deletedAt !== null,
+        ownerName: item.student?.fullName ?? null,
       }),
     );
 
@@ -577,6 +591,30 @@ export class AdminReportsService {
         : null;
     }
 
+    if (report.entityType === ReportEntityType.REVIEW) {
+      const review = await this.dataSource.getRepository(Review).findOne({
+        where: { id: report.entityId },
+        relations: { student: true, listing: true },
+        withDeleted: true,
+      });
+
+      return review
+        ? {
+            title: review.listing.title,
+            body: review.comment,
+            ownerId: review.studentId,
+            ownerName: review.student.fullName,
+            createdAt: review.createdAt,
+            viewCount: null,
+            commentCount: null,
+            category: 'review',
+            status: review.deletedAt ? 'removed' : 'published',
+            price: review.averageRating,
+            address: review.listing.fullAddress,
+          }
+        : null;
+    }
+
     const user = await this.dataSource
       .getRepository(User)
       .findOneBy({ id: report.entityId });
@@ -626,8 +664,9 @@ export class AdminReportsService {
       LEFT JOIN listings listing ON report.entity_type = 'listing' AND listing.id = report.entity_id
       LEFT JOIN forum_posts post ON report.entity_type = 'forum_post' AND post.id = report.entity_id
       LEFT JOIN forum_comments comment ON report.entity_type = 'forum_comment' AND comment.id = report.entity_id
+      LEFT JOIN reviews review ON report.entity_type = 'review' AND review.id = report.entity_id
       WHERE report.entity_id <> $2
-        AND (listing.owner_id = $1 OR post.author_id = $1 OR comment.author_id = $1 OR (report.entity_type = 'user' AND report.entity_id = $1))`,
+        AND (listing.owner_id = $1 OR post.author_id = $1 OR comment.author_id = $1 OR review.student_id = $1 OR (report.entity_type = 'user' AND report.entity_id = $1))`,
       [ownerId, excludeId],
     );
 
@@ -652,6 +691,15 @@ export class AdminReportsService {
       const post = await manager.findOneBy(ForumPost, { id: report.entityId });
 
       return post?.authorId ?? null;
+    }
+
+    if (report.entityType === ReportEntityType.REVIEW) {
+      const review = await manager.findOne(Review, {
+        where: { id: report.entityId },
+        withDeleted: true,
+      });
+
+      return review?.studentId ?? null;
     }
 
     const comment = await manager.findOneBy(ForumComment, {
@@ -692,6 +740,32 @@ export class AdminReportsService {
       if (comment.status === ForumCommentStatus.PUBLISHED) {
         await this.adjustCommentCount(manager, comment.postId, -1);
       }
+    } else if (report.entityType === ReportEntityType.REVIEW) {
+      const review = await manager.findOneBy(Review, { id: report.entityId });
+
+      if (!review) {
+        throw new NotFoundException('Không tìm thấy đánh giá');
+      }
+
+      await manager.softDelete(Review, { id: report.entityId });
+      const row = await manager
+        .getRepository(Review)
+        .createQueryBuilder('review')
+        .select('COALESCE(AVG(review.averageRating), 0)', 'average')
+        .addSelect('COUNT(review.id)', 'count')
+        .where('review.listingId = :listingId', {
+          listingId: review.listingId,
+        })
+        .getRawOne<{ average: string; count: string }>();
+
+      await manager.update(
+        Listing,
+        { id: review.listingId },
+        {
+          averageRating: Number(row?.average ?? 0).toFixed(2),
+          reviewCount: Number(row?.count ?? 0),
+        },
+      );
     } else {
       throw new BadRequestException('Dùng thao tác khoá để xử lý tài khoản');
     }

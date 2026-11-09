@@ -39,8 +39,7 @@ export class LandlordPublicProfileDto {
   @ApiProperty({
     nullable: true,
     type: Number,
-    description:
-      'Điểm đánh giá trung bình, chưa có dữ liệu cho tới khi ra mắt đánh giá',
+    description: 'Điểm đánh giá trung bình của các tin đăng',
   })
   averageRating!: number | null;
 

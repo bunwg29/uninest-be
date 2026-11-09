@@ -26,6 +26,9 @@ export class ListingView {
   @Column({ type: 'uuid', name: 'viewer_id', nullable: true })
   viewerId!: string | null;
 
+  @Column({ type: 'varchar', length: 20, default: 'other' })
+  source!: string;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 

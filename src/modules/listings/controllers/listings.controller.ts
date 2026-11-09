@@ -26,6 +26,7 @@ import {
   CreateListingDto,
   LandlordListingsQueryDto,
   ListingIdsQueryDto,
+  RecordViewDto,
   ReportListingDto,
   UpdateListingStatusDto,
 } from '../dtos';
@@ -142,8 +143,9 @@ export class ListingsController {
     @CurrentUser('userId') userId: string,
     @CurrentUser('roleId') roleId: UserRoleType,
     @Param('id', LISTING_ID_PIPE) id: string,
+    @Body() dto: RecordViewDto,
   ) {
-    return this.listingsService.recordView(userId, roleId, id);
+    return this.listingsService.recordView(userId, roleId, id, dto.source);
   }
 
   @Post(':id/favorite')

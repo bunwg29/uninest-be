@@ -111,6 +111,22 @@ export class EnvironmentVariables {
   @IsOptional()
   EXPO_PUSH_ACCESS_TOKEN?: string;
 
+  @IsString()
+  @IsOptional()
+  SEPAY_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  SEPAY_BANK_ACCOUNT?: string;
+
+  @IsString()
+  @IsOptional()
+  SEPAY_BANK_CODE?: string;
+
+  @IsString()
+  @IsOptional()
+  SEPAY_ACCOUNT_NAME?: string;
+
   @IsOptional()
   PRICE_AGGREGATION_ENABLED?: boolean | string = true;
 

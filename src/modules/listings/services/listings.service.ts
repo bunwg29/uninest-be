@@ -25,7 +25,7 @@ import {
   type BookingStatusChangedPayload,
 } from '@modules/booking';
 import { UniversitiesService } from '@modules/universities/universities.service';
-import { LISTING_EVENTS } from '../constants';
+import { LISTING_EVENTS, type ListingViewSource } from '../constants';
 import { UserRoleType } from '@common/constants';
 import { escapeLikePattern } from '@common/utils';
 import { R2StorageService } from '@core/storage';
@@ -326,7 +326,12 @@ export class ListingsService {
     return this.toListingDetail(listing, isFavorite, canSeeStats, myBooking);
   }
 
-  async recordView(userId: string, roleId: UserRoleType, id: string) {
+  async recordView(
+    userId: string,
+    roleId: UserRoleType,
+    id: string,
+    source: ListingViewSource = 'other',
+  ) {
     const listing = await this.listingRepository.findOneBy({ id });
 
     this.assertCanAccessListing(listing, userId, roleId);
@@ -352,7 +357,11 @@ export class ListingsService {
       if (recentView) return false;
 
       await manager.increment(Listing, { id }, 'viewCount', 1);
-      await manager.insert(ListingView, { listingId: id, viewerId: userId });
+      await manager.insert(ListingView, {
+        listingId: id,
+        viewerId: userId,
+        source,
+      });
 
       return true;
     });
@@ -1206,7 +1215,9 @@ export class ListingsService {
       rejectionReason: listing.rejectionReason,
       moderationReason: canSeeStats ? listing.moderationReason : null,
       viewingSchedule: listing.viewingSchedule,
-      averageRating: null,
+      averageRating:
+        listing.reviewCount > 0 ? Number(listing.averageRating) : null,
+      reviewCount: listing.reviewCount,
       viewCount: canSeeStats ? listing.viewCount : null,
       availability: this.getAvailability(listing),
       isFavorite,
