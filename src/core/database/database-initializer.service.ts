@@ -5,6 +5,7 @@ import {
   LISTING_SEARCH_INDEXES_SQL,
   UNACCENT_FUNCTION_SQL,
 } from './keyword-search.sql';
+import { LISTING_EMBEDDING_INDEX_SQL } from './vector-search.sql';
 
 @Injectable()
 export class DatabaseInitializerService implements OnModuleInit {
@@ -21,6 +22,19 @@ export class DatabaseInitializerService implements OnModuleInit {
     await this.migrateListingsViewingScheduleSchema();
     await this.migrateStorageReferencesToObjectKeys();
     await this.migrateAmenitiesSchema();
+    await this.initializeVectorSearchIndexes();
+  }
+
+  private async initializeVectorSearchIndexes() {
+    try {
+      await this.dataSource.query(LISTING_EMBEDDING_INDEX_SQL);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      this.logger.warn(
+        `Failed to initialize listing embedding index: ${message}`,
+      );
+    }
   }
 
   private async migrateListingsSearchSchema() {
