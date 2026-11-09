@@ -1,0 +1,38 @@
+export enum UserBehaviorEventType {
+  VIEW = 'view',
+  FAVORITE = 'favorite',
+  SEARCH = 'search',
+}
+
+export const BEHAVIOR_WEIGHTS: Record<
+  UserBehaviorEventType.VIEW | UserBehaviorEventType.FAVORITE,
+  number
+> = {
+  [UserBehaviorEventType.VIEW]: 1,
+  [UserBehaviorEventType.FAVORITE]: 3,
+};
+
+export const RECOMMENDATION_DEFAULTS = {
+  REFRESH_INTERVAL_HOURS: 24,
+  BEHAVIOR_WINDOW_DAYS: 90,
+  MIN_BEHAVIORS_FOR_PERSONALIZATION: 3,
+  STORED_RECOMMENDATIONS: 20,
+  DEFAULT_LIMIT: 10,
+  MAX_LIMIT: 20,
+  CANDIDATE_POOL_SIZE: 200,
+  PRICE_BAND_PADDING_RATIO: 0.15,
+  SIMILARITY_FLOOR: 0.3,
+  SIMILARITY_RANGE: 0.6,
+  WARD_MATCH_SCORE: 1,
+  PROVINCE_MATCH_SCORE: 0.6,
+  CRON_EXPRESSION: '0 3 * * *',
+  TIME_ZONE: 'Asia/Ho_Chi_Minh',
+  ADVISORY_LOCK_ID: 836_501,
+  CRON_BATCH_SIZE: 100,
+  KEYWORD_MAX_LENGTH: 200,
+} as const;
+
+export const RECOMMENDATION_SCORE_WEIGHTS = {
+  WITH_EMBEDDING: { SIMILARITY: 0.5, AREA: 0.25, PRICE: 0.25 },
+  WITHOUT_EMBEDDING: { SIMILARITY: 0, AREA: 0.5, PRICE: 0.5 },
+} as const;

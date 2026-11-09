@@ -29,6 +29,12 @@ import {
 } from '@modules/listings/constants';
 import { ListingStatus } from '@modules/listings/entities';
 import {
+  PREMIUM_EVENTS,
+  type PremiumActivatedPayload,
+  type PremiumExpiredPayload,
+  type PremiumExpiringPayload,
+} from '@modules/premium/constants';
+import {
   Notification,
   NotificationDelivery,
   NotificationDeliveryStatus,
@@ -172,6 +178,45 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
             ? `Tin đăng của bạn đã bị quản trị viên ẩn. Lý do: ${event.reason ?? 'Không có lý do'}. Hãy chỉnh sửa và gửi duyệt lại.`
             : `Tin đăng của bạn chưa được duyệt. Lý do: ${event.reason ?? 'Không có lý do'}`,
       payload: { screen: 'ListingDetail', listingId: event.listingId },
+    });
+  }
+
+  @OnEvent(PREMIUM_EVENTS.ACTIVATED)
+  onPremiumActivated(event: PremiumActivatedPayload): void {
+    this.schedule({
+      userId: event.userId,
+      eventKey: `premium-activated:${event.orderId}`,
+      type: NotificationType.SYSTEM,
+      mandatory: true,
+      title: 'Nâng cấp Premium thành công',
+      body: `Gói Premium của bạn có hiệu lực đến ${this.formatDate(event.expiresAt)}.`,
+      payload: { screen: 'PremiumUpgrade' },
+    });
+  }
+
+  @OnEvent(PREMIUM_EVENTS.EXPIRING)
+  onPremiumExpiring(event: PremiumExpiringPayload): void {
+    this.schedule({
+      userId: event.userId,
+      eventKey: `premium-expiring:${event.userId}:${event.expiresAt.toISOString()}`,
+      type: NotificationType.REMINDER,
+      mandatory: true,
+      title: 'Gói Premium sắp hết hạn',
+      body: `Gói Premium của bạn hết hạn vào ${this.formatDate(event.expiresAt)}. Hãy gia hạn để giữ ưu tiên hiển thị.`,
+      payload: { screen: 'PremiumUpgrade' },
+    });
+  }
+
+  @OnEvent(PREMIUM_EVENTS.EXPIRED)
+  onPremiumExpired(event: PremiumExpiredPayload): void {
+    this.schedule({
+      userId: event.userId,
+      eventKey: `premium-expired:${event.userId}:${event.expiredAt.toISOString()}`,
+      type: NotificationType.SYSTEM,
+      mandatory: true,
+      title: 'Gói Premium đã hết hạn',
+      body: 'Tài khoản của bạn đã quay về gói miễn phí. Gia hạn để tiếp tục được ưu tiên hiển thị.',
+      payload: { screen: 'PremiumUpgrade' },
     });
   }
 
@@ -699,6 +744,10 @@ export class NotificationQueueService implements OnModuleInit, OnModuleDestroy {
       default:
         return true;
     }
+  }
+
+  private formatDate(date: Date): string {
+    return date.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
   }
 
   private bookingStatusLabel(status: BookingStatus): string {

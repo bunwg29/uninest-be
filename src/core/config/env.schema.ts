@@ -111,8 +111,51 @@ export class EnvironmentVariables {
   @IsOptional()
   EXPO_PUSH_ACCESS_TOKEN?: string;
 
+  @IsString()
+  @IsOptional()
+  SEPAY_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  SEPAY_BANK_ACCOUNT?: string;
+
+  @IsString()
+  @IsOptional()
+  SEPAY_BANK_CODE?: string;
+
+  @IsString()
+  @IsOptional()
+  SEPAY_ACCOUNT_NAME?: string;
+
   @IsOptional()
   PRICE_AGGREGATION_ENABLED?: boolean | string = true;
+
+  @IsString()
+  @IsOptional()
+  AI_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  AI_BASE_URL: string = 'https://api.openai.com/v1';
+
+  @IsString()
+  @IsOptional()
+  AI_CHAT_MODEL: string = 'gpt-4o-mini';
+
+  @IsString()
+  @IsOptional()
+  AI_EMBEDDING_MODEL: string = 'text-embedding-3-small';
+
+  @IsNumber()
+  @IsOptional()
+  AI_REQUEST_TIMEOUT_MS: number = 4000;
+
+  @IsString()
+  @IsOptional()
+  AI_REASONING_EFFORT?: string;
+
+  @IsOptional()
+  AI_EMBEDDING_ENABLED?: boolean | string = true;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

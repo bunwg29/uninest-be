@@ -25,7 +25,7 @@ import {
   type BookingStatusChangedPayload,
 } from '@modules/booking';
 import { UniversitiesService } from '@modules/universities/universities.service';
-import { LISTING_EVENTS } from '../constants';
+import { LISTING_EVENTS, type ListingViewSource } from '../constants';
 import { UserRoleType } from '@common/constants';
 import { escapeLikePattern } from '@common/utils';
 import { R2StorageService } from '@core/storage';
@@ -326,7 +326,12 @@ export class ListingsService {
     return this.toListingDetail(listing, isFavorite, canSeeStats, myBooking);
   }
 
-  async recordView(userId: string, roleId: UserRoleType, id: string) {
+  async recordView(
+    userId: string,
+    roleId: UserRoleType,
+    id: string,
+    source: ListingViewSource = 'other',
+  ) {
     const listing = await this.listingRepository.findOneBy({ id });
 
     this.assertCanAccessListing(listing, userId, roleId);
@@ -352,10 +357,18 @@ export class ListingsService {
       if (recentView) return false;
 
       await manager.increment(Listing, { id }, 'viewCount', 1);
-      await manager.insert(ListingView, { listingId: id, viewerId: userId });
+      await manager.insert(ListingView, {
+        listingId: id,
+        viewerId: userId,
+        source,
+      });
 
       return true;
     });
+
+    if (incremented && roleId === UserRoleType.STUDENT) {
+      this.eventEmitter.emit(LISTING_EVENTS.VIEWED, { listingId: id, userId });
+    }
 
     return { viewCount: null, incremented };
   }
@@ -468,6 +481,8 @@ export class ListingsService {
       listingId: id,
     });
 
+    this.eventEmitter.emit(LISTING_EVENTS.FAVORITED, { listingId: id, userId });
+
     return {
       listingId: id,
       isFavorite: true,
@@ -533,6 +548,10 @@ export class ListingsService {
 
   async removeFavorite(userId: string, id: string): Promise<void> {
     await this.favoriteRepository.delete({ userId, listingId: id });
+    this.eventEmitter.emit(LISTING_EVENTS.UNFAVORITED, {
+      listingId: id,
+      userId,
+    });
   }
 
   async updateListingStatus(

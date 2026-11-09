@@ -355,7 +355,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Thanh toán chỉ quay lại ở **Sprint 4** cho việc Chủ trọ mua gói Premium (FR-PREMIUM). Cổng thanh toán chọn khi làm Sprint 4 (ưu tiên cổng có môi trường test miễn phí và tài khoản cá nhân dùng được, ví dụ SePay hoặc payOS).
 - Khi làm lại: chỉ coi là thành công khi cổng xác nhận (webhook đã xác thực chữ ký hoặc API tra cứu), mỗi giao dịch có mã tham chiếu duy nhất, đối soát bằng cron nội bộ, không lưu thông tin thẻ.
 
-### 4.14. FR-AICHAT — Chatbot tư vấn (RAG) (Sprint 4 · Chưa làm)
+### 4.14. FR-AICHAT — Chatbot tư vấn (RAG) (Sprint 4 · TSK-S4-01 đã triển khai trên nhánh task, chờ review)
 
 **Task:** TSK-S4-01 (embedding + RAG + LLM, P1), TSK-S4-02 (giao diện, P1). **Màn hình:** AI-01 Chào, AI-02 Trả lời dần, AI-03 Thẻ phòng, AI-04 Không có kết quả, AI-05 Lỗi dịch vụ, AI-06 Lịch sử, AI-07 Bảng tiêu chí trích xuất.
 
@@ -369,9 +369,22 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Phản hồi ≤ 5 giây; ≥ 80% câu trả lời trong bộ test chuẩn có ít nhất 1 tin phù hợp thật; 100% link hợp lệ.
 - Giới hạn chi phí: dùng mô hình nhỏ, giới hạn số request, cache kết quả tái sử dụng được.
 
-**API dự kiến:** `POST /ai/chat` trả câu trả lời + danh sách `listingId`.
+**Đã chốt khi triển khai TSK-S4-01**
+- Nhà cung cấp AI: API tương thích OpenAI (`AI_BASE_URL`, mặc định OpenAI), gọi bằng `fetch` có sẵn của Node, không thêm thư viện. Mô hình mặc định `gpt-4o-mini` (trả lời) và `text-embedding-3-small` (embedding, **768 chiều**, cột `vector(768)`). Thiếu `AI_API_KEY` → cron bỏ qua, chat trả `service_error`.
+- Bảng `listing_embeddings` (listing_id PK, embedding, content_hash, model, embedded_at), index **HNSW `vector_cosine_ops`**. Cron `*/10 * * * *` (tắt bằng `AI_EMBEDDING_ENABLED=false`), khoá advisory chống chạy trùng, mỗi lượt tối đa 10 lô × 64 tin `active` chưa có embedding hoặc `updated_at > embedded_at`; nội dung không đổi (so `content_hash`) thì không gọi API. Chạy tay: `npm run ai-embedding:run`.
+- Trích xuất tiêu chí bằng **luật tiếng Việt phía server** (nhanh, không tốn request): giá (`dưới 2 triệu 5`, `1tr5`, `800k`, `từ 3 đến 5 triệu`, `khoảng 1,2 triệu` → ±20%), diện tích tối thiểu, loại phòng, tiện ích (theo tên + từ đồng nghĩa), trường (tên trường, `BKĐN`, `gần trường` = trường của sinh viên), tỉnh/thành, phường. Tiêu chí lượt mới **gộp** với tiêu chí của cuộc trò chuyện (tiện ích cộng dồn, `rẻ hơn` = giảm 15% giá tối đa). Gửi `criteria` (AI-07) thì dùng nguyên tiêu chí đó.
+- Câu hỏi không có tiêu chí và không có từ khoá tìm phòng → trả lời chung (`general`), không gợi ý phòng.
+- Truy xuất: lọc cấu trúc (giá, diện tích, loại phòng, tiện ích bắt buộc đủ, trường liên kết, phường hoặc tỉnh) **AND** sắp xếp theo khoảng cách cosine; tin chưa có embedding xếp sau. Tối đa **5 tin**, chi tiết tin lấy qua `ListingsService.getListingsByIds` nên chỉ có tin `active` thật.
+- Không có kết quả → câu trả lời cố định trung thực + tối đa **2 gợi ý nới tiêu chí** có đếm số phòng thật (nới ngân sách +25%, bỏ tiện ích, mở rộng ra toàn tỉnh, mọi loại phòng, bỏ giới hạn trường, bỏ diện tích).
+- Dịch vụ AI lỗi/hết giờ (`AI_REQUEST_TIMEOUT_MS`, mặc định 4000ms) → HTTP 200 `type: service_error`, `errorCode: AI-503`, vẫn trả `criteriaDisplay` để app điền sẵn bộ lọc tìm kiếm thường; lượt lỗi **không lưu**.
+- Giới hạn: **30 câu hỏi/giờ/sinh viên** (429 `AI_RATE_LIMITED`), nội dung ≤ 1000 ký tự, ngữ cảnh gửi LLM 6 tin gần nhất, cache embedding câu hỏi trong bộ nhớ (500 mục).
+- Lịch sử lưu ở `ai_conversations` (tiêu chí hiện tại, số tin nhắn, số phòng đã gợi ý, xoá mềm) và `ai_messages`.
 
-### 4.15. FR-AIRECOMM — Gợi ý cá nhân hoá (Sprint 4 · Chưa làm)
+**API (chỉ Sinh viên):**
+- `POST /ai/chat` body `{ message, conversationId?, criteria? }` → `{ conversationId, type: results|no_results|general|service_error, errorCode, answer, criteria, criteriaDisplay { labels, university, province, ward, amenities, roomTypes }, matchedCount, totalActiveCount, listingIds, listings, suggestions[{ title, description, criteria, matchedCount }], userMessage, assistantMessage }`.
+- `GET /ai/conversations?page=&limit=`, `GET /ai/conversations/:id` (kèm `messages`, `listings` còn hiển thị), `DELETE /ai/conversations/:id`, `DELETE /ai/conversations` (xoá hết).
+
+### 4.15. FR-AIRECOMM — Gợi ý cá nhân hoá (Sprint 4 · TSK-S4-03 đã triển khai trên nhánh task, chờ review)
 
 **Task:** TSK-S4-03 (theo dõi hành vi + engine, P2), TSK-S4-04 (khu vực "Gợi ý dành cho bạn", P2). **Màn hình:** H-01, H-03, SH-05.
 
@@ -384,18 +397,40 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Với tài khoản ≥ 10 lượt xem/lưu: ≥ 50% tin gợi ý thuộc đúng khu vực/khoảng giá quan tâm nhiều nhất.
 - Hiện tại trang chủ đã có "Đã xem gần đây" lưu trên máy — giữ nguyên, khu vực gợi ý là phần riêng.
 
-**API dự kiến:** `GET /recommendations`, `DELETE /users/me/behaviors`.
+**Đã chốt khi triển khai TSK-S4-03**
+- `user_behaviors` (user_id, event_type `view` | `favorite` | `search`, listing_id hoặc keyword + filters, created_at). Lượt xem ghi khi sinh viên mở chi tiết và lượt xem được cộng (cùng giới hạn 30 phút); lưu/bỏ lưu ghi qua sự kiện `listing.favorited` / `listing.unfavorited` (bỏ lưu thì xoá hành vi lưu). Tìm kiếm do app gửi `POST /users/me/behaviors/search` (vì `/listings/search` công khai). Migration chép sẵn lượt xem và phòng đã lưu cũ của sinh viên.
+- Cửa sổ hành vi **90 ngày**, trọng số xem 1 / lưu 3. Từ **3 lượt xem/lưu** trở lên mới cá nhân hoá; ít hơn → fallback tin phổ biến nhất (lượt xem, rồi mới nhất) trong tỉnh của sinh viên, thiếu thì lấy toàn quốc.
+- Vector hành vi = trung bình có trọng số embedding (`listing_embeddings`, `vector(768)` của TSK-S4-01) các tin đã xem/lưu, lưu ở `user_recommendation_profiles` cùng khu vực (tỉnh/phường xuất hiện nhiều nhất) và khoảng giá quan tâm (tứ phân vị 25–75%, nới ±15%; chưa có thì lấy giá từ bộ lọc đã tìm gần nhất).
+- Điểm = 0,5 × độ giống cosine + 0,25 × khu vực (trùng phường 1, trùng tỉnh 0,6) + 0,25 × giá; không có embedding thì 0,5 khu vực + 0,5 giá. Ứng viên: tin `active` trong tỉnh quan tâm, chưa xem/lưu, không phải tin của chính mình. Lưu 20 tin xếp hạng ở `user_recommendations`, thiếu thì bù bằng tin phổ biến.
+- Làm mới: cron `0 3 * * *` (khoá advisory) cho mọi sinh viên có hành vi trong 90 ngày; `GET /recommendations` tự tính lại khi chưa có, đã quá **24 giờ**, hoặc đang fallback mà đã đủ hành vi.
 
-### 4.16. FR-PREMIUM — Gói Chủ trọ Premium (Sprint 4 · Chưa làm)
+**API (chỉ Sinh viên):**
+- `GET /recommendations?limit=` (mặc định 10, tối đa 20) → `{ items: [ListingDetail + matchPercentage | null], isFallback, basedOnListingCount, computedAt, nextRefreshAt }`.
+- `GET /users/me/behaviors/summary` → `{ viewedCount, savedCount, searchCount }` (SH-05).
+- `POST /users/me/behaviors/search` body `{ keyword?, minPrice?, maxPrice?, roomTypes?, amenities?, universityCodes? }`.
+- `DELETE /users/me/behaviors` → xoá hành vi, hồ sơ và danh sách gợi ý; **không** xoá phòng đã lưu, lịch hẹn, tin nhắn.
+
+### 4.16. FR-PREMIUM — Gói Chủ trọ Premium (Sprint 4 · TSK-S4-05 đã làm ở backend, TSK-S4-06 đang làm ở app)
 
 **Task:** TSK-S4-05 (logic, P2), TSK-S4-06 (trang nâng cấp + thống kê nâng cao, P2).
 
 **Quy tắc bắt buộc**
-- Kích hoạt sau khi thanh toán gói thành công (module thanh toán làm mới ở Sprint 4), lưu ngày hết hạn (`is_premium`, `premium_expires_at`).
-- Tin Premium được ưu tiên **chỉ trong tập kết quả đã khớp bộ lọc**; tin không khớp **không bao giờ** được đẩy lên.
+- Kích hoạt sau khi thanh toán gói thành công, lưu ngày hết hạn (`users.is_premium`, `users.premium_expires_at`). Mua khi còn hạn thì **cộng dồn** thời hạn.
+- Tin Premium được ưu tiên **chỉ trong tập kết quả đã khớp bộ lọc** (chỉ áp dụng khi sắp xếp "Phù hợp nhất"); tin không khớp **không bao giờ** được đẩy lên. Cờ `isHighlighted` trả về cho mọi kết quả của chủ trọ Premium còn hạn.
 - Gắn nhãn **"Nổi bật"** trên thẻ tin phía sinh viên.
-- Hết hạn → tự hạ về miễn phí, gỡ ưu tiên; nhắc gia hạn trước khi hết hạn. Kiểm tra bằng **cron nội bộ hằng ngày**.
-- Thống kê nâng cao (lượt xem theo thời gian, nguồn truy cập, tỉ lệ chuyển đổi thành liên hệ) **chỉ hiện với Premium còn hiệu lực**. Biểu đồ dùng chung thư viện với S-13.
+- Hết hạn → tự hạ về miễn phí, gỡ ưu tiên; nhắc gia hạn trước 3 ngày. Cron nội bộ `0 1 * * *` giờ Việt Nam (không Redis), kiểm tra `premium_expires_at`; tìm kiếm cũng tự bỏ ưu tiên ngay khi quá hạn.
+- Thống kê nâng cao (lượt xem theo ngày, nguồn truy cập, tỉ lệ chuyển đổi thành liên hệ) **chỉ hiện với Premium còn hiệu lực** (403 `PREMIUM_REQUIRED` nếu không). Biểu đồ dùng chung thư viện với S-13.
+
+**Gói (đã chốt, cấu hình ở `premium/constants`):** `1m` 99.000đ · `3m` 269.000đ · `6m` 499.000đ.
+
+**Thanh toán (SePay):** tạo đơn → QR chuyển khoản (`qr.sepay.vn`) với nội dung là mã tham chiếu duy nhất `UNINEST` + 8 ký tự; chỉ kích hoạt khi **webhook SePay hợp lệ** (header `Authorization: Apikey <SEPAY_API_KEY>`, so sánh an toàn), số tiền ≥ giá gói, mỗi giao dịch xử lý một lần. Đơn quá 30 phút không thanh toán chuyển `expired` (cron 10 phút). Biến môi trường: `SEPAY_API_KEY`, `SEPAY_BANK_ACCOUNT`, `SEPAY_BANK_CODE`, `SEPAY_ACCOUNT_NAME`. Không lưu thông tin thẻ.
+
+**API**
+- `GET /premium/plans`, `GET /premium/me`, `GET /premium/stats?period=7d|30d|90d` (Landlord).
+- `POST /payment/premium/orders` `{ planCode }` → `{ id, amount, referenceCode, qrUrl, bankAccount, bankCode, accountName, status, expiresAt }`; `GET /payment/premium/orders/:id` để theo dõi `pending|paid|expired`.
+- `POST /payment/sepay/webhook` (public, xác thực bằng API key).
+- `PATCH /listings/:id/view` nhận `{ source }` ∈ `search|home|map|favorites|recommendation|other` để thống kê nguồn truy cập.
+- Thông báo: kích hoạt thành công, sắp hết hạn, đã hết hạn (màn `PremiumUpgrade`).
 
 ### 4.17. Sprint 4 — Hiệu năng & media (Chưa làm)
 
@@ -420,6 +455,7 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 | `booking.created`, `booking.status_changed` | booking | Thông báo (S3), Đánh giá (S3) |
 | `listing.availability_changed` | listings/booking | Socket cập nhật app |
 | `listing.activated` *(thêm ở S3)* | listings/admin | Đối chiếu bộ lọc đã lưu (S3), embedding (S4) |
+| `listing.viewed`, `listing.favorited`, `listing.unfavorited` *(thêm ở S4)* | listings | Ghi hành vi cho gợi ý cá nhân hoá (S4) |
 
 Thêm sự kiện mới: khai báo hằng số trong `constants/` của module phát, payload có interface.
 
