@@ -89,6 +89,12 @@ export class User {
   @Column({ type: 'timestamptz', name: 'landlord_verified_at', nullable: true })
   landlordVerifiedAt!: Date | null;
 
+  @Column({ type: 'boolean', name: 'is_premium', default: false })
+  isPremium!: boolean;
+
+  @Column({ type: 'timestamptz', name: 'premium_expires_at', nullable: true })
+  premiumExpiresAt!: Date | null;
+
   @CreateDateColumn({ type: 'timestamptz', name: 'created_at' })
   createdAt!: Date;
 

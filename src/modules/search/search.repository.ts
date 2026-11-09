@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { R2StorageService } from '@core/storage';
 import { Favorite, Listing, ListingStatus } from '@modules/listings/entities';
+import { User } from '@modules/users/entities';
 import {
   SearchListingItemDto,
   SearchListingsResponseDto,
@@ -20,6 +21,9 @@ interface SearchListingRow {
   id: string;
   distanceMeters?: number | string | null;
 }
+
+const PREMIUM_OWNER_SQL =
+  'CASE WHEN owner.isPremium = true AND owner.premiumExpiresAt > NOW() THEN 1 ELSE 0 END';
 
 const SEARCH_DISTANCE_SQL = `ST_Distance(${SEARCH_LISTING_GEOGRAPHY_SQL}, ${SEARCH_REFERENCE_POINT_SQL})`;
 
@@ -143,12 +147,38 @@ export class ListingsSearchRepository {
     const listingsById = new Map(
       listings.map((listing) => [listing.id, listing]),
     );
+    const premiumOwnerIds = await this.findPremiumOwnerIds(
+      listings.map((listing) => listing.ownerId),
+    );
 
     return rows.flatMap((row) => {
       const listing = listingsById.get(row.id);
 
-      return listing ? [this.toSearchListing(listing, row)] : [];
+      return listing
+        ? [
+            this.toSearchListing(
+              listing,
+              row,
+              premiumOwnerIds.has(listing.ownerId),
+            ),
+          ]
+        : [];
     });
+  }
+
+  private async findPremiumOwnerIds(ownerIds: string[]): Promise<Set<string>> {
+    if (ownerIds.length === 0) return new Set();
+
+    const owners = await this.listingRepository.manager
+      .getRepository(User)
+      .createQueryBuilder('owner')
+      .select('owner.id', 'id')
+      .where('owner.id IN (:...ownerIds)', { ownerIds })
+      .andWhere('owner.isPremium = true')
+      .andWhere('owner.premiumExpiresAt > NOW()')
+      .getRawMany<{ id: string }>();
+
+    return new Set(owners.map((owner) => owner.id));
   }
 
   private createSuggestion(
@@ -197,6 +227,12 @@ export class ListingsSearchRepository {
         activeStatus: ListingStatus.ACTIVE,
       })
       .andWhere('listing.deletedAt IS NULL');
+
+    if (query.sortBy === 'relevance') {
+      listingsQuery
+        .leftJoin(User, 'owner', 'owner.id = listing.ownerId')
+        .addSelect(PREMIUM_OWNER_SQL, 'premiumBoost');
+    }
 
     if (query.universityCodes.length > 0) {
       listingsQuery.andWhere(
@@ -319,13 +355,15 @@ export class ListingsSearchRepository {
     listingsQuery: SelectQueryBuilder<Listing>,
     query: NormalizedSearchQuery,
   ): void {
+    listingsQuery.orderBy('"premiumBoost"', 'DESC');
+
     if (query.keyword) {
       listingsQuery
         .addSelect(
           'CASE WHEN uninest_unaccent(listing.title) ILIKE uninest_unaccent(:keyword) THEN 0 ELSE 1 END',
           'keywordRank',
         )
-        .orderBy('"keywordRank"', 'ASC');
+        .addOrderBy('"keywordRank"', 'ASC');
     }
 
     if (query.latitude !== undefined) {
@@ -338,6 +376,7 @@ export class ListingsSearchRepository {
   private toSearchListing(
     listing: Listing,
     row: SearchListingRow,
+    isPremiumOwner: boolean,
   ): SearchListingItemDto {
     const images = [...(listing.images ?? [])].sort(
       (first, second) => first.sortOrder - second.sortOrder,
@@ -373,8 +412,11 @@ export class ListingsSearchRepository {
         longitude: listing.location.coordinates[0],
       },
       distanceMeters,
-      isHighlighted: false,
+      isHighlighted: isPremiumOwner,
       availability: this.getAvailability(listing),
+      averageRating:
+        listing.reviewCount > 0 ? Number(listing.averageRating) : null,
+      reviewCount: listing.reviewCount,
       capacity: listing.maxOccupants,
       description: listing.description ?? undefined,
       status: 'active',

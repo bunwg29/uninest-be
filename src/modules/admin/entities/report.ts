@@ -12,6 +12,7 @@ export enum ReportEntityType {
   FORUM_POST = 'forum_post',
   FORUM_COMMENT = 'forum_comment',
   USER = 'user',
+  REVIEW = 'review',
 }
 
 export enum ReportStatus {

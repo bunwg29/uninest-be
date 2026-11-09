@@ -57,6 +57,12 @@ export class SearchListingItemDto {
   @ApiProperty({ enum: ['available', 'rented', 'paused'] })
   availability!: 'available' | 'rented' | 'paused';
 
+  @ApiPropertyOptional({ nullable: true })
+  averageRating!: number | null;
+
+  @ApiProperty()
+  reviewCount!: number;
+
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;
 }

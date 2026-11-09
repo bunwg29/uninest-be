@@ -28,3 +28,14 @@ export interface ListingReviewedPayload {
   reason?: string;
   auditId: string;
 }
+
+export const LISTING_VIEW_SOURCES = [
+  'search',
+  'home',
+  'map',
+  'favorites',
+  'recommendation',
+  'other',
+] as const;
+
+export type ListingViewSource = (typeof LISTING_VIEW_SOURCES)[number];

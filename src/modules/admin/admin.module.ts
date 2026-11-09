@@ -4,6 +4,7 @@ import { ForumModule } from '@modules/forum/forum.module';
 import { ListingsModule } from '@modules/listings/listings.module';
 import { Listing } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
+import { Review } from '@modules/reviews/entities';
 import { AdminController } from './controllers/admin.controller';
 import { UserReportController } from './controllers/user-report.controller';
 import { AuditLog, Report } from './entities';
@@ -15,7 +16,7 @@ import { AdminUsersService } from './services/admin-users.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AuditLog, Report, Listing, User]),
+    TypeOrmModule.forFeature([AuditLog, Report, Listing, User, Review]),
     ForumModule,
     ListingsModule,
   ],
