@@ -27,13 +27,31 @@ export const AI_EMBEDDING_DEFAULTS = {
   DESCRIPTION_MAX_LENGTH: 1500,
 } as const;
 
-export const AI_PROVIDER_DEFAULTS = {
+export const AI_PROVIDER_DEFAULTS: {
+  readonly BASE_URL: string;
+  readonly CHAT_MODEL: string;
+  readonly EMBEDDING_MODEL: string;
+  readonly REQUEST_TIMEOUT_MS: number;
+  readonly QUERY_EMBEDDING_TIMEOUT_MS: number;
+  readonly EMBEDDING_TIMEOUT_MS: number;
+  readonly TOTAL_BUDGET_MS: number;
+  readonly MAX_RETRIES: number;
+  readonly RETRY_DELAY_MS: number;
+  readonly MIN_ATTEMPT_MS: number;
+  readonly RETRYABLE_STATUSES: readonly number[];
+} = {
   BASE_URL: 'https://api.openai.com/v1',
   CHAT_MODEL: 'gpt-4o-mini',
   EMBEDDING_MODEL: 'text-embedding-3-small',
-  REQUEST_TIMEOUT_MS: 4000,
+  REQUEST_TIMEOUT_MS: 10000,
+  QUERY_EMBEDDING_TIMEOUT_MS: 5000,
   EMBEDDING_TIMEOUT_MS: 15000,
-} as const;
+  TOTAL_BUDGET_MS: 13000,
+  MAX_RETRIES: 1,
+  RETRY_DELAY_MS: 300,
+  MIN_ATTEMPT_MS: 1500,
+  RETRYABLE_STATUSES: [408, 429, 500, 502, 503, 504],
+};
 
 export const AI_ERROR_CODES = {
   SERVICE_UNAVAILABLE: 'AI-503',

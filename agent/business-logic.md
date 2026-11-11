@@ -376,7 +376,9 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Câu hỏi không có tiêu chí và không có từ khoá tìm phòng → trả lời chung (`general`), không gợi ý phòng.
 - Truy xuất: lọc cấu trúc (giá, diện tích, loại phòng, tiện ích bắt buộc đủ, trường liên kết, phường hoặc tỉnh) **AND** sắp xếp theo khoảng cách cosine; tin chưa có embedding xếp sau. Tối đa **5 tin**, chi tiết tin lấy qua `ListingsService.getListingsByIds` nên chỉ có tin `active` thật.
 - Không có kết quả → câu trả lời cố định trung thực + tối đa **2 gợi ý nới tiêu chí** có đếm số phòng thật (nới ngân sách +25%, bỏ tiện ích, mở rộng ra toàn tỉnh, mọi loại phòng, bỏ giới hạn trường, bỏ diện tích).
-- Dịch vụ AI lỗi/hết giờ (`AI_REQUEST_TIMEOUT_MS`, mặc định 4000ms) → HTTP 200 `type: service_error`, `errorCode: AI-503`, vẫn trả `criteriaDisplay` để app điền sẵn bộ lọc tìm kiếm thường; lượt lỗi **không lưu**.
+- Độ bền khi gọi nhà cung cấp AI (UNINEST-23): mỗi câu hỏi có **ngân sách thời gian chung 13 giây** (app timeout 15 giây). Trả lời dùng `AI_REQUEST_TIMEOUT_MS` (mặc định 10000ms, chia đều theo số model còn lại), embedding câu hỏi 5 giây, embedding lô của cron 15 giây. Lỗi tạm thời HTTP 408/429/5xx được **thử lại 1 lần**; timeout hoặc lỗi khác thì chuyển sang model kế tiếp trong `AI_CHAT_FALLBACK_MODELS` (phân tách bằng dấu phẩy). Nhà cung cấp trả 400 vì không hỗ trợ `reasoning_effort` thì gọi lại không kèm tham số đó.
+- Hạ cấp mượt: embedding câu hỏi lỗi → truy xuất theo bộ lọc cấu trúc (không sắp xếp cosine); sinh câu trả lời lỗi nhưng đã có tin → vẫn trả thẻ phòng kèm câu mẫu tiếng Việt (`type: results`).
+- Chỉ khi câu hỏi chung (`general`) mà mọi model đều lỗi/hết giờ → HTTP 200 `type: service_error`, `errorCode: AI-503`, vẫn trả `criteriaDisplay` để app điền sẵn bộ lọc tìm kiếm thường; lượt lỗi **không lưu**.
 - Giới hạn: **30 câu hỏi/giờ/sinh viên** (429 `AI_RATE_LIMITED`), nội dung ≤ 1000 ký tự, ngữ cảnh gửi LLM 6 tin gần nhất, cache embedding câu hỏi trong bộ nhớ (500 mục).
 - Lịch sử lưu ở `ai_conversations` (tiêu chí hiện tại, số tin nhắn, số phòng đã gợi ý, xoá mềm) và `ai_messages`.
 
