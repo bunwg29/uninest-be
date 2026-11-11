@@ -1,12 +1,6 @@
-export const PREMIUM_PLANS = [
-  { code: '1m', name: 'Premium 1 tháng', months: 1, price: 99000 },
-  { code: '3m', name: 'Premium 3 tháng', months: 3, price: 269000 },
-  { code: '6m', name: 'Premium 6 tháng', months: 6, price: 499000 },
-] as const;
+export const PREMIUM_PLAN_CODES = ['1m', '3m', '6m'] as const;
 
-export type PremiumPlanCode = (typeof PREMIUM_PLANS)[number]['code'];
-
-export const PREMIUM_PLAN_CODES = PREMIUM_PLANS.map((plan) => plan.code);
+export type PremiumPlanCode = (typeof PREMIUM_PLAN_CODES)[number];
 
 export const PREMIUM_DEFAULTS = {
   CRON_EXPRESSION: '0 1 * * *',

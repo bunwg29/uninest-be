@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ForumModule } from '@modules/forum/forum.module';
 import { ListingsModule } from '@modules/listings/listings.module';
 import { Listing } from '@modules/listings/entities';
+import { PremiumPlan } from '@modules/premium/entities';
 import { User } from '@modules/users/entities';
 import { Review } from '@modules/reviews/entities';
 import { AdminController } from './controllers/admin.controller';
@@ -11,12 +12,20 @@ import { AuditLog, Report } from './entities';
 import { AdminAuditService } from './services/admin-audit.service';
 import { AdminListingsService } from './services/admin-listings.service';
 import { AdminOverviewService } from './services/admin-overview.service';
+import { AdminPremiumPlansService } from './services/admin-premium-plans.service';
 import { AdminReportsService } from './services/admin-reports.service';
 import { AdminUsersService } from './services/admin-users.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AuditLog, Report, Listing, User, Review]),
+    TypeOrmModule.forFeature([
+      AuditLog,
+      Report,
+      Listing,
+      User,
+      Review,
+      PremiumPlan,
+    ]),
     ForumModule,
     ListingsModule,
   ],
@@ -25,6 +34,7 @@ import { AdminUsersService } from './services/admin-users.service';
     AdminAuditService,
     AdminListingsService,
     AdminOverviewService,
+    AdminPremiumPlansService,
     AdminReportsService,
     AdminUsersService,
   ],
