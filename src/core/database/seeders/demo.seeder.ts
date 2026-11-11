@@ -811,8 +811,8 @@ async function seedChat(
   const messageRepository = dataSource.getRepository(Message);
   const conversation =
     (await conversationRepository.findOneBy({
-      listingId,
       studentId: student.id,
+      landlordId: landlord.id,
     })) ??
     (await conversationRepository.save(
       conversationRepository.create({
@@ -837,6 +837,7 @@ async function seedChat(
         conversationId: conversation.id,
         senderId: entry.fromStudent ? student.id : landlord.id,
         clientMessageId: randomUUID(),
+        listingId: index === 0 ? listingId : null,
         type: MessageType.TEXT,
         content: entry.content,
         imageKeys: [],

@@ -237,13 +237,14 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 
 **API:** `GET /bookings/slots` (công khai), `POST /bookings`, `GET /bookings`, `GET /bookings/:id`, `DELETE /bookings/:id` (sinh viên huỷ), `GET /bookings/landlord`, `PATCH /bookings/:id/confirm|reject`.
 
-### 4.7. FR-CHAT — Chat trực tiếp (Sprint 2 · Đã làm)
+### 4.7. FR-CHAT — Chat trực tiếp (Sprint 2 · Đã làm, Sprint 4 gom hội thoại theo chủ trọ)
 
 **Task:** TSK-S2-07 (gateway + API), TSK-S2-08 (giao diện).
 **Màn hình:** M-01 Danh sách hội thoại, M-02 Rỗng, M-03 Khung chat (ghim tin đăng), M-04 Xem trước ảnh, M-05 Mất mạng/hàng đợi, M-06 Thu hồi.
 
 **Quy tắc bắt buộc**
-- Hội thoại gắn **1 tin đăng + 1 sinh viên** (duy nhất theo cặp). Sinh viên mở từ trang chi tiết. Chủ trọ chỉ mở được với sinh viên **đã đặt lịch xem phòng đó**.
+- Hội thoại là **duy nhất theo cặp (sinh viên, chủ trọ)** (UNINEST-24, thay quy tắc cũ "1 tin đăng + 1 sinh viên"): dù hỏi nhiều phòng hay nhắn riêng từ hồ sơ chủ trọ vẫn chỉ có **một** mục trong danh sách chat. Sinh viên mở từ trang chi tiết (`POST /conversations { listingId }`) hoặc từ hồ sơ chủ trọ (`{ landlordId }`). Chủ trọ chỉ mở được với sinh viên **đã đặt lịch xem một phòng của mình** (`{ listingId, studentId }`).
+- Ngữ cảnh tin đăng: `conversations.listing_id` là tin **gần nhất** được trao đổi (thanh ghim, có thể rỗng nếu tin bị xoá). Gửi tin kèm `listingId` mà khác ngữ cảnh gần nhất thì tin đó có `messages.listing_id` và trả kèm `listing` để hiện **thẻ phòng** trong luồng chat. Migration `ChatByLandlord1700000000022` gộp hội thoại cũ theo cặp, đặt thẻ phòng ở tin đầu tiên của mỗi hội thoại cũ; nếu một bên đã xoá đoạn chat nhưng vẫn còn hội thoại khác với cùng người thì mốc xoá của bên đó bị bỏ khi gộp.
 - Chỉ 2 người tham gia xem được hội thoại.
 - Tin nhắn **không được sửa**. Người gửi chỉ **thu hồi** (ẩn) tin của mình; ảnh trên R2 vẫn giữ.
 - Nội dung ≤ 2000 ký tự, tối đa **10 ảnh/tin** (jpg/png, thư mục `chat/`). Chưa hỗ trợ video trong chat.
@@ -314,9 +315,9 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Admin ẩn được tin `active` → `hidden` kèm lý do (ghi `listing.hide`), hoặc gỡ tin qua xử lý báo cáo. Tin bị **quản trị viên ẩn** được gắn `moderation_hidden_at` + `moderation_reason`: Chủ trọ **không tự hiện lại** được (`PATCH /landlord/listings/:id/visibility` trả 400); Chủ trọ sửa tin → tin về `pending` để duyệt lại; Admin duyệt hoặc `PATCH /admin/listings/:id/restore` (ghi `listing.restore`) mới gỡ cờ. Chủ trọ nhận thông báo khi tin bị ẩn và khi được hiện lại. Tin bị ẩn do **khoá tài khoản** không gắn cờ này.
 - Không duyệt được tin của Chủ trọ đang bị khoá. Duyệt hàng loạt = gọi duyệt từng tin.
 - Danh sách người dùng/báo cáo trả kèm `counts` cho từng tab; nhật ký lọc được theo hành động, người thực hiện, khoảng thời gian, từ khoá.
-- Chưa có dữ liệu thật (tác vụ định kỳ, Premium, IP): web-admin hiển thị dữ liệu mẫu, tích hợp sau. Không còn mục giao dịch vì đã bỏ đặt cọc.
+- Chưa có dữ liệu thật (tác vụ định kỳ, IP): web-admin hiển thị dữ liệu mẫu, tích hợp sau. Không còn mục giao dịch vì đã bỏ đặt cọc. Tab Premium ở màn Duyệt tin lọc tin chờ duyệt của chủ trọ Premium còn hạn (`flag=premium`, `counts.premium`, `owner.isPremium`).
 
-**API:** `GET /admin/overview`, `GET /admin/listings` (lọc `status`, `flag=warning`, `provinceCode`, `sort=newest|oldest`, `keyword`; trả kèm `counts`), `GET /admin/listings/provinces`, `GET /admin/listings/:id`, `PATCH /admin/listings/:id/approve`, `PATCH /admin/listings/:id/reject`, `PATCH /admin/listings/:id/hide`, `PATCH /admin/listings/:id/restore`, `GET /admin/reports`, `GET /admin/reports/:id`, `PATCH /admin/reports/:id/resolve`, `GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/lock`, `PATCH /admin/users/:id/unlock`, `GET /admin/audit-logs`, `POST /users/:id/reports`.
+**API:** `GET /admin/overview`, `GET /admin/listings` (lọc `status`, `flag=warning|premium`, `provinceCode`, `sort=newest|oldest`, `keyword`; trả kèm `counts`), `GET /admin/listings/provinces`, `GET /admin/listings/:id`, `PATCH /admin/listings/:id/approve`, `PATCH /admin/listings/:id/reject`, `PATCH /admin/listings/:id/hide`, `PATCH /admin/listings/:id/restore`, `GET /admin/reports`, `GET /admin/reports/:id`, `PATCH /admin/reports/:id/resolve`, `GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/lock`, `PATCH /admin/users/:id/unlock`, `GET /admin/audit-logs`, `POST /users/:id/reports`.
 
 **API:** `GET /admin/overview`, `GET /admin/listings`, `GET /admin/listings/:id`, `PATCH /admin/listings/:id/approve`, `PATCH /admin/listings/:id/reject`, `GET /admin/reports`, `GET /admin/reports/:id`, `PATCH /admin/reports/:id/resolve`, `GET /admin/users`, `GET /admin/users/:id`, `PATCH /admin/users/:id/lock`, `PATCH /admin/users/:id/unlock`, `GET /admin/audit-logs`, `POST /users/:id/reports`.
 
@@ -376,7 +377,9 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Câu hỏi không có tiêu chí và không có từ khoá tìm phòng → trả lời chung (`general`), không gợi ý phòng.
 - Truy xuất: lọc cấu trúc (giá, diện tích, loại phòng, tiện ích bắt buộc đủ, trường liên kết, phường hoặc tỉnh) **AND** sắp xếp theo khoảng cách cosine; tin chưa có embedding xếp sau. Tối đa **5 tin**, chi tiết tin lấy qua `ListingsService.getListingsByIds` nên chỉ có tin `active` thật.
 - Không có kết quả → câu trả lời cố định trung thực + tối đa **2 gợi ý nới tiêu chí** có đếm số phòng thật (nới ngân sách +25%, bỏ tiện ích, mở rộng ra toàn tỉnh, mọi loại phòng, bỏ giới hạn trường, bỏ diện tích).
-- Dịch vụ AI lỗi/hết giờ (`AI_REQUEST_TIMEOUT_MS`, mặc định 4000ms) → HTTP 200 `type: service_error`, `errorCode: AI-503`, vẫn trả `criteriaDisplay` để app điền sẵn bộ lọc tìm kiếm thường; lượt lỗi **không lưu**.
+- Độ bền khi gọi nhà cung cấp AI (UNINEST-23): mỗi câu hỏi có **ngân sách thời gian chung 13 giây** (app timeout 15 giây). Trả lời dùng `AI_REQUEST_TIMEOUT_MS` (mặc định 10000ms, chia đều theo số model còn lại), embedding câu hỏi 5 giây, embedding lô của cron 15 giây. Lỗi tạm thời HTTP 408/429/5xx được **thử lại 1 lần**; timeout hoặc lỗi khác thì chuyển sang model kế tiếp trong `AI_CHAT_FALLBACK_MODELS` (phân tách bằng dấu phẩy). Nhà cung cấp trả 400 vì không hỗ trợ `reasoning_effort` thì gọi lại không kèm tham số đó.
+- Hạ cấp mượt: embedding câu hỏi lỗi → truy xuất theo bộ lọc cấu trúc (không sắp xếp cosine); sinh câu trả lời lỗi nhưng đã có tin → vẫn trả thẻ phòng kèm câu mẫu tiếng Việt (`type: results`).
+- Chỉ khi câu hỏi chung (`general`) mà mọi model đều lỗi/hết giờ → HTTP 200 `type: service_error`, `errorCode: AI-503`, vẫn trả `criteriaDisplay` để app điền sẵn bộ lọc tìm kiếm thường; lượt lỗi **không lưu**.
 - Giới hạn: **30 câu hỏi/giờ/sinh viên** (429 `AI_RATE_LIMITED`), nội dung ≤ 1000 ký tự, ngữ cảnh gửi LLM 6 tin gần nhất, cache embedding câu hỏi trong bộ nhớ (500 mục).
 - Lịch sử lưu ở `ai_conversations` (tiêu chí hiện tại, số tin nhắn, số phòng đã gợi ý, xoá mềm) và `ai_messages`.
 

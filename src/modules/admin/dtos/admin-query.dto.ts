@@ -20,6 +20,7 @@ export enum AdminSortOrder {
 
 export enum AdminListingFlag {
   WARNING = 'warning',
+  PREMIUM = 'premium',
 }
 
 export enum AdminUserStatus {
@@ -44,7 +45,7 @@ export class AdminListingsQueryDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({
     enum: AdminListingFlag,
-    description: 'Lọc tin có cảnh báo tự động',
+    description: 'Lọc tin có cảnh báo tự động hoặc của chủ trọ Premium',
   })
   @IsOptional()
   @IsEnum(AdminListingFlag, { message: 'Bộ lọc tin đăng không hợp lệ' })

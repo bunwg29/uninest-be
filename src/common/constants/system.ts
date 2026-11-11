@@ -1,5 +1,5 @@
 export const SYSTEM_CONSTANTS = {
-  DEFAULT_PORT: 3000,
+  DEFAULT_PORT: 3001,
   DEFAULT_API_PREFIX: 'api/v1',
   APP_NAME: 'UniNest API',
   APP_DESCRIPTION: 'Cross-platform Student Housing Mobile App API Service',

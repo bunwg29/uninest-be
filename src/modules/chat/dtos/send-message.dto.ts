@@ -19,6 +19,14 @@ export class SendMessageDto {
   clientMessageId!: string;
 
   @ApiPropertyOptional({
+    description:
+      'Tin đăng đang trao đổi. Khi khác ngữ cảnh gần nhất, tin nhắn này kèm thẻ phòng',
+  })
+  @IsOptional()
+  @IsUUID('4', { message: 'Mã tin đăng không hợp lệ' })
+  listingId?: string;
+
+  @ApiPropertyOptional({
     description: 'Nội dung văn bản hoặc chú thích đi kèm ảnh',
     maxLength: CHAT_LIMITS.MAX_CONTENT_LENGTH,
   })

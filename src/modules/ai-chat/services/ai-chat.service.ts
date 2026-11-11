@@ -14,6 +14,7 @@ import { ListingsService } from '@modules/listings/services/listings.service';
 import {
   AI_CHAT_LIMITS,
   AI_ERROR_CODES,
+  AI_PROVIDER_DEFAULTS,
   AiMessageRole,
   AiResponseType,
 } from '../constants';
@@ -109,6 +110,7 @@ export class AiChatService {
     ]);
 
     let turn: ChatTurnResult;
+    const deadline = this.aiProviderService.createDeadline();
 
     try {
       turn = extraction.isRoomQuery
@@ -118,8 +120,9 @@ export class AiChatService {
             criteria,
             criteriaDisplay,
             history,
+            deadline,
           )
-        : await this.answerGeneralQuestion(message, history);
+        : await this.answerGeneralQuestion(message, history, deadline);
     } catch (error: unknown) {
       if (!(error instanceof AiProviderError)) throw error;
 
@@ -246,9 +249,11 @@ export class AiChatService {
     criteria: AiChatCriteria,
     criteriaDisplay: AiCriteriaDisplay,
     history: AiProviderMessage[],
+    deadline: number,
   ): Promise<ChatTurnResult> {
-    const embedding = await this.getQueryEmbedding(
+    const embedding = await this.getQueryEmbeddingOrNull(
       [message, ...criteriaDisplay.labels].join('\n'),
+      deadline,
     );
     const retrieval = await this.aiRetrievalService.findMatches(
       criteria,
@@ -280,24 +285,13 @@ export class AiChatService {
       };
     }
 
-    const answer = await this.aiProviderService.createChatCompletion(
-      [
-        { role: 'system', content: RESULTS_RULES },
-        ...history,
-        {
-          role: 'user',
-          content: [
-            `Tiêu chí đã hiểu: ${criteriaDisplay.labels.join(', ') || 'chưa có'}`,
-            `Số phòng đang hiển thị khớp tiêu chí: ${retrieval.matchedCount}`,
-            'DANH SÁCH PHÒNG:',
-            ...listings.map((listing, index) =>
-              this.describeListing(listing, index),
-            ),
-            `Câu hỏi của sinh viên: ${message}`,
-          ].join('\n'),
-        },
-      ],
-      AI_CHAT_LIMITS.ANSWER_MAX_TOKENS,
+    const answer = await this.generateResultsAnswer(
+      message,
+      criteriaDisplay,
+      history,
+      listings,
+      retrieval.matchedCount,
+      deadline,
     );
 
     return {
@@ -310,9 +304,50 @@ export class AiChatService {
     };
   }
 
+  private async generateResultsAnswer(
+    message: string,
+    criteriaDisplay: AiCriteriaDisplay,
+    history: AiProviderMessage[],
+    listings: Awaited<ReturnType<ListingsService['getListingsByIds']>>,
+    matchedCount: number,
+    deadline: number,
+  ): Promise<string> {
+    try {
+      return await this.aiProviderService.createChatCompletion(
+        [
+          { role: 'system', content: RESULTS_RULES },
+          ...history,
+          {
+            role: 'user',
+            content: [
+              `Tiêu chí đã hiểu: ${criteriaDisplay.labels.join(', ') || 'chưa có'}`,
+              `Số phòng đang hiển thị khớp tiêu chí: ${matchedCount}`,
+              'DANH SÁCH PHÒNG:',
+              ...listings.map((listing, index) =>
+                this.describeListing(listing, index),
+              ),
+              `Câu hỏi của sinh viên: ${message}`,
+            ].join('\n'),
+          },
+        ],
+        AI_CHAT_LIMITS.ANSWER_MAX_TOKENS,
+        { deadline },
+      );
+    } catch (error: unknown) {
+      if (!(error instanceof AiProviderError)) throw error;
+
+      this.logger.warn(
+        `AI answer unavailable, using template answer: ${error.message}`,
+      );
+
+      return `Mình tìm được ${matchedCount} phòng phù hợp với tiêu chí của bạn, đây là ${listings.length} phòng gợi ý đầu tiên. Trợ lý đang bận nên chưa giải thích chi tiết được, bạn xem các thẻ phòng bên dưới nhé.`;
+    }
+  }
+
   private async answerGeneralQuestion(
     message: string,
     history: AiProviderMessage[],
+    deadline: number,
   ): Promise<ChatTurnResult> {
     const answer = await this.aiProviderService.createChatCompletion(
       [
@@ -321,6 +356,7 @@ export class AiChatService {
         { role: 'user', content: message },
       ],
       AI_CHAT_LIMITS.ANSWER_MAX_TOKENS,
+      { deadline },
     );
 
     return {
@@ -440,13 +476,36 @@ export class AiChatService {
       .join(' | ');
   }
 
-  private async getQueryEmbedding(text: string): Promise<number[]> {
+  private async getQueryEmbeddingOrNull(
+    text: string,
+    deadline: number,
+  ): Promise<number[] | null> {
+    try {
+      return await this.getQueryEmbedding(text, deadline);
+    } catch (error: unknown) {
+      if (!(error instanceof AiProviderError)) throw error;
+
+      this.logger.warn(
+        `Query embedding unavailable, searching by filters only: ${error.message}`,
+      );
+
+      return null;
+    }
+  }
+
+  private async getQueryEmbedding(
+    text: string,
+    deadline: number,
+  ): Promise<number[]> {
     const cacheKey = normalizeVietnameseText(text);
     const cached = this.queryEmbeddingCache.get(cacheKey);
 
     if (cached) return cached;
 
-    const [embedding] = await this.aiProviderService.createEmbeddings([text]);
+    const [embedding] = await this.aiProviderService.createEmbeddings([text], {
+      timeoutMs: AI_PROVIDER_DEFAULTS.QUERY_EMBEDDING_TIMEOUT_MS,
+      deadline,
+    });
 
     if (
       this.queryEmbeddingCache.size >= AI_CHAT_LIMITS.QUERY_EMBEDDING_CACHE_SIZE

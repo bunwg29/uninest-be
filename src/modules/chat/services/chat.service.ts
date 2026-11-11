@@ -7,8 +7,10 @@ import {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { R2StorageService } from '@core/storage';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { UserRoleType } from '@common/constants';
 import { Booking } from '@modules/booking/entities';
+import { User } from '@modules/users/entities';
 import { createPaginatedResult } from '@common/dtos';
 import {
   Listing,
@@ -38,7 +40,7 @@ export interface MessageCreatedEvent {
   message: ChatMessageResponseDto;
   participantIds: [string, string];
   recipientId: string;
-  listingId: string;
+  listingId: string | null;
 }
 
 export interface MessageRecalledEvent {
@@ -109,8 +111,10 @@ export class ChatService {
     landlordId: string,
     dto: CreateConversationDto,
   ): Promise<ConversationResponseDto> {
-    if (!dto.studentId) {
-      throw new BadRequestException('Vui lòng chọn sinh viên cần nhắn tin');
+    if (!dto.studentId || !dto.listingId) {
+      throw new BadRequestException(
+        'Vui lòng chọn sinh viên và tin đăng cần nhắn tin',
+      );
     }
 
     const listing = await this.listingRepository.findOne({
@@ -131,82 +135,113 @@ export class ChatService {
       );
     }
 
-    const existing = await this.conversationRepository.findOne({
-      where: { listingId: listing.id, studentId: dto.studentId },
-    });
+    const conversationId = await this.getOrCreateConversationId(
+      dto.studentId,
+      landlordId,
+      listing.id,
+    );
 
-    if (existing) {
-      return this.getConversation(landlordId, existing.id);
-    }
-
-    try {
-      const created = await this.conversationRepository.save(
-        this.conversationRepository.create({
-          listingId: listing.id,
-          studentId: dto.studentId,
-          landlordId,
-        }),
-      );
-
-      return await this.getConversation(landlordId, created.id);
-    } catch (error) {
-      if (this.isUniqueViolation(error)) {
-        const concurrent = await this.conversationRepository.findOneOrFail({
-          where: { listingId: listing.id, studentId: dto.studentId },
-        });
-
-        return this.getConversation(landlordId, concurrent.id);
-      }
-
-      throw error;
-    }
+    return this.getConversation(landlordId, conversationId);
   }
 
   async createOrGetConversation(
     studentId: string,
     dto: CreateConversationDto,
   ): Promise<ConversationResponseDto> {
-    const listing = await this.listingRepository.findOne({
-      where: { id: dto.listingId },
-    });
-
-    if (!listing || listing.status !== ListingStatus.ACTIVE) {
-      throw new NotFoundException(
-        'Tin đăng không tồn tại hoặc đã ngừng hiển thị',
-      );
-    }
-
-    if (listing.ownerId === studentId) {
+    if (!dto.listingId && !dto.landlordId) {
       throw new BadRequestException(
-        'Bạn không thể nhắn tin cho chính tin đăng của mình',
+        'Vui lòng chọn tin đăng hoặc chủ trọ cần nhắn tin',
       );
     }
 
+    let listingId: string | null = null;
+    let landlordId = dto.landlordId ?? null;
+
+    if (dto.listingId) {
+      const listing = await this.listingRepository.findOne({
+        where: { id: dto.listingId },
+      });
+
+      if (!listing || listing.status !== ListingStatus.ACTIVE) {
+        throw new NotFoundException(
+          'Tin đăng không tồn tại hoặc đã ngừng hiển thị',
+        );
+      }
+
+      if (landlordId && landlordId !== listing.ownerId) {
+        throw new BadRequestException('Tin đăng không thuộc chủ trọ này');
+      }
+
+      listingId = listing.id;
+      landlordId = listing.ownerId;
+    } else if (landlordId) {
+      const landlord = await this.conversationRepository.manager
+        .getRepository(User)
+        .findOne({
+          select: { id: true, roleId: true, isActive: true },
+          where: { id: landlordId },
+        });
+
+      if (
+        !landlord ||
+        landlord.roleId !== UserRoleType.LANDLORD ||
+        !landlord.isActive
+      ) {
+        throw new NotFoundException('Không tìm thấy chủ trọ');
+      }
+    }
+
+    if (!landlordId) {
+      throw new BadRequestException('Không xác định được chủ trọ');
+    }
+
+    if (landlordId === studentId) {
+      throw new BadRequestException('Bạn không thể nhắn tin cho chính mình');
+    }
+
+    const conversationId = await this.getOrCreateConversationId(
+      studentId,
+      landlordId,
+      listingId,
+    );
+
+    return this.getConversation(studentId, conversationId);
+  }
+
+  private async getOrCreateConversationId(
+    studentId: string,
+    landlordId: string,
+    listingId: string | null,
+  ): Promise<string> {
     const existing = await this.conversationRepository.findOne({
-      where: { listingId: listing.id, studentId },
+      where: { studentId, landlordId },
     });
 
     if (existing) {
-      return this.getConversation(studentId, existing.id);
+      if (listingId && existing.listingId !== listingId) {
+        await this.conversationRepository.update(existing.id, { listingId });
+      }
+
+      return existing.id;
     }
 
     try {
       const created = await this.conversationRepository.save(
         this.conversationRepository.create({
-          listingId: listing.id,
+          listingId,
           studentId,
-          landlordId: listing.ownerId,
+          landlordId,
         }),
       );
 
-      return await this.getConversation(studentId, created.id);
+      return created.id;
     } catch (error) {
       if (this.isUniqueViolation(error)) {
         const concurrent = await this.conversationRepository.findOneOrFail({
-          where: { listingId: listing.id, studentId },
+          where: { studentId, landlordId },
         });
 
-        return this.getConversation(studentId, concurrent.id);
+        return concurrent.id;
       }
 
       throw error;
@@ -359,7 +394,7 @@ export class ChatService {
     const pageRows = hasMore ? rows.slice(0, query.limit) : rows;
 
     return {
-      items: pageRows.map((message) => this.mapper.toMessage(message)),
+      items: await this.toMessageResponses(pageRows),
       nextCursor: hasMore ? pageRows[pageRows.length - 1].id : null,
       hasMore,
     };
@@ -393,11 +428,18 @@ export class ChatService {
     });
 
     if (duplicate) {
-      return { message: this.mapper.toMessage(duplicate), isDuplicate: true };
+      const [duplicateMessage] = await this.toMessageResponses([duplicate]);
+
+      return { message: duplicateMessage, isDuplicate: true };
     }
 
     await Promise.all(
       imageKeys.map((key) => this.storageService.assertValidImageObject(key)),
+    );
+
+    const contextListingId = await this.resolveContextListing(
+      conversation,
+      dto.listingId,
     );
 
     let saved: Message;
@@ -410,6 +452,7 @@ export class ChatService {
               conversationId,
               senderId: userId,
               clientMessageId: dto.clientMessageId,
+              listingId: contextListingId,
               type: imageKeys.length > 0 ? MessageType.IMAGE : MessageType.TEXT,
               content,
               imageKeys,
@@ -418,6 +461,7 @@ export class ChatService {
 
           await manager.update(Conversation, conversationId, {
             lastMessageAt: created.createdAt,
+            ...(dto.listingId ? { listingId: dto.listingId } : {}),
           });
 
           return created;
@@ -433,22 +477,21 @@ export class ChatService {
           },
         });
 
-        return {
-          message: this.mapper.toMessage(concurrent),
-          isDuplicate: true,
-        };
+        const [concurrentMessage] = await this.toMessageResponses([concurrent]);
+
+        return { message: concurrentMessage, isDuplicate: true };
       }
 
       throw error;
     }
 
-    const message = this.mapper.toMessage(saved);
+    const [message] = await this.toMessageResponses([saved]);
 
     const event: MessageCreatedEvent = {
       message,
       participantIds: this.getParticipantIds(conversation),
       recipientId: this.getCounterpartId(conversation, userId),
-      listingId: conversation.listingId,
+      listingId: dto.listingId ?? conversation.listingId,
     };
 
     this.eventEmitter.emit(CHAT_EVENTS.MESSAGE_CREATED, event);
@@ -520,13 +563,15 @@ export class ChatService {
     }
 
     if (message.recalledAt) {
-      return this.mapper.toMessage(message);
+      const [recalledMessage] = await this.toMessageResponses([message]);
+
+      return recalledMessage;
     }
 
     message.recalledAt = new Date();
 
     const saved = await this.messageRepository.save(message);
-    const response = this.mapper.toMessage(saved);
+    const [response] = await this.toMessageResponses([saved]);
 
     const event: MessageRecalledEvent = {
       message: response,
@@ -563,6 +608,74 @@ export class ChatService {
     return { conversationId };
   }
 
+  private async resolveContextListing(
+    conversation: Conversation,
+    listingId: string | undefined,
+  ): Promise<string | null> {
+    if (!listingId) return null;
+
+    const listing = await this.listingRepository.findOne({
+      select: { id: true, ownerId: true },
+      where: { id: listingId },
+    });
+
+    if (!listing || listing.ownerId !== conversation.landlordId) {
+      throw new BadRequestException('Tin đăng không thuộc chủ trọ này');
+    }
+
+    const latestContext = await this.messageRepository
+      .createQueryBuilder('message')
+      .select('message.listingId', 'listingId')
+      .where('message.conversationId = :conversationId', {
+        conversationId: conversation.id,
+      })
+      .andWhere('message.listingId IS NOT NULL')
+      .orderBy('message.createdAt', 'DESC')
+      .addOrderBy('message.id', 'DESC')
+      .limit(1)
+      .getRawOne<{ listingId: string }>();
+
+    return latestContext?.listingId === listingId ? null : listingId;
+  }
+
+  private async toMessageResponses(
+    messages: Message[],
+  ): Promise<ChatMessageResponseDto[]> {
+    const listingIds = [
+      ...new Set(
+        messages
+          .map((message) => message.listingId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+
+    if (listingIds.length === 0) {
+      return messages.map((message) => this.mapper.toMessage(message));
+    }
+
+    const [listings, coverImages] = await Promise.all([
+      this.listingRepository.find({
+        select: { id: true, title: true, price: true, status: true },
+        where: { id: In(listingIds) },
+        withDeleted: true,
+      }),
+      this.loadCoverImages(listingIds),
+    ]);
+    const summaries = new Map(
+      listings.map((listing) => [
+        listing.id,
+        this.mapper.toListingSummary(listing, coverImages.get(listing.id)),
+      ]),
+    );
+
+    return messages.map((message) =>
+      this.mapper.toMessage(
+        message,
+        message.listingId ? (summaries.get(message.listingId) ?? null) : null,
+      ),
+    );
+  }
+
   private async findParticipantConversation(
     userId: string,
     conversationId: string,
@@ -595,7 +708,7 @@ export class ChatService {
   private createConversationQueryBuilder() {
     return this.conversationRepository
       .createQueryBuilder('conversation')
-      .innerJoin('conversation.listing', 'listing')
+      .leftJoin('conversation.listing', 'listing')
       .innerJoin('conversation.student', 'student')
       .innerJoin('conversation.landlord', 'landlord')
       .addSelect([
@@ -621,7 +734,13 @@ export class ChatService {
     }
 
     const conversationIds = conversations.map(({ id }) => id);
-    const listingIds = [...new Set(conversations.map((c) => c.listingId))];
+    const listingIds = [
+      ...new Set(
+        conversations
+          .map((c) => c.listingId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
 
     const [coverImages, stats] = await Promise.all([
       this.loadCoverImages(listingIds),
@@ -638,10 +757,13 @@ export class ChatService {
 
       return {
         id: conversation.id,
-        listing: this.mapper.toListingSummary(
-          conversation.listing,
-          coverImages.get(conversation.listingId),
-        ),
+        listing:
+          conversation.listing && conversation.listingId
+            ? this.mapper.toListingSummary(
+                conversation.listing,
+                coverImages.get(conversation.listingId),
+              )
+            : null,
         counterpart: this.mapper.toCounterpart(counterpart),
         lastMessage: conversationStats?.lastMessage
           ? this.mapper.toLastMessage(conversationStats.lastMessage)
@@ -656,6 +778,8 @@ export class ChatService {
   private async loadCoverImages(
     listingIds: string[],
   ): Promise<Map<string, ListingImage>> {
+    if (listingIds.length === 0) return new Map();
+
     const images = await this.listingImageRepository
       .createQueryBuilder('image')
       .distinctOn(['image.listingId'])
