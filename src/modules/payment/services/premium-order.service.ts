@@ -13,7 +13,6 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, LessThanOrEqual, Repository } from 'typeorm';
 import {
   PREMIUM_EVENTS,
-  PREMIUM_PLANS,
   PremiumService,
   type PremiumActivatedPayload,
   type PremiumPlanCode,
@@ -48,10 +47,12 @@ export class PremiumOrderService {
       });
     }
 
-    const plan = PREMIUM_PLANS.find((item) => item.code === planCode);
+    const plan = await this.premiumService.findActivePlan(planCode);
 
     if (!plan) {
-      throw new BadRequestException('Gói Premium không hợp lệ');
+      throw new BadRequestException(
+        'Gói Premium không tồn tại hoặc đang tạm ngưng',
+      );
     }
 
     const order = await this.orderRepository.save(

@@ -19,10 +19,12 @@ import {
   AdminReportsQueryDto,
   AdminUsersQueryDto,
   ResolveReportDto,
+  UpdatePremiumPlanDto,
 } from '../dtos';
 import { AdminAuditService } from '../services/admin-audit.service';
 import { AdminListingsService } from '../services/admin-listings.service';
 import { AdminOverviewService } from '../services/admin-overview.service';
+import { AdminPremiumPlansService } from '../services/admin-premium-plans.service';
 import { AdminReportsService } from '../services/admin-reports.service';
 import { AdminUsersService } from '../services/admin-users.service';
 
@@ -38,6 +40,7 @@ export class AdminController {
     private readonly reportsService: AdminReportsService,
     private readonly usersService: AdminUsersService,
     private readonly auditService: AdminAuditService,
+    private readonly premiumPlansService: AdminPremiumPlansService,
   ) {}
 
   @Get('overview')
@@ -164,5 +167,21 @@ export class AdminController {
   @ApiOperation({ summary: 'Tra cứu nhật ký hành động quản trị' })
   getAuditLogs(@Query() query: AdminAuditQueryDto) {
     return this.auditService.list(query);
+  }
+
+  @Get('premium/plans')
+  @ApiOperation({ summary: 'Lấy danh sách gói Premium (cả gói đang tắt)' })
+  getPremiumPlans() {
+    return this.premiumPlansService.list();
+  }
+
+  @Patch('premium/plans/:code')
+  @ApiOperation({ summary: 'Đổi tên, giá hoặc bật/tắt gói Premium' })
+  updatePremiumPlan(
+    @CurrentUser('userId') actorId: string,
+    @Param('code') code: string,
+    @Body() dto: UpdatePremiumPlanDto,
+  ) {
+    return this.premiumPlansService.update(actorId, code, dto);
   }
 }

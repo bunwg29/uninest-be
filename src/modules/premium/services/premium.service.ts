@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { User } from '@modules/users/entities';
-import { PREMIUM_PLANS } from '../constants';
+import { PremiumPlan } from '../entities';
 
 const DAY_MILLISECONDS = 24 * 60 * 60 * 1000;
 
@@ -17,10 +17,27 @@ export class PremiumService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(PremiumPlan)
+    private readonly planRepository: Repository<PremiumPlan>,
   ) {}
 
-  getPlans() {
-    return PREMIUM_PLANS.map((plan) => ({ ...plan, unit: 'VNĐ' }));
+  async getPlans() {
+    const plans = await this.planRepository.find({
+      where: { isActive: true },
+      order: { sortOrder: 'ASC' },
+    });
+
+    return plans.map((plan) => ({
+      code: plan.code,
+      name: plan.name,
+      months: plan.months,
+      price: plan.price,
+      unit: 'VNĐ',
+    }));
+  }
+
+  findActivePlan(code: string): Promise<PremiumPlan | null> {
+    return this.planRepository.findOneBy({ code, isActive: true });
   }
 
   async getStatus(userId: string): Promise<PremiumStatus> {
