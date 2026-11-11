@@ -424,12 +424,13 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 - Hết hạn → tự hạ về miễn phí, gỡ ưu tiên; nhắc gia hạn trước 3 ngày. Cron nội bộ `0 1 * * *` giờ Việt Nam (không Redis), kiểm tra `premium_expires_at`; tìm kiếm cũng tự bỏ ưu tiên ngay khi quá hạn.
 - Thống kê nâng cao (lượt xem theo ngày, nguồn truy cập, tỉ lệ chuyển đổi thành liên hệ) **chỉ hiện với Premium còn hiệu lực** (403 `PREMIUM_REQUIRED` nếu không). Biểu đồ dùng chung thư viện với S-13.
 
-**Gói (đã chốt, cấu hình ở `premium/constants`):** `1m` 99.000đ · `3m` 269.000đ · `6m` 499.000đ.
+**Gói (UNINEST-27, cấu hình ở bảng `premium_plans`, Admin chỉnh trên web):** mã cố định `1m`, `3m`, `6m`; Admin đổi được **tên, giá (1.000 – 100.000.000đ, số nguyên) và bật/tắt**, luôn còn ít nhất 1 gói bật; mỗi lần đổi ghi nhật ký `premium_plan.update`. Giá mặc định khi khởi tạo: `1m` 99.000đ · `3m` 269.000đ · `6m` 499.000đ. Giá mới chỉ áp dụng cho **đơn tạo sau đó**; đơn đang chờ thanh toán giữ giá đã lưu (`premium_orders.amount`). Gói đang tắt không hiện trên app và không tạo được đơn mới.
 
 **Thanh toán (SePay):** tạo đơn → QR chuyển khoản (`qr.sepay.vn`) với nội dung là mã tham chiếu duy nhất `UNINEST` + 8 ký tự; chỉ kích hoạt khi **webhook SePay hợp lệ** (header `Authorization: Apikey <SEPAY_API_KEY>`, so sánh an toàn), số tiền ≥ giá gói, mỗi giao dịch xử lý một lần. Đơn quá 30 phút không thanh toán chuyển `expired` (cron 10 phút). Biến môi trường: `SEPAY_API_KEY`, `SEPAY_BANK_ACCOUNT`, `SEPAY_BANK_CODE`, `SEPAY_ACCOUNT_NAME`. Không lưu thông tin thẻ.
 
 **API**
-- `GET /premium/plans`, `GET /premium/me`, `GET /premium/stats?period=7d|30d|90d` (Landlord).
+- `GET /admin/premium/plans`, `PATCH /admin/premium/plans/:code` `{ name?, price?, isActive? }` (Admin).
+- `GET /premium/plans` (chỉ gói đang bật), `GET /premium/me`, `GET /premium/stats?period=7d|30d|90d` (Landlord).
 - `POST /payment/premium/orders` `{ planCode }` → `{ id, amount, referenceCode, qrUrl, bankAccount, bankCode, accountName, status, expiresAt }`; `GET /payment/premium/orders/:id` để theo dõi `pending|paid|expired`.
 - `POST /payment/sepay/webhook` (public, xác thực bằng API key).
 - `PATCH /listings/:id/view` nhận `{ source }` ∈ `search|home|map|favorites|recommendation|other` để thống kê nguồn truy cập.
