@@ -16,6 +16,7 @@ import { University } from '@modules/universities/entities';
 import { User } from '@modules/users/entities';
 import { DEMO_ASSETS } from './demo-assets';
 import { seedModeration } from './demo-moderation.seeder';
+import { seedReviews } from './demo-reviews.seeder';
 
 export const DEMO_PASSWORD = 'UniNest@123';
 
@@ -909,4 +910,11 @@ export async function seedDemo(
   );
 
   await seedModeration(dataSource, users);
+
+  const reviewCount = await seedReviews(
+    dataSource,
+    STUDENTS.map((student) => requireUser(users, student.phone)),
+  );
+
+  console.log(`[Demo] ${reviewCount} new reviews`);
 }
