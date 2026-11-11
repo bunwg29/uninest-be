@@ -8,6 +8,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Listing } from '@modules/listings/entities';
 import { User } from '@modules/users/entities';
 import { Conversation } from './conversation';
 import { MessageType } from './message-type';
@@ -19,6 +20,9 @@ import { MessageType } from './message-type';
   { unique: true },
 )
 @Index('idx_messages_conversation_created', ['conversationId', 'createdAt'])
+@Index('idx_messages_listing', ['listingId'], {
+  where: 'listing_id IS NOT NULL',
+})
 @Index('idx_messages_unread', ['conversationId'], {
   where: 'read_at IS NULL AND recalled_at IS NULL AND deleted_at IS NULL',
 })
@@ -34,6 +38,9 @@ export class Message {
 
   @Column({ type: 'uuid', name: 'client_message_id' })
   clientMessageId!: string;
+
+  @Column({ type: 'uuid', name: 'listing_id', nullable: true })
+  listingId!: string | null;
 
   @Column({ type: 'enum', enum: MessageType, default: MessageType.TEXT })
   type!: MessageType;
@@ -65,4 +72,8 @@ export class Message {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'sender_id' })
   sender!: User;
+
+  @ManyToOne(() => Listing, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'listing_id' })
+  listing!: Listing | null;
 }

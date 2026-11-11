@@ -29,7 +29,7 @@ import { LISTING_EVENTS, type ListingViewSource } from '../constants';
 import { UserRoleType } from '@common/constants';
 import { escapeLikePattern } from '@common/utils';
 import { R2StorageService } from '@core/storage';
-import { Conversation } from '@modules/chat/entities';
+import { Conversation, Message } from '@modules/chat/entities';
 import { Province, Ward } from '@modules/locations/entities';
 import { User } from '@modules/users/entities';
 import { Report, ReportEntityType } from '@modules/admin/entities';
@@ -283,7 +283,13 @@ export class ListingsService {
 
     const [saveCount, contactCount, bookingCount] = await Promise.all([
       this.favoriteRepository.countBy({ listingId: id }),
-      this.dataSource.getRepository(Conversation).countBy({ listingId: id }),
+      this.dataSource
+        .getRepository(Message)
+        .createQueryBuilder('message')
+        .select('COUNT(DISTINCT message.conversationId)', 'total')
+        .where('message.listingId = :id', { id })
+        .getRawOne<{ total: string }>()
+        .then((row) => Number(row?.total ?? 0)),
       this.dataSource.getRepository(Booking).countBy({ listingId: id }),
     ]);
 
@@ -1123,8 +1129,12 @@ export class ListingsService {
         .getRepository(Booking)
         .exists({ where: { listingId, userId } }),
       this.dataSource
-        .getRepository(Conversation)
-        .exists({ where: { listingId, studentId: userId } }),
+        .getRepository(Message)
+        .createQueryBuilder('message')
+        .innerJoin('message.conversation', 'conversation')
+        .where('message.listingId = :listingId', { listingId })
+        .andWhere('conversation.studentId = :userId', { userId })
+        .getExists(),
     ]);
 
     return hasBooking || hasConversation;
@@ -1262,12 +1272,12 @@ export class ListingsService {
         .groupBy('favorite.listingId')
         .getRawMany<{ listingId: string; total: string }>(),
       this.dataSource
-        .getRepository(Conversation)
-        .createQueryBuilder('conversation')
-        .select('conversation.listingId', 'listingId')
-        .addSelect('COUNT(*)', 'total')
-        .where('conversation.listingId IN (:...listingIds)', { listingIds })
-        .groupBy('conversation.listingId')
+        .getRepository(Message)
+        .createQueryBuilder('message')
+        .select('message.listingId', 'listingId')
+        .addSelect('COUNT(DISTINCT message.conversationId)', 'total')
+        .where('message.listingId IN (:...listingIds)', { listingIds })
+        .groupBy('message.listingId')
         .getRawMany<{ listingId: string; total: string }>(),
       this.dataSource
         .getRepository(Booking)

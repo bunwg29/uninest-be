@@ -19,7 +19,10 @@ export class ChatMapperService {
     private readonly presenceService: ChatPresenceService,
   ) {}
 
-  toMessage(message: Message): ChatMessageResponseDto {
+  toMessage(
+    message: Message,
+    listing: ChatListingSummaryDto | null = null,
+  ): ChatMessageResponseDto {
     const isRecalled = message.recalledAt !== null;
 
     return {
@@ -35,6 +38,7 @@ export class ChatMapperService {
       isRecalled,
       readAt: message.readAt,
       createdAt: message.createdAt,
+      listing,
     };
   }
 

@@ -15,7 +15,7 @@ import { Listing } from '@modules/listings/entities';
 import { Message } from './message';
 
 @Entity('conversations')
-@Index('uq_conversations_listing_student', ['listingId', 'studentId'], {
+@Index('uq_conversations_student_landlord', ['studentId', 'landlordId'], {
   unique: true,
   where: 'deleted_at IS NULL',
 })
@@ -23,8 +23,8 @@ export class Conversation {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'uuid', name: 'listing_id' })
-  listingId!: string;
+  @Column({ type: 'uuid', name: 'listing_id', nullable: true })
+  listingId!: string | null;
 
   @Index('idx_conversations_student_id')
   @Column({ type: 'uuid', name: 'student_id' })
@@ -52,9 +52,9 @@ export class Conversation {
   @DeleteDateColumn({ type: 'timestamptz', name: 'deleted_at' })
   deletedAt!: Date | null;
 
-  @ManyToOne(() => Listing, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Listing, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'listing_id' })
-  listing!: Listing;
+  listing!: Listing | null;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'student_id' })
