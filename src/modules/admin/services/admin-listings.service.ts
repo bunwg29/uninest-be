@@ -66,6 +66,10 @@ export class AdminListingsService {
       this.whereWarning(builder);
     }
 
+    if (query.flag === AdminListingFlag.PREMIUM) {
+      this.wherePremium(builder);
+    }
+
     if (query.provinceCode) {
       builder.andWhere('listing.provinceCode = :provinceCode', {
         provinceCode: query.provinceCode,
@@ -116,6 +120,10 @@ export class AdminListingsService {
           fullName: listing.owner.fullName,
           isVerified: listing.owner.isVerified,
           landlordVerifiedAt: listing.owner.landlordVerifiedAt,
+          isPremium:
+            listing.owner.isPremium &&
+            listing.owner.premiumExpiresAt !== null &&
+            listing.owner.premiumExpiresAt > new Date(),
         },
         coverUrl: cover ? this.storageService.getPublicUrl(cover.url) : null,
         moderationHidden: listing.moderationHiddenAt !== null,
@@ -394,7 +402,7 @@ export class AdminListingsService {
         .createQueryBuilder('listing')
         .leftJoin('listing.owner', 'owner')
         .where('listing.status = :pending', { pending: ListingStatus.PENDING });
-    const [rows, warning] = await Promise.all([
+    const [rows, warning, premium] = await Promise.all([
       this.repository
         .createQueryBuilder('listing')
         .select('listing.status', 'status')
@@ -402,6 +410,7 @@ export class AdminListingsService {
         .groupBy('listing.status')
         .getRawMany<{ status: ListingStatus; count: string }>(),
       this.whereWarning(pending()).getCount(),
+      this.wherePremium(pending()).getCount(),
     ]);
     const byStatus = Object.fromEntries(
       Object.values(ListingStatus).map((status) => [status, 0]),
@@ -411,7 +420,13 @@ export class AdminListingsService {
       byStatus[row.status] = Number(row.count);
     });
 
-    return { ...byStatus, warning };
+    return { ...byStatus, warning, premium };
+  }
+
+  private wherePremium(builder: SelectQueryBuilder<Listing>) {
+    return builder
+      .andWhere('owner.isPremium = true')
+      .andWhere('owner.premiumExpiresAt > NOW()');
   }
 
   private whereWarning(builder: SelectQueryBuilder<Listing>) {
