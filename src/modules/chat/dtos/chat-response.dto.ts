@@ -22,6 +22,14 @@ export class ChatMessageResponseDto {
   @ApiProperty({ nullable: true, type: Date }) readAt!: Date | null;
 
   @ApiProperty() createdAt!: Date;
+
+  @ApiProperty({
+    nullable: true,
+    type: () => ChatListingSummaryDto,
+    description:
+      'Tin đăng được nêu làm ngữ cảnh từ tin nhắn này (hiện thẻ phòng)',
+  })
+  listing!: ChatListingSummaryDto | null;
 }
 
 export class ChatCounterpartDto {
@@ -67,8 +75,12 @@ export class ChatLastMessageDto {
 export class ConversationResponseDto {
   @ApiProperty() id!: string;
 
-  @ApiProperty({ type: ChatListingSummaryDto })
-  listing!: ChatListingSummaryDto;
+  @ApiProperty({
+    type: ChatListingSummaryDto,
+    nullable: true,
+    description: 'Tin đăng gần nhất được trao đổi trong hội thoại',
+  })
+  listing!: ChatListingSummaryDto | null;
 
   @ApiProperty({ type: ChatCounterpartDto })
   counterpart!: ChatCounterpartDto;
