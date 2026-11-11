@@ -144,11 +144,15 @@ export class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  AI_CHAT_FALLBACK_MODELS?: string;
+
+  @IsString()
+  @IsOptional()
   AI_EMBEDDING_MODEL: string = 'text-embedding-3-small';
 
   @IsNumber()
   @IsOptional()
-  AI_REQUEST_TIMEOUT_MS: number = 4000;
+  AI_REQUEST_TIMEOUT_MS: number = 10000;
 
   @IsString()
   @IsOptional()
