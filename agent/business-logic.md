@@ -237,13 +237,14 @@ confirmed, expired, cancelled, rejected → (kết thúc khi đã qua giờ xem)
 
 **API:** `GET /bookings/slots` (công khai), `POST /bookings`, `GET /bookings`, `GET /bookings/:id`, `DELETE /bookings/:id` (sinh viên huỷ), `GET /bookings/landlord`, `PATCH /bookings/:id/confirm|reject`.
 
-### 4.7. FR-CHAT — Chat trực tiếp (Sprint 2 · Đã làm)
+### 4.7. FR-CHAT — Chat trực tiếp (Sprint 2 · Đã làm, Sprint 4 gom hội thoại theo chủ trọ)
 
 **Task:** TSK-S2-07 (gateway + API), TSK-S2-08 (giao diện).
 **Màn hình:** M-01 Danh sách hội thoại, M-02 Rỗng, M-03 Khung chat (ghim tin đăng), M-04 Xem trước ảnh, M-05 Mất mạng/hàng đợi, M-06 Thu hồi.
 
 **Quy tắc bắt buộc**
-- Hội thoại gắn **1 tin đăng + 1 sinh viên** (duy nhất theo cặp). Sinh viên mở từ trang chi tiết. Chủ trọ chỉ mở được với sinh viên **đã đặt lịch xem phòng đó**.
+- Hội thoại là **duy nhất theo cặp (sinh viên, chủ trọ)** (UNINEST-24, thay quy tắc cũ "1 tin đăng + 1 sinh viên"): dù hỏi nhiều phòng hay nhắn riêng từ hồ sơ chủ trọ vẫn chỉ có **một** mục trong danh sách chat. Sinh viên mở từ trang chi tiết (`POST /conversations { listingId }`) hoặc từ hồ sơ chủ trọ (`{ landlordId }`). Chủ trọ chỉ mở được với sinh viên **đã đặt lịch xem một phòng của mình** (`{ listingId, studentId }`).
+- Ngữ cảnh tin đăng: `conversations.listing_id` là tin **gần nhất** được trao đổi (thanh ghim, có thể rỗng nếu tin bị xoá). Gửi tin kèm `listingId` mà khác ngữ cảnh gần nhất thì tin đó có `messages.listing_id` và trả kèm `listing` để hiện **thẻ phòng** trong luồng chat. Migration `ChatByLandlord1700000000022` gộp hội thoại cũ theo cặp, đặt thẻ phòng ở tin đầu tiên của mỗi hội thoại cũ; nếu một bên đã xoá đoạn chat nhưng vẫn còn hội thoại khác với cùng người thì mốc xoá của bên đó bị bỏ khi gộp.
 - Chỉ 2 người tham gia xem được hội thoại.
 - Tin nhắn **không được sửa**. Người gửi chỉ **thu hồi** (ẩn) tin của mình; ảnh trên R2 vẫn giữ.
 - Nội dung ≤ 2000 ký tự, tối đa **10 ảnh/tin** (jpg/png, thư mục `chat/`). Chưa hỗ trợ video trong chat.
