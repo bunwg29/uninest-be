@@ -1,0 +1,54 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: .
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      API_PREFIX: api/v1
+      DB_HOST: host.docker.internal
+      DB_SYNCHRONIZE: "false"
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "${API_BIND_ADDRESS:-0.0.0.0}:3001:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/api/v1/health').then(async response => { const body = await response.json(); if (!response.ok || body.data?.status !== 'ok') process.exit(1) }).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 6
+
+  web:
+    build: ../uninest-web
+    environment:
+      BACKEND_API_URL: http://backend:3001/api/v1
+      ADMIN_COOKIE_SECURE: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis_data:
